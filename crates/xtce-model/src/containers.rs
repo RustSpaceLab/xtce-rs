@@ -158,6 +158,40 @@ pub enum MatchCriteria {
     },
 }
 
+/// A comparison literal, pre-coerced at load time.
+///
+/// XTCE does not type the `value` attribute of a `<Comparison>`, and the reference
+/// implementation resolves that by coercing the literal to `type(parsed_value)` on every
+/// evaluation — so an enumerated parameter compares as text and an integer one as a number.
+/// Which of those applies cannot be known from the schema alone, because a calibrator turns
+/// an integer-encoded parameter into a float.
+///
+/// Rather than predict it, every reading that could apply is computed once here, at load
+/// time. Evaluation then picks the one matching the value it actually got, and never parses
+/// inside the packet loop.
+#[derive(Clone, Copy, Debug)]
+pub struct ComparisonValue {
+    /// The literal exactly as written, for error messages and text comparisons.
+    pub text: NameId,
+    /// The literal read as an integer, if it is one.
+    pub as_int: Option<i128>,
+    /// The literal read as a float, if it is one.
+    pub as_float: Option<f64>,
+}
+
+impl ComparisonValue {
+    /// Pre-coerces a literal.
+    #[must_use]
+    pub fn new(text: NameId, literal: &str) -> Self {
+        let literal = literal.trim();
+        Self {
+            text,
+            as_int: literal.parse::<i128>().ok(),
+            as_float: literal.parse::<f64>().ok(),
+        }
+    }
+}
+
 /// `<xtce:Comparison>`.
 #[derive(Clone, Copy, Debug)]
 pub struct Comparison {
@@ -165,12 +199,8 @@ pub struct Comparison {
     pub parameter: ParamId,
     /// Operator.
     pub operator: CompareOp,
-    /// Required value, kept as written.
-    ///
-    /// XTCE does not type this attribute; it is coerced to the runtime type of the
-    /// parameter's value at evaluation time, so an enumerated parameter compares as text
-    /// and an integer parameter as a number.
-    pub value: NameId,
+    /// Required value, pre-coerced to every reading that could apply.
+    pub value: ComparisonValue,
     /// Whether to test the calibrated or the raw value.
     pub use_calibrated: bool,
 }
@@ -207,8 +237,8 @@ pub enum Operand {
         /// Whether to read its calibrated or raw value.
         use_calibrated: bool,
     },
-    /// `<Value>`, kept as written and coerced against the other operand.
-    Literal(NameId),
+    /// `<Value>`, pre-coerced against whatever the other operand turns out to be.
+    Literal(ComparisonValue),
 }
 
 /// A `<xtce:SpaceSystem>` node.

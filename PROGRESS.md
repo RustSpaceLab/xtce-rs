@@ -44,17 +44,51 @@ chunk-size test now covers it.
 **Deliberate divergences from the reference** are listed at the bottom of `SUPPORTED.md`.
 None is exercised by the bundled test data, so the differential result is unaffected by them.
 
-### Numbers (release, M1 Mac)
+### Numbers (release, criterion, M1 Mac)
 
-| Case | Load | Reference load | Decode | Reference decode |
-|---|---|---|---|---|
-| ctim (1.6 MB, 1499 packets) | 23 ms | 120 ms | 1087 ms | 5109 ms |
-| jpss (7200 packets) | 0.2 ms | 10 ms | 112 ms | 954 ms |
+Load, and decode of the whole stream:
 
-Decode timings include the harness's own per-packet work (name lookup, `BTreeMap`, SHA-256),
-so they understate the decoder. M6 will measure it properly with criterion.
+| Case | Load | Reference | Speed-up | Decode | Reference | Speed-up |
+|---|---|---|---|---|---|---|
+| ctim — 1.6 MB definition, 1499 packets | 23.2 ms | 120 ms | 5.2x | 77.1 ms | 5109 ms | 66x |
+| jpss — 7200 packets | 0.17 ms | 10 ms | 59x | 15.8 ms | 954 ms | 61x |
+| idex — 78 packets | 1.25 ms | 21 ms | 17x | 0.21 ms | 19.5 ms | 94x |
+
+**Correction.** The decode figures first recorded here came from `xtask diff`, which times
+its own per-packet bookkeeping — name lookup, `BTreeMap`, SHA-256 — alongside the decoder.
+For ctim that inflated decode from 77 ms to 1087 ms, a factor of fourteen. The table above is
+`Decoder::decode` and nothing else, measured by criterion. The project's claim is a measured
+advantage, so measuring the wrong thing is not a small error.
+
+Load is the weak half: 68 MiB/s on ctim, of which the XML reader is 10.7 ms and lowering the
+other 12.5 ms. That is the number the whole thesis rests on — the reference's issue #112 is
+about *load* time — so it is where the optimisation work goes next.
+
+### Two bugs the differential tests could not have caught
+
+Both live in code paths no bundled test file reaches, which is exactly why they needed unit
+tests rather than more golden cases.
+
+**`half_to_f32` mis-scaled every subnormal by a factor of two.** The renormalisation shift
+was off by one bit. No test file declares a 16-bit `FloatDataEncoding`, so no golden case
+would ever have executed it. Now checked exhaustively against all 65 536 encodings, compared
+against the IEEE-754 definition written out independently.
+
+**Float comparisons used `total_cmp`.** That makes NaN compare equal to NaN and `-0.0` less
+than `0.0`, where IEEE-754 and Python say the opposite. A NaN comparing equal to everything
+would silently select the wrong container — precisely the failure `SUPPORTED.md` promises
+cannot happen. Comparisons now return a three-valued result, and *unordered* means no
+operator holds. No bundled file has a restriction criterion on a float parameter, so the
+goldens were blind to it.
+
+### Note on milestone order
+
+`CONTRIBUTING.md` rule 2 says work strictly in order. M4's content — calibrators, String, Binary and
+AbsoluteTime types — landed inside M2 rather than after it, because the IDEX and SUDA test
+files need dynamically sized binary fields and CTIM needs strings, so M3 could not have gone
+green without them. Nothing was skipped; the boundary moved.
 
 ### Next
 
-M6 benchmarks before M4/M5, so that "make it faster" has numbers behind it rather than
-guesses.
+Optimise loading, with the benchmarks above as the baseline. Then M5 (codegen) and M7
+(PyO3 bindings).

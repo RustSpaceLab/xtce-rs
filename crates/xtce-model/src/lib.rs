@@ -50,8 +50,8 @@ pub mod types;
 pub mod xml;
 
 pub use containers::{
-    BooleanExpr, CompareOp, Comparison, Condition, Container, Entry, EntryKind, Location,
-    LocationReference, MatchCriteria, Operand, SpaceSystem,
+    BooleanExpr, CompareOp, Comparison, ComparisonValue, Condition, Container, Entry, EntryKind,
+    Location, LocationReference, MatchCriteria, Operand, SpaceSystem,
 };
 pub use db::{Stats, Unsupported, XtceDb};
 pub use error::{RefKind, XtceError};

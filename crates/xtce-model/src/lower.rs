@@ -14,8 +14,8 @@
 //! the first packet.
 
 use crate::containers::{
-    BooleanExpr, CompareOp, Comparison, Condition, Container, Entry, EntryKind, Location,
-    LocationReference, MatchCriteria, Operand, SpaceSystem,
+    BooleanExpr, CompareOp, Comparison, ComparisonValue, Condition, Container, Entry, EntryKind,
+    Location, LocationReference, MatchCriteria, Operand, SpaceSystem,
 };
 use crate::db::{Unsupported, XtceDb};
 use crate::error::{RefKind, XtceError};
@@ -880,9 +880,8 @@ impl<'d> Lowering<'d> {
             .attr(AttrKey::ComparisonOperator)
             .and_then(CompareOp::parse)
             .unwrap_or(CompareOp::Equal);
-        let value = self
-            .interner
-            .intern(element.attr(AttrKey::Value).unwrap_or_default());
+        let literal = element.attr(AttrKey::Value).unwrap_or_default();
+        let value = ComparisonValue::new(self.interner.intern(literal), literal);
         MatchCriteria::Comparison(Comparison {
             parameter,
             operator,
@@ -960,7 +959,10 @@ impl<'d> Lowering<'d> {
                 }
                 Tag::Value => {
                     let text = child.text().unwrap_or_default();
-                    operands.push(Operand::Literal(self.interner.intern(text)));
+                    operands.push(Operand::Literal(ComparisonValue::new(
+                        self.interner.intern(text),
+                        text,
+                    )));
                 }
                 Tag::ComparisonOperator => {
                     operator = child.text().and_then(CompareOp::parse);

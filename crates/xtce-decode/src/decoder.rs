@@ -3,9 +3,9 @@
 use std::borrow::Cow;
 
 use xtce_model::{
-    BooleanExpr, Calibrator, Comparison, Condition, ContainerId, DataEncoding, DiscreteLookup,
-    EntryKind, FloatCoding, IntegerCoding, LocationReference, MatchCriteria, Operand, ParamId,
-    ParameterType, SizeSpec, StringDelimiter, TypeKind, XtceDb,
+    BooleanExpr, Calibrator, Comparison, ComparisonValue, Condition, ContainerId, DataEncoding,
+    DiscreteLookup, EntryKind, FloatCoding, IntegerCoding, LocationReference, MatchCriteria,
+    NameId, Operand, ParamId, ParameterType, SizeSpec, StringDelimiter, TypeKind, XtceDb,
 };
 
 use crate::bits::{BitCursor, ones_complement, sign_magnitude, swap_byte_order, twos_complement};
@@ -666,30 +666,43 @@ impl<'db> Decoder<'db> {
         packet: &DecodedPacket<'db, '_>,
         current: Option<&RawValue<'_>>,
     ) -> Result<bool, DecodeError> {
-        let literal = self.db.name(comparison.value);
-        let name = self.parameter_name(comparison.parameter);
+        let literal_text = self.db.name(comparison.value.text);
 
-        let ordering = match packet.get(comparison.parameter) {
+        let outcome = match packet.get(comparison.parameter) {
             Some(value) => {
-                if comparison.use_calibrated {
-                    compare_eng(&value.eng, literal, &name)?
+                let scalar = if comparison.use_calibrated {
+                    Scalar::from_eng(&value.eng)
                 } else {
-                    compare_raw(&value.raw, literal, &name)?
-                }
+                    Scalar::from_raw(&value.raw)
+                };
+                compare_with_literal(scalar, &comparison.value, literal_text)
             }
             // The referenced parameter is not in the packet, so this must be a comparison
-            // against the value currently being decoded.
+            // against the value currently being decoded — how a context calibrator refers to
+            // its own uncalibrated value.
             None => match current {
-                Some(raw) => compare_raw(raw, literal, &name)?,
+                Some(raw) => {
+                    compare_with_literal(Scalar::from_raw(raw), &comparison.value, literal_text)
+                }
                 None => {
                     return Err(DecodeError::ParameterNotYetDecoded {
                         context: "comparison",
-                        parameter: name,
+                        parameter: self.parameter_name(comparison.parameter),
                     });
                 }
             },
         };
-        Ok(comparison.operator.matches(ordering))
+
+        match outcome {
+            // Unordered: a NaN was involved, and no operator holds over a NaN.
+            Ok(None) => Ok(false),
+            Ok(Some(ordering)) => Ok(comparison.operator.matches(ordering)),
+            Err(failure) => Err(DecodeError::IncomparableValue {
+                parameter: self.parameter_name(comparison.parameter),
+                value_kind: failure.value_kind,
+                literal: literal_text.to_owned(),
+            }),
+        }
     }
 
     fn evaluate_boolean(
@@ -723,50 +736,64 @@ impl<'db> Decoder<'db> {
         condition: &Condition,
         packet: &DecodedPacket<'db, '_>,
     ) -> Result<bool, DecodeError> {
-        let (left_value, left_name) = self.operand_value(condition.left, packet)?;
+        let left = self.operand_value(condition.left, packet)?;
 
-        let ordering = match &condition.right {
+        let outcome = match condition.right {
             Operand::Literal(literal) => {
-                compare_operand_literal(&left_value, self.db.name(*literal), &left_name)?
+                compare_with_literal(left, &literal, self.db.name(literal.text))
             }
             Operand::Parameter { .. } => {
-                let (right_value, right_name) = self.operand_value(condition.right, packet)?;
-                compare_operands(&left_value, &right_value, &left_name, &right_name)?
+                compare_scalars(left, self.operand_value(condition.right, packet)?)
             }
         };
-        Ok(condition.operator.matches(ordering))
+
+        match outcome {
+            Ok(None) => Ok(false),
+            Ok(Some(ordering)) => Ok(condition.operator.matches(ordering)),
+            Err(failure) => Err(DecodeError::IncomparableValue {
+                parameter: self.operand_name(condition.left),
+                value_kind: failure.value_kind,
+                literal: self.operand_name(condition.right),
+            }),
+        }
     }
 
     /// Resolves one side of a condition to a comparable scalar.
-    fn operand_value(
+    fn operand_value<'v>(
         &self,
         operand: Operand,
-        packet: &DecodedPacket<'db, '_>,
-    ) -> Result<(Scalar, String), DecodeError> {
+        packet: &'v DecodedPacket<'db, '_>,
+    ) -> Result<Scalar<'v>, DecodeError>
+    where
+        'db: 'v,
+    {
         match operand {
             Operand::Parameter {
                 parameter,
                 use_calibrated,
             } => {
-                let name = self.parameter_name(parameter);
                 let value =
                     packet
                         .get(parameter)
                         .ok_or_else(|| DecodeError::ParameterNotYetDecoded {
                             context: "condition",
-                            parameter: name.clone(),
+                            parameter: self.parameter_name(parameter),
                         })?;
-                let scalar = if use_calibrated {
+                Ok(if use_calibrated {
                     Scalar::from_eng(&value.eng)
                 } else {
                     Scalar::from_raw(&value.raw)
-                };
-                Ok((scalar, name))
+                })
             }
-            Operand::Literal(literal) => Ok((
-                Scalar::Text(self.db.name(literal).to_owned()),
-                "<literal>".to_owned(),
-            )),
+            Operand::Literal(literal) => Ok(Scalar::Text(self.db.name(literal.text))),
+        }
+    }
+
+    /// A human-readable name for an operand, built only when reporting a failure.
+    fn operand_name(&self, operand: Operand) -> String {
+        match operand {
+            Operand::Parameter { parameter, .. } => self.parameter_name(parameter),
+            Operand::Literal(literal) => format!("{:?}", self.db.name(literal.text)),
         }
     }
 
@@ -783,17 +810,22 @@ impl<'db> Decoder<'db> {
     }
 }
 
-/// A comparable view of a value, after the type-directed coercion XTCE comparisons imply.
-#[derive(Clone, Debug)]
-enum Scalar {
+/// A comparable view of a value.
+///
+/// Borrows its text rather than owning it: this is built and thrown away for every criterion
+/// of every candidate container of every packet, and a database whose root has dozens of
+/// inheritors would otherwise allocate dozens of strings before reading a single field.
+#[derive(Clone, Copy, Debug)]
+enum Scalar<'a> {
     Integer(i128),
     Float(f64),
-    Text(String),
+    Text(&'a str),
+    /// A value no XTCE comparison is defined over, carrying its kind for the error.
     Opaque(&'static str),
 }
 
-impl Scalar {
-    fn from_raw(raw: &RawValue<'_>) -> Self {
+impl<'a> Scalar<'a> {
+    fn from_raw(raw: &'a RawValue<'_>) -> Self {
         match raw {
             RawValue::Unsigned(value) => Self::Integer(i128::from(*value)),
             RawValue::Signed(value) => Self::Integer(i128::from(*value)),
@@ -802,19 +834,19 @@ impl Scalar {
         }
     }
 
-    fn from_eng(eng: &EngValue<'_, '_>) -> Self {
+    fn from_eng(eng: &'a EngValue<'_, '_>) -> Self {
         match eng {
             EngValue::Unsigned(value) => Self::Integer(i128::from(*value)),
             EngValue::Signed(value) => Self::Integer(i128::from(*value)),
             EngValue::Bool(value) => Self::Integer(i128::from(*value)),
             EngValue::Float(value) => Self::Float(*value),
-            EngValue::Label(text) => Self::Text((*text).to_owned()),
-            EngValue::Text(text) => Self::Text(text.as_ref().to_owned()),
+            EngValue::Label(text) => Self::Text(text),
+            EngValue::Text(text) => Self::Text(text.as_ref()),
             EngValue::Bytes(_) => Self::Opaque("binary"),
         }
     }
 
-    const fn kind(&self) -> &'static str {
+    const fn kind(self) -> &'static str {
         match self {
             Self::Integer(_) => "integer",
             Self::Float(_) => "float",
@@ -824,76 +856,66 @@ impl Scalar {
     }
 }
 
-/// Compares a raw value against a literal from the definition.
+/// The literal could not be read as the kind of value it was compared against.
 ///
-/// XTCE does not type comparison literals, so the literal is coerced to whatever the value
-/// turned out to be — an integer parameter compares numerically, an enumerated one compares
-/// as text. This mirrors the reference implementation, where the coercion is literally
-/// `type(parsed_value)(required_value)`.
-fn compare_raw(
-    raw: &RawValue<'_>,
-    literal: &str,
-    name: &str,
-) -> Result<std::cmp::Ordering, DecodeError> {
-    compare_operand_literal(&Scalar::from_raw(raw), literal, name)
+/// Deliberately carries no owned data: it is turned into a [`DecodeError`] with names and
+/// text attached only at the call site, and only when a comparison actually fails.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct Incomparable {
+    value_kind: &'static str,
 }
 
-fn compare_eng(
-    eng: &EngValue<'_, '_>,
-    literal: &str,
-    name: &str,
-) -> Result<std::cmp::Ordering, DecodeError> {
-    compare_operand_literal(&Scalar::from_eng(eng), literal, name)
-}
+/// The outcome of a comparison.
+///
+/// `Ok(None)` means *unordered*, which in IEEE-754 is what any comparison involving NaN is.
+/// The reference implementation gets this from Python, where every operator on a NaN returns
+/// false; here it has to be explicit, because `Ord` on `f64` would happily report `Equal` for
+/// two NaNs and quietly select the wrong container.
+type Comparison3 = Result<Option<std::cmp::Ordering>, Incomparable>;
 
-fn compare_operand_literal(
-    value: &Scalar,
-    literal: &str,
-    name: &str,
-) -> Result<std::cmp::Ordering, DecodeError> {
-    let incomparable = || DecodeError::IncomparableValue {
-        parameter: name.to_owned(),
+/// Compares a value against a pre-coerced literal.
+///
+/// XTCE does not type comparison literals, so the reading used is chosen by what the value
+/// turned out to be: an integer parameter compares numerically, an enumerated one as text.
+/// That mirrors the reference implementation, where the coercion is literally
+/// `type(parsed_value)(required_value)` — except that the parsing happened once at load time.
+fn compare_with_literal(value: Scalar<'_>, literal: &ComparisonValue, text: &str) -> Comparison3 {
+    let incomparable = Incomparable {
         value_kind: value.kind(),
-        literal: literal.to_owned(),
     };
-
     match value {
-        Scalar::Integer(left) => {
-            let right: i128 = literal.trim().parse().map_err(|_| incomparable())?;
-            Ok(left.cmp(&right))
-        }
-        Scalar::Float(left) => {
-            let right: f64 = literal.trim().parse().map_err(|_| incomparable())?;
-            Ok(left.total_cmp(&right))
-        }
-        Scalar::Text(left) => Ok(left.as_str().cmp(literal)),
-        Scalar::Opaque(_) => Err(incomparable()),
+        Scalar::Integer(left) => match literal.as_int {
+            Some(right) => Ok(Some(left.cmp(&right))),
+            None => Err(incomparable),
+        },
+        Scalar::Float(left) => match literal.as_float {
+            Some(right) => Ok(left.partial_cmp(&right)),
+            None => Err(incomparable),
+        },
+        Scalar::Text(left) => Ok(Some(left.cmp(text))),
+        Scalar::Opaque(_) => Err(incomparable),
     }
 }
 
-fn compare_operands(
-    left: &Scalar,
-    right: &Scalar,
-    left_name: &str,
-    right_name: &str,
-) -> Result<std::cmp::Ordering, DecodeError> {
+/// Compares two decoded values against each other.
+fn compare_scalars(left: Scalar<'_>, right: Scalar<'_>) -> Comparison3 {
+    use std::cmp::Ordering;
     match (left, right) {
-        (Scalar::Integer(a), Scalar::Integer(b)) => Ok(a.cmp(b)),
-        (Scalar::Float(a), Scalar::Float(b)) => Ok(a.total_cmp(b)),
-        (Scalar::Integer(a), Scalar::Float(b)) => Ok((*a as f64).total_cmp(b)),
-        (Scalar::Float(a), Scalar::Integer(b)) => Ok(a.total_cmp(&(*b as f64))),
-        (Scalar::Text(a), Scalar::Text(b)) => Ok(a.cmp(b)),
-        // Mixed text and number: coerce the text side, as the reference does.
+        (Scalar::Integer(a), Scalar::Integer(b)) => Ok(Some(a.cmp(&b))),
+        (Scalar::Float(a), Scalar::Float(b)) => Ok(a.partial_cmp(&b)),
+        (Scalar::Integer(a), Scalar::Float(b)) => Ok((a as f64).partial_cmp(&b)),
+        (Scalar::Float(a), Scalar::Integer(b)) => Ok(a.partial_cmp(&(b as f64))),
+        (Scalar::Text(a), Scalar::Text(b)) => Ok(Some(a.cmp(b))),
+        // A number against text: read the text as a number, as the reference does.
         (Scalar::Integer(_) | Scalar::Float(_), Scalar::Text(text)) => {
-            compare_operand_literal(left, text, left_name)
+            compare_with_literal(left, &ComparisonValue::new(NameId::ZERO, text), text)
         }
         (Scalar::Text(text), Scalar::Integer(_) | Scalar::Float(_)) => {
-            compare_operand_literal(right, text, right_name).map(std::cmp::Ordering::reverse)
+            compare_with_literal(right, &ComparisonValue::new(NameId::ZERO, text), text)
+                .map(|ordering| ordering.map(Ordering::reverse))
         }
-        _ => Err(DecodeError::IncomparableValue {
-            parameter: left_name.to_owned(),
+        _ => Err(Incomparable {
             value_kind: left.kind(),
-            literal: right_name.to_owned(),
         }),
     }
 }
@@ -908,23 +930,31 @@ fn ieee754(bits: u64, width: u32) -> Option<f64> {
     }
 }
 
-/// Widens IEEE-754 binary16 to `f32`, which is exact.
+/// Widens IEEE-754 binary16 to `f32`, which is exact for every input.
+///
+/// Subnormals need renormalising: `f16` has no implicit leading 1 below its smallest normal,
+/// but every one of those values is comfortably normal in `f32`. For a subnormal fraction
+/// `m`, the value is `m × 2^-24`; writing `p` for the index of its highest set bit, the
+/// `f32` exponent field is `p + 103` and the fraction is `m` shifted so that bit `p` lands on
+/// the implicit-1 position and is then masked away.
 fn half_to_f32(bits: u16) -> f32 {
     let sign = u32::from(bits >> 15) << 31;
     let exponent = u32::from((bits >> 10) & 0x1F);
-    let mantissa = u32::from(bits & 0x03FF);
+    let fraction = u32::from(bits & 0x03FF);
 
     match exponent {
-        0 if mantissa == 0 => f32::from_bits(sign),
-        // Subnormal: renormalise into the much wider f32 exponent range.
+        0 if fraction == 0 => f32::from_bits(sign),
         0 => {
-            let leading = mantissa.leading_zeros() - 21;
-            let exponent = 127 - 15 - leading;
-            let mantissa = (mantissa << (leading + 1)) & 0x03FF;
-            f32::from_bits(sign | (exponent << 23) | (mantissa << 13))
+            // `p = 31 - leading_zeros()` is the index of the highest set bit, so the shift
+            // that moves it up to bit 10 — the implicit-1 position of the 10-bit window —
+            // is `10 - p`, i.e. `leading_zeros() - 21`. It ranges 1..=10.
+            let shift = fraction.leading_zeros() - 21;
+            let exponent = 113 - shift;
+            let fraction = (fraction << shift) & 0x03FF;
+            f32::from_bits(sign | (exponent << 23) | (fraction << 13))
         }
-        0x1F => f32::from_bits(sign | 0x7F80_0000 | (mantissa << 13)),
-        _ => f32::from_bits(sign | ((exponent + 127 - 15) << 23) | (mantissa << 13)),
+        0x1F => f32::from_bits(sign | 0x7F80_0000 | (fraction << 13)),
+        _ => f32::from_bits(sign | ((exponent + 127 - 15) << 23) | (fraction << 13)),
     }
 }
 
@@ -946,4 +976,152 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
         .windows(needle.len())
         .position(|window| window == needle)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The reference for half-precision: the exact rational value of the encoding.
+    ///
+    /// Deliberately written from the IEEE-754 definition rather than from the implementation,
+    /// so it cannot inherit the implementation's mistakes.
+    fn half_reference(bits: u16) -> f64 {
+        let sign = if bits >> 15 == 1 { -1.0 } else { 1.0 };
+        let exponent = i32::from((bits >> 10) & 0x1F);
+        let fraction = f64::from(bits & 0x03FF);
+        match exponent {
+            0 => sign * fraction * 2f64.powi(-24),
+            0x1F => {
+                if fraction == 0.0 {
+                    sign * f64::INFINITY
+                } else {
+                    f64::NAN
+                }
+            }
+            _ => sign * (1.0 + fraction / 1024.0) * 2f64.powi(exponent - 15),
+        }
+    }
+
+    #[test]
+    fn half_precision_matches_the_ieee_definition_for_every_encoding() {
+        // All 65 536 encodings, which is cheap and leaves nothing to sampling.
+        for bits in 0u16..=u16::MAX {
+            let got = f64::from(half_to_f32(bits));
+            let want = half_reference(bits);
+            if want.is_nan() {
+                assert!(got.is_nan(), "bits {bits:#06x}: expected NaN, got {got}");
+            } else {
+                assert_eq!(got.to_bits(), want.to_bits(), "bits {bits:#06x}");
+            }
+        }
+    }
+
+    #[test]
+    fn half_precision_subnormals() {
+        // These are the values a naive renormalisation gets wrong by a factor of two, and
+        // no bundled test file declares a 16-bit float, so only a unit test reaches them.
+        assert_eq!(f64::from(half_to_f32(0x0001)), 2f64.powi(-24));
+        assert_eq!(f64::from(half_to_f32(0x0002)), 2f64.powi(-23));
+        assert_eq!(f64::from(half_to_f32(0x03FF)), 1023.0 * 2f64.powi(-24));
+        // Largest subnormal and smallest normal must be adjacent.
+        assert_eq!(f64::from(half_to_f32(0x0400)), 2f64.powi(-14));
+        assert_eq!(f64::from(half_to_f32(0x8001)), -(2f64.powi(-24)));
+    }
+
+    #[test]
+    fn half_precision_specials() {
+        assert_eq!(f64::from(half_to_f32(0x0000)), 0.0);
+        assert!(f64::from(half_to_f32(0x8000)).is_sign_negative());
+        assert_eq!(f64::from(half_to_f32(0x3C00)), 1.0);
+        assert_eq!(f64::from(half_to_f32(0xC000)), -2.0);
+        assert!(f64::from(half_to_f32(0x7C00)).is_infinite());
+        assert!(f64::from(half_to_f32(0xFC00)).is_infinite());
+        assert!(f64::from(half_to_f32(0x7E00)).is_nan());
+    }
+
+    #[test]
+    fn mil_std_1750a_reference_values() {
+        // Every row of the MIL-STD-1750A specification's own extended-precision table.
+        assert_eq!(mil_std_1750a(0x4000_0000), 0.5);
+        assert_eq!(mil_std_1750a(0x4000_0001), 1.0);
+        assert_eq!(mil_std_1750a(0x4000_0004), 8.0);
+        assert_eq!(mil_std_1750a(0x8000_0000), -1.0);
+        assert_eq!(mil_std_1750a(0x0000_0000), 0.0);
+        // The table gives this as -0.5000001 x 2^-1.
+        assert_eq!(mil_std_1750a(0xBFFF_FFFF), -0.250_000_059_604_644_8);
+        // Smallest magnitude: -1.0 x 2^-128.
+        assert_eq!(mil_std_1750a(0x8000_0080), -2f64.powi(-128));
+        assert_eq!(mil_std_1750a(0x4000_007F), 0.5 * 2f64.powi(127));
+    }
+
+    fn literal(text: &str) -> ComparisonValue {
+        ComparisonValue::new(NameId::ZERO, text)
+    }
+
+    #[test]
+    fn nan_is_unordered_so_no_operator_holds() {
+        let nan = Scalar::Float(f64::NAN);
+        // Python's `float('nan') == float('nan')` is False, and so is every other operator.
+        // `Ord::cmp` on f64 would report Equal here and silently select a container.
+        assert_eq!(compare_with_literal(nan, &literal("0"), "0"), Ok(None));
+        assert_eq!(compare_with_literal(nan, &literal("nan"), "nan"), Ok(None));
+        assert_eq!(compare_scalars(nan, Scalar::Float(f64::NAN)), Ok(None));
+        assert_eq!(compare_scalars(nan, Scalar::Integer(0)), Ok(None));
+    }
+
+    #[test]
+    fn negative_zero_equals_zero() {
+        // IEEE-754 says -0.0 == 0.0; a total ordering says it is less.
+        assert_eq!(
+            compare_with_literal(Scalar::Float(-0.0), &literal("0.0"), "0.0"),
+            Ok(Some(std::cmp::Ordering::Equal))
+        );
+        assert_eq!(
+            compare_scalars(Scalar::Float(-0.0), Scalar::Float(0.0)),
+            Ok(Some(std::cmp::Ordering::Equal))
+        );
+    }
+
+    #[test]
+    fn literals_are_coerced_to_the_value_they_meet() {
+        use std::cmp::Ordering;
+        assert_eq!(
+            compare_with_literal(Scalar::Integer(11), &literal("11"), "11"),
+            Ok(Some(Ordering::Equal))
+        );
+        // A float literal cannot be read as an integer, which is what Python's
+        // `int("3.5")` does too.
+        assert!(compare_with_literal(Scalar::Integer(3), &literal("3.5"), "3.5").is_err());
+        // But an integer literal reads fine as a float.
+        assert_eq!(
+            compare_with_literal(Scalar::Float(3.0), &literal("3"), "3"),
+            Ok(Some(Ordering::Equal))
+        );
+        // Enumerated parameters compare as text, so their labels never parse as numbers.
+        assert_eq!(
+            compare_with_literal(Scalar::Text("ON"), &literal("ON"), "ON"),
+            Ok(Some(Ordering::Equal))
+        );
+        assert_eq!(
+            compare_with_literal(Scalar::Text("OFF"), &literal("ON"), "ON"),
+            Ok(Some(Ordering::Less))
+        );
+        // Binary is not comparable at all.
+        assert!(compare_with_literal(Scalar::Opaque("binary"), &literal("0"), "0").is_err());
+    }
+
+    #[test]
+    fn operators_over_an_ordering() {
+        use std::cmp::Ordering::{Equal, Greater, Less};
+        use xtce_model::CompareOp;
+        assert!(CompareOp::Equal.matches(Equal));
+        assert!(!CompareOp::Equal.matches(Less));
+        assert!(CompareOp::NotEqual.matches(Less));
+        assert!(CompareOp::NotEqual.matches(Greater));
+        assert!(!CompareOp::NotEqual.matches(Equal));
+        assert!(CompareOp::LessOrEqual.matches(Equal));
+        assert!(CompareOp::GreaterOrEqual.matches(Equal));
+        assert!(!CompareOp::Greater.matches(Equal));
+    }
 }
