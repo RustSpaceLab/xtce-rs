@@ -1,0 +1,32 @@
+[
+ {
+  "case": "jpss_geolocation",
+  "packet_count": 7200,
+  "load_seconds": 0.008672,
+  "parse_seconds": 1.03186
+ },
+ {
+  "case": "jpss_contrived_inheritance",
+  "packet_count": 7200,
+  "load_seconds": 0.003016,
+  "parse_seconds": 1.154283
+ },
+ {
+  "case": "ctim",
+  "packet_count": 1499,
+  "load_seconds": 0.11889,
+  "parse_seconds": 4.773655
+ },
+ {
+  "case": "suda",
+  "packet_count": 13,
+  "load_seconds": 0.019756,
+  "parse_seconds": 0.003564
+ },
+ {
+  "case": "idex",
+  "packet_count": 78,
+  "load_seconds": 0.021563,
+  "parse_seconds": 0.021278
+ }
+]

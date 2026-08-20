@@ -1,0 +1,17 @@
+[package]
+name = "xtce-cli"
+description = "Command-line tools for inspecting and decoding CCSDS telemetry defined by XTCE"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "xtce"
+path = "src/main.rs"
+
+[dependencies]
+xtce-model.workspace = true
+clap.workspace = true

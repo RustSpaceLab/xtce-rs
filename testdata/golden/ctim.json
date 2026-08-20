@@ -1,0 +1,12334 @@
+{
+ "case": "ctim",
+ "detail": [
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4064,
+    4064
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168528,
+    481168528
+   ],
+   "SHFINE": [
+    911,
+    911
+   ],
+   "SPARE_16": [
+    49152,
+    49152
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    61459,
+    61459
+   ],
+   "ana_ccd_p15": [
+    61545,
+    61545
+   ],
+   "ana_ccd_p32": [
+    61552,
+    61552
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    168,
+    168
+   ],
+   "ana_zynq_temp": [
+    7527,
+    7527
+   ],
+   "ana_zynq_vccPDro": [
+    33776,
+    33776
+   ],
+   "ana_zynq_vccaux": [
+    23744,
+    23744
+   ],
+   "ana_zynq_vccbram": [
+    31409,
+    31409
+   ],
+   "ana_zynq_vccint": [
+    691,
+    691
+   ],
+   "ana_zynq_vccpaux": [
+    29887,
+    29887
+   ],
+   "ana_zynq_vccpint": [
+    23217,
+    23217
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    53248,
+    53248
+   ],
+   "sw_cmd_rjct_op": [
+    4096,
+    4096
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    53251,
+    53251
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1632,
+    1632
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2019,
+    2019
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11456,
+    11456
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11554,
+    11554
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4065,
+    4065
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168528,
+    481168528
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1023,
+    1023
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4065,
+    4065
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168529,
+    481168529
+   ],
+   "SHFINE": [
+    911,
+    911
+   ],
+   "SPARE_16": [
+    38912,
+    38912
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    63507,
+    63507
+   ],
+   "ana_ccd_p15": [
+    63593,
+    63593
+   ],
+   "ana_ccd_p32": [
+    63600,
+    63600
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    144,
+    144
+   ],
+   "ana_zynq_temp": [
+    7527,
+    7527
+   ],
+   "ana_zynq_vccPDro": [
+    60403,
+    60403
+   ],
+   "ana_zynq_vccaux": [
+    9406,
+    9406
+   ],
+   "ana_zynq_vccbram": [
+    47794,
+    47794
+   ],
+   "ana_zynq_vccint": [
+    8883,
+    8883
+   ],
+   "ana_zynq_vccpaux": [
+    9406,
+    9406
+   ],
+   "ana_zynq_vccpint": [
+    4785,
+    4785
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    53248,
+    53248
+   ],
+   "sw_cmd_rjct_op": [
+    4096,
+    4096
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    53251,
+    53251
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1632,
+    1632
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    1763,
+    1763
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11488,
+    11488
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11586,
+    11586
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4066,
+    4066
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168529,
+    481168529
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1025,
+    1025
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4066,
+    4066
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168530,
+    481168530
+   ],
+   "SHFINE": [
+    911,
+    911
+   ],
+   "SPARE_16": [
+    24576,
+    24576
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    57363,
+    57363
+   ],
+   "ana_ccd_p15": [
+    59497,
+    59497
+   ],
+   "ana_ccd_p32": [
+    59504,
+    59504
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    48,
+    48
+   ],
+   "ana_zynq_temp": [
+    7530,
+    7530
+   ],
+   "ana_zynq_vccPDro": [
+    39923,
+    39923
+   ],
+   "ana_zynq_vccaux": [
+    36030,
+    36030
+   ],
+   "ana_zynq_vccbram": [
+    58035,
+    58035
+   ],
+   "ana_zynq_vccint": [
+    49845,
+    49845
+   ],
+   "ana_zynq_vccpaux": [
+    33982,
+    33982
+   ],
+   "ana_zynq_vccpint": [
+    60082,
+    60082
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    53248,
+    53248
+   ],
+   "sw_cmd_rjct_op": [
+    4096,
+    4096
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    53251,
+    53251
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1632,
+    1632
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    1763,
+    1763
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11520,
+    11520
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11618,
+    11618
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4067,
+    4067
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168530,
+    481168530
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1027,
+    1027
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4067,
+    4067
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168531,
+    481168531
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "SPARE_16": [
+    24576,
+    24576
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    61459,
+    61459
+   ],
+   "ana_ccd_p15": [
+    63593,
+    63593
+   ],
+   "ana_ccd_p32": [
+    59504,
+    59504
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    160,
+    160
+   ],
+   "ana_zynq_temp": [
+    7528,
+    7528
+   ],
+   "ana_zynq_vccPDro": [
+    44019,
+    44019
+   ],
+   "ana_zynq_vccaux": [
+    17599,
+    17599
+   ],
+   "ana_zynq_vccbram": [
+    35504,
+    35504
+   ],
+   "ana_zynq_vccint": [
+    17075,
+    17075
+   ],
+   "ana_zynq_vccpaux": [
+    44223,
+    44223
+   ],
+   "ana_zynq_vccpint": [
+    58034,
+    58034
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    53248,
+    53248
+   ],
+   "sw_cmd_rjct_op": [
+    4096,
+    4096
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    53251,
+    53251
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1632,
+    1632
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    1859,
+    1859
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11552,
+    11552
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11650,
+    11650
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4068,
+    4068
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168531,
+    481168531
+   ],
+   "SHFINE": [
+    951,
+    951
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1049,
+    1049
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4068,
+    4068
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168532,
+    481168532
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "SPARE_16": [
+    45056,
+    45056
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    61458,
+    61458
+   ],
+   "ana_ccd_p15": [
+    61545,
+    61545
+   ],
+   "ana_ccd_p32": [
+    61552,
+    61552
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    192,
+    192
+   ],
+   "ana_zynq_temp": [
+    7528,
+    7528
+   ],
+   "ana_zynq_vccPDro": [
+    35827,
+    35827
+   ],
+   "ana_zynq_vccaux": [
+    11454,
+    11454
+   ],
+   "ana_zynq_vccbram": [
+    37551,
+    37551
+   ],
+   "ana_zynq_vccint": [
+    21171,
+    21171
+   ],
+   "ana_zynq_vccpaux": [
+    48319,
+    48319
+   ],
+   "ana_zynq_vccpint": [
+    55986,
+    55986
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    53248,
+    53248
+   ],
+   "sw_cmd_rjct_op": [
+    4096,
+    4096
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    53251,
+    53251
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1632,
+    1632
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    1475,
+    1475
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11584,
+    11584
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11682,
+    11682
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4069,
+    4069
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168532,
+    481168532
+   ],
+   "SHFINE": [
+    951,
+    951
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1051,
+    1051
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4069,
+    4069
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168533,
+    481168533
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "SPARE_16": [
+    20480,
+    20480
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    63507,
+    63507
+   ],
+   "ana_ccd_p15": [
+    63593,
+    63593
+   ],
+   "ana_ccd_p32": [
+    61552,
+    61552
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    240,
+    240
+   ],
+   "ana_zynq_temp": [
+    7527,
+    7527
+   ],
+   "ana_zynq_vccPDro": [
+    60403,
+    60403
+   ],
+   "ana_zynq_vccaux": [
+    23744,
+    23744
+   ],
+   "ana_zynq_vccbram": [
+    39602,
+    39602
+   ],
+   "ana_zynq_vccint": [
+    37555,
+    37555
+   ],
+   "ana_zynq_vccpaux": [
+    31934,
+    31934
+   ],
+   "ana_zynq_vccpint": [
+    10926,
+    10926
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    53248,
+    53248
+   ],
+   "sw_cmd_rjct_op": [
+    4096,
+    4096
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    53251,
+    53251
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1632,
+    1632
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    1795,
+    1795
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11616,
+    11616
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11714,
+    11714
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4070,
+    4070
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168533,
+    481168533
+   ],
+   "SHFINE": [
+    951,
+    951
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1053,
+    1053
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4070,
+    4070
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168534,
+    481168534
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "SPARE_16": [
+    12288,
+    12288
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    63508,
+    63508
+   ],
+   "ana_ccd_p15": [
+    63593,
+    63593
+   ],
+   "ana_ccd_p32": [
+    61552,
+    61552
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    32,
+    32
+   ],
+   "ana_zynq_temp": [
+    7526,
+    7526
+   ],
+   "ana_zynq_vccPDro": [
+    39924,
+    39924
+   ],
+   "ana_zynq_vccaux": [
+    15551,
+    15551
+   ],
+   "ana_zynq_vccbram": [
+    10930,
+    10930
+   ],
+   "ana_zynq_vccint": [
+    8883,
+    8883
+   ],
+   "ana_zynq_vccpaux": [
+    33983,
+    33983
+   ],
+   "ana_zynq_vccpint": [
+    6833,
+    6833
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    53248,
+    53248
+   ],
+   "sw_cmd_rjct_op": [
+    4096,
+    4096
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    53251,
+    53251
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1632,
+    1632
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    1891,
+    1891
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11648,
+    11648
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11746,
+    11746
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4071,
+    4071
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168534,
+    481168534
+   ],
+   "SHFINE": [
+    951,
+    951
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1055,
+    1055
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4071,
+    4071
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168535,
+    481168535
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "SPARE_16": [
+    12288,
+    12288
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    59411,
+    59411
+   ],
+   "ana_ccd_p15": [
+    59497,
+    59497
+   ],
+   "ana_ccd_p32": [
+    59504,
+    59504
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    144,
+    144
+   ],
+   "ana_zynq_temp": [
+    7528,
+    7528
+   ],
+   "ana_zynq_vccPDro": [
+    48114,
+    48114
+   ],
+   "ana_zynq_vccaux": [
+    40128,
+    40128
+   ],
+   "ana_zynq_vccbram": [
+    692,
+    692
+   ],
+   "ana_zynq_vccint": [
+    29362,
+    29362
+   ],
+   "ana_zynq_vccpaux": [
+    23742,
+    23742
+   ],
+   "ana_zynq_vccpint": [
+    51889,
+    51889
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    53248,
+    53248
+   ],
+   "sw_cmd_rjct_op": [
+    4096,
+    4096
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    53251,
+    53251
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1632,
+    1632
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    1763,
+    1763
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11680,
+    11680
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11778,
+    11778
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4072,
+    4072
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168535,
+    481168535
+   ],
+   "SHFINE": [
+    951,
+    951
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1057,
+    1057
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4072,
+    4072
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168536,
+    481168536
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "SPARE_16": [
+    53248,
+    53248
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    61458,
+    61458
+   ],
+   "ana_ccd_p15": [
+    63593,
+    63593
+   ],
+   "ana_ccd_p32": [
+    61552,
+    61552
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    232,
+    232
+   ],
+   "ana_zynq_temp": [
+    7529,
+    7529
+   ],
+   "ana_zynq_vccPDro": [
+    39920,
+    39920
+   ],
+   "ana_zynq_vccaux": [
+    60608,
+    60608
+   ],
+   "ana_zynq_vccbram": [
+    27311,
+    27311
+   ],
+   "ana_zynq_vccint": [
+    691,
+    691
+   ],
+   "ana_zynq_vccpaux": [
+    1215,
+    1215
+   ],
+   "ana_zynq_vccpint": [
+    60082,
+    60082
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    53248,
+    53248
+   ],
+   "sw_cmd_rjct_op": [
+    4096,
+    4096
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    53251,
+    53251
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1632,
+    1632
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    1603,
+    1603
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11712,
+    11712
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11810,
+    11810
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4073,
+    4073
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168536,
+    481168536
+   ],
+   "SHFINE": [
+    951,
+    951
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1059,
+    1059
+   ]
+  },
+  {
+   "PKT_APID": [
+    20,
+    20
+   ],
+   "PKT_LEN": [
+    23,
+    23
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    5279,
+    5279
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168537,
+    481168537
+   ],
+   "SHFINE": [
+    451,
+    451
+   ],
+   "SPARE_8": [
+    0,
+    0
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "log_logid_hdr": [
+    255,
+    255
+   ],
+   "log_msgid_hdr": [
+    0,
+    0
+   ],
+   "log_params_0": [
+    0,
+    0
+   ],
+   "log_params_1": [
+    192,
+    192
+   ],
+   "log_params_2": [
+    1,
+    1
+   ],
+   "log_params_3": [
+    27,
+    27
+   ],
+   "log_slice_hdr": [
+    0,
+    0
+   ],
+   "log_time_sec_hdr": [
+    481168537,
+    481168537
+   ],
+   "log_time_sub_hdr": [
+    439,
+    439
+   ],
+   "packet_checksum": [
+    2011,
+    2011
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4073,
+    4073
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168537,
+    481168537
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "SPARE_16": [
+    32768,
+    32768
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    59411,
+    59411
+   ],
+   "ana_ccd_p15": [
+    63593,
+    63593
+   ],
+   "ana_ccd_p32": [
+    59504,
+    59504
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    64,
+    64
+   ],
+   "ana_zynq_temp": [
+    7528,
+    7528
+   ],
+   "ana_zynq_vccPDro": [
+    37876,
+    37876
+   ],
+   "ana_zynq_vccaux": [
+    13502,
+    13502
+   ],
+   "ana_zynq_vccbram": [
+    60083,
+    60083
+   ],
+   "ana_zynq_vccint": [
+    62133,
+    62133
+   ],
+   "ana_zynq_vccpaux": [
+    48319,
+    48319
+   ],
+   "ana_zynq_vccpint": [
+    29362,
+    29362
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1664,
+    1664
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    1603,
+    1603
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11744,
+    11744
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11842,
+    11842
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4074,
+    4074
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168537,
+    481168537
+   ],
+   "SHFINE": [
+    951,
+    951
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1061,
+    1061
+   ]
+  },
+  {
+   "PKT_APID": [
+    20,
+    20
+   ],
+   "PKT_LEN": [
+    23,
+    23
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    5282,
+    5282
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168538,
+    481168538
+   ],
+   "SHFINE": [
+    851,
+    851
+   ],
+   "SPARE_8": [
+    0,
+    0
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "log_logid_hdr": [
+    255,
+    255
+   ],
+   "log_msgid_hdr": [
+    2309,
+    2309
+   ],
+   "log_params_0": [
+    0,
+    0
+   ],
+   "log_params_1": [
+    0,
+    0
+   ],
+   "log_params_2": [
+    0,
+    0
+   ],
+   "log_params_3": [
+    0,
+    0
+   ],
+   "log_slice_hdr": [
+    0,
+    0
+   ],
+   "log_time_sec_hdr": [
+    481168538,
+    481168538
+   ],
+   "log_time_sub_hdr": [
+    840,
+    840
+   ],
+   "packet_checksum": [
+    1591,
+    1591
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4074,
+    4074
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168538,
+    481168538
+   ],
+   "SHFINE": [
+    931,
+    931
+   ],
+   "SPARE_16": [
+    12288,
+    12288
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    20499,
+    20499
+   ],
+   "ana_ccd_p15": [
+    34921,
+    34921
+   ],
+   "ana_ccd_p32": [
+    20592,
+    20592
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    112,
+    112
+   ],
+   "ana_zynq_temp": [
+    7528,
+    7528
+   ],
+   "ana_zynq_vccPDro": [
+    60403,
+    60403
+   ],
+   "ana_zynq_vccaux": [
+    31935,
+    31935
+   ],
+   "ana_zynq_vccbram": [
+    43695,
+    43695
+   ],
+   "ana_zynq_vccint": [
+    21172,
+    21172
+   ],
+   "ana_zynq_vccpaux": [
+    58558,
+    58558
+   ],
+   "ana_zynq_vccpint": [
+    62128,
+    62128
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2563,
+    2563
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11776,
+    11776
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11874,
+    11874
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4075,
+    4075
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168538,
+    481168538
+   ],
+   "SHFINE": [
+    951,
+    951
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1063,
+    1063
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4076,
+    4076
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168539,
+    481168539
+   ],
+   "SHFINE": [
+    932,
+    932
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1046,
+    1046
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4075,
+    4075
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168539,
+    481168539
+   ],
+   "SHFINE": [
+    952,
+    952
+   ],
+   "SPARE_16": [
+    20480,
+    20480
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    26643,
+    26643
+   ],
+   "ana_ccd_p15": [
+    34921,
+    34921
+   ],
+   "ana_ccd_p32": [
+    20592,
+    20592
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    224,
+    224
+   ],
+   "ana_zynq_temp": [
+    7527,
+    7527
+   ],
+   "ana_zynq_vccPDro": [
+    37875,
+    37875
+   ],
+   "ana_zynq_vccaux": [
+    3263,
+    3263
+   ],
+   "ana_zynq_vccbram": [
+    47793,
+    47793
+   ],
+   "ana_zynq_vccint": [
+    17077,
+    17077
+   ],
+   "ana_zynq_vccpaux": [
+    3263,
+    3263
+   ],
+   "ana_zynq_vccpint": [
+    29362,
+    29362
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2371,
+    2371
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11808,
+    11808
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11906,
+    11906
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4076,
+    4076
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168540,
+    481168540
+   ],
+   "SHFINE": [
+    952,
+    952
+   ],
+   "SPARE_16": [
+    53248,
+    53248
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    20499,
+    20499
+   ],
+   "ana_ccd_p15": [
+    32873,
+    32873
+   ],
+   "ana_ccd_p32": [
+    26736,
+    26736
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    160,
+    160
+   ],
+   "ana_zynq_temp": [
+    7526,
+    7526
+   ],
+   "ana_zynq_vccPDro": [
+    35826,
+    35826
+   ],
+   "ana_zynq_vccaux": [
+    15553,
+    15553
+   ],
+   "ana_zynq_vccbram": [
+    2737,
+    2737
+   ],
+   "ana_zynq_vccint": [
+    41651,
+    41651
+   ],
+   "ana_zynq_vccpaux": [
+    25790,
+    25790
+   ],
+   "ana_zynq_vccpint": [
+    51887,
+    51887
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2723,
+    2723
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11840,
+    11840
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11938,
+    11938
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4077,
+    4077
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168540,
+    481168540
+   ],
+   "SHFINE": [
+    972,
+    972
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1088,
+    1088
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4078,
+    4078
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168541,
+    481168541
+   ],
+   "SHFINE": [
+    953,
+    953
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1071,
+    1071
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4077,
+    4077
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168541,
+    481168541
+   ],
+   "SHFINE": [
+    973,
+    973
+   ],
+   "SPARE_16": [
+    28672,
+    28672
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    22547,
+    22547
+   ],
+   "ana_ccd_p15": [
+    36969,
+    36969
+   ],
+   "ana_ccd_p32": [
+    22640,
+    22640
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    224,
+    224
+   ],
+   "ana_zynq_temp": [
+    7525,
+    7525
+   ],
+   "ana_zynq_vccPDro": [
+    1010,
+    1010
+   ],
+   "ana_zynq_vccaux": [
+    25791,
+    25791
+   ],
+   "ana_zynq_vccbram": [
+    60084,
+    60084
+   ],
+   "ana_zynq_vccint": [
+    62129,
+    62129
+   ],
+   "ana_zynq_vccpaux": [
+    9407,
+    9407
+   ],
+   "ana_zynq_vccpint": [
+    23218,
+    23218
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2307,
+    2307
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11872,
+    11872
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    11970,
+    11970
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4078,
+    4078
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168542,
+    481168542
+   ],
+   "SHFINE": [
+    973,
+    973
+   ],
+   "SPARE_16": [
+    26624,
+    26624
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    20499,
+    20499
+   ],
+   "ana_ccd_p15": [
+    32873,
+    32873
+   ],
+   "ana_ccd_p32": [
+    28784,
+    28784
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    128,
+    128
+   ],
+   "ana_zynq_temp": [
+    7524,
+    7524
+   ],
+   "ana_zynq_vccPDro": [
+    35826,
+    35826
+   ],
+   "ana_zynq_vccaux": [
+    3263,
+    3263
+   ],
+   "ana_zynq_vccbram": [
+    15028,
+    15028
+   ],
+   "ana_zynq_vccint": [
+    17077,
+    17077
+   ],
+   "ana_zynq_vccpaux": [
+    13503,
+    13503
+   ],
+   "ana_zynq_vccpint": [
+    15028,
+    15028
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2627,
+    2627
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11904,
+    11904
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12002,
+    12002
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4079,
+    4079
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168542,
+    481168542
+   ],
+   "SHFINE": [
+    993,
+    993
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1113,
+    1113
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4080,
+    4080
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168543,
+    481168543
+   ],
+   "SHFINE": [
+    974,
+    974
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1096,
+    1096
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4079,
+    4079
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168543,
+    481168543
+   ],
+   "SHFINE": [
+    994,
+    994
+   ],
+   "SPARE_16": [
+    4096,
+    4096
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    20500,
+    20500
+   ],
+   "ana_ccd_p15": [
+    34921,
+    34921
+   ],
+   "ana_ccd_p32": [
+    26736,
+    26736
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    176,
+    176
+   ],
+   "ana_zynq_temp": [
+    7524,
+    7524
+   ],
+   "ana_zynq_vccPDro": [
+    25587,
+    25587
+   ],
+   "ana_zynq_vccaux": [
+    54463,
+    54463
+   ],
+   "ana_zynq_vccbram": [
+    31413,
+    31413
+   ],
+   "ana_zynq_vccint": [
+    29360,
+    29360
+   ],
+   "ana_zynq_vccpaux": [
+    13504,
+    13504
+   ],
+   "ana_zynq_vccpint": [
+    6833,
+    6833
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2339,
+    2339
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11936,
+    11936
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12034,
+    12034
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4080,
+    4080
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168544,
+    481168544
+   ],
+   "SHFINE": [
+    994,
+    994
+   ],
+   "SPARE_16": [
+    10240,
+    10240
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    22547,
+    22547
+   ],
+   "ana_ccd_p15": [
+    30825,
+    30825
+   ],
+   "ana_ccd_p32": [
+    26736,
+    26736
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    48,
+    48
+   ],
+   "ana_zynq_temp": [
+    7523,
+    7523
+   ],
+   "ana_zynq_vccPDro": [
+    48115,
+    48115
+   ],
+   "ana_zynq_vccaux": [
+    42176,
+    42176
+   ],
+   "ana_zynq_vccbram": [
+    29363,
+    29363
+   ],
+   "ana_zynq_vccint": [
+    8882,
+    8882
+   ],
+   "ana_zynq_vccpaux": [
+    27839,
+    27839
+   ],
+   "ana_zynq_vccpint": [
+    17076,
+    17076
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2371,
+    2371
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    11968,
+    11968
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12066,
+    12066
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4081,
+    4081
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168545,
+    481168545
+   ],
+   "SHFINE": [
+    14,
+    14
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    904,
+    904
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4082,
+    4082
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168545,
+    481168545
+   ],
+   "SHFINE": [
+    994,
+    994
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1120,
+    1120
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4081,
+    4081
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168546,
+    481168546
+   ],
+   "SHFINE": [
+    14,
+    14
+   ],
+   "SPARE_16": [
+    20480,
+    20480
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    26643,
+    26643
+   ],
+   "ana_ccd_p15": [
+    30825,
+    30825
+   ],
+   "ana_ccd_p32": [
+    24688,
+    24688
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    160,
+    160
+   ],
+   "ana_zynq_temp": [
+    7523,
+    7523
+   ],
+   "ana_zynq_vccPDro": [
+    52211,
+    52211
+   ],
+   "ana_zynq_vccaux": [
+    7357,
+    7357
+   ],
+   "ana_zynq_vccbram": [
+    64178,
+    64178
+   ],
+   "ana_zynq_vccint": [
+    58034,
+    58034
+   ],
+   "ana_zynq_vccpaux": [
+    21695,
+    21695
+   ],
+   "ana_zynq_vccpint": [
+    10928,
+    10928
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2595,
+    2595
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12000,
+    12000
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12098,
+    12098
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4082,
+    4082
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168547,
+    481168547
+   ],
+   "SHFINE": [
+    14,
+    14
+   ],
+   "SPARE_16": [
+    26624,
+    26624
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    24595,
+    24595
+   ],
+   "ana_ccd_p15": [
+    32873,
+    32873
+   ],
+   "ana_ccd_p32": [
+    28784,
+    28784
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    72,
+    72
+   ],
+   "ana_zynq_temp": [
+    7525,
+    7525
+   ],
+   "ana_zynq_vccPDro": [
+    52208,
+    52208
+   ],
+   "ana_zynq_vccaux": [
+    36031,
+    36031
+   ],
+   "ana_zynq_vccbram": [
+    25267,
+    25267
+   ],
+   "ana_zynq_vccint": [
+    690,
+    690
+   ],
+   "ana_zynq_vccpaux": [
+    29887,
+    29887
+   ],
+   "ana_zynq_vccpint": [
+    49839,
+    49839
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2723,
+    2723
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12032,
+    12032
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12130,
+    12130
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4083,
+    4083
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168547,
+    481168547
+   ],
+   "SHFINE": [
+    34,
+    34
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    928,
+    928
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4084,
+    4084
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168548,
+    481168548
+   ],
+   "SHFINE": [
+    14,
+    14
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    910,
+    910
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4083,
+    4083
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168548,
+    481168548
+   ],
+   "SHFINE": [
+    34,
+    34
+   ],
+   "SPARE_16": [
+    22528,
+    22528
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    30739,
+    30739
+   ],
+   "ana_ccd_p15": [
+    32873,
+    32873
+   ],
+   "ana_ccd_p32": [
+    26736,
+    26736
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    64,
+    64
+   ],
+   "ana_zynq_temp": [
+    7524,
+    7524
+   ],
+   "ana_zynq_vccPDro": [
+    11251,
+    11251
+   ],
+   "ana_zynq_vccaux": [
+    56512,
+    56512
+   ],
+   "ana_zynq_vccbram": [
+    27315,
+    27315
+   ],
+   "ana_zynq_vccint": [
+    12981,
+    12981
+   ],
+   "ana_zynq_vccpaux": [
+    13503,
+    13503
+   ],
+   "ana_zynq_vccpint": [
+    47793,
+    47793
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2307,
+    2307
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12064,
+    12064
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12162,
+    12162
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4084,
+    4084
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168549,
+    481168549
+   ],
+   "SHFINE": [
+    34,
+    34
+   ],
+   "SPARE_16": [
+    63488,
+    63488
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    26642,
+    26642
+   ],
+   "ana_ccd_p15": [
+    32873,
+    32873
+   ],
+   "ana_ccd_p32": [
+    26736,
+    26736
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    32,
+    32
+   ],
+   "ana_zynq_temp": [
+    7523,
+    7523
+   ],
+   "ana_zynq_vccPDro": [
+    48116,
+    48116
+   ],
+   "ana_zynq_vccaux": [
+    17599,
+    17599
+   ],
+   "ana_zynq_vccbram": [
+    4786,
+    4786
+   ],
+   "ana_zynq_vccint": [
+    12979,
+    12979
+   ],
+   "ana_zynq_vccpaux": [
+    5310,
+    5310
+   ],
+   "ana_zynq_vccpint": [
+    35502,
+    35502
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2339,
+    2339
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12096,
+    12096
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12194,
+    12194
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4085,
+    4085
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168549,
+    481168549
+   ],
+   "SHFINE": [
+    54,
+    54
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    952,
+    952
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4086,
+    4086
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168550,
+    481168550
+   ],
+   "SHFINE": [
+    34,
+    34
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    934,
+    934
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4085,
+    4085
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168550,
+    481168550
+   ],
+   "SHFINE": [
+    54,
+    54
+   ],
+   "SPARE_16": [
+    53248,
+    53248
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    30739,
+    30739
+   ],
+   "ana_ccd_p15": [
+    32873,
+    32873
+   ],
+   "ana_ccd_p32": [
+    28784,
+    28784
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    160,
+    160
+   ],
+   "ana_zynq_temp": [
+    7522,
+    7522
+   ],
+   "ana_zynq_vccPDro": [
+    60403,
+    60403
+   ],
+   "ana_zynq_vccaux": [
+    13504,
+    13504
+   ],
+   "ana_zynq_vccbram": [
+    690,
+    690
+   ],
+   "ana_zynq_vccint": [
+    53937,
+    53937
+   ],
+   "ana_zynq_vccpaux": [
+    50366,
+    50366
+   ],
+   "ana_zynq_vccpint": [
+    35503,
+    35503
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2755,
+    2755
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12128,
+    12128
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12226,
+    12226
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4086,
+    4086
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168551,
+    481168551
+   ],
+   "SHFINE": [
+    54,
+    54
+   ],
+   "SPARE_16": [
+    36864,
+    36864
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    30738,
+    30738
+   ],
+   "ana_ccd_p15": [
+    30825,
+    30825
+   ],
+   "ana_ccd_p32": [
+    22640,
+    22640
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    192,
+    192
+   ],
+   "ana_zynq_temp": [
+    7523,
+    7523
+   ],
+   "ana_zynq_vccPDro": [
+    1011,
+    1011
+   ],
+   "ana_zynq_vccaux": [
+    3265,
+    3265
+   ],
+   "ana_zynq_vccbram": [
+    31413,
+    31413
+   ],
+   "ana_zynq_vccint": [
+    41652,
+    41652
+   ],
+   "ana_zynq_vccpaux": [
+    36032,
+    36032
+   ],
+   "ana_zynq_vccpint": [
+    31410,
+    31410
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2339,
+    2339
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12160,
+    12160
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12258,
+    12258
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4087,
+    4087
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168551,
+    481168551
+   ],
+   "SHFINE": [
+    74,
+    74
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    976,
+    976
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4088,
+    4088
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168552,
+    481168552
+   ],
+   "SHFINE": [
+    54,
+    54
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    958,
+    958
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4087,
+    4087
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168552,
+    481168552
+   ],
+   "SHFINE": [
+    74,
+    74
+   ],
+   "SPARE_16": [
+    26624,
+    26624
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    28691,
+    28691
+   ],
+   "ana_ccd_p15": [
+    30825,
+    30825
+   ],
+   "ana_ccd_p32": [
+    24688,
+    24688
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    192,
+    192
+   ],
+   "ana_zynq_temp": [
+    7524,
+    7524
+   ],
+   "ana_zynq_vccPDro": [
+    44019,
+    44019
+   ],
+   "ana_zynq_vccaux": [
+    50368,
+    50368
+   ],
+   "ana_zynq_vccbram": [
+    31411,
+    31411
+   ],
+   "ana_zynq_vccint": [
+    58034,
+    58034
+   ],
+   "ana_zynq_vccpaux": [
+    7358,
+    7358
+   ],
+   "ana_zynq_vccpint": [
+    49842,
+    49842
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2723,
+    2723
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12192,
+    12192
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12290,
+    12290
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4088,
+    4088
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168553,
+    481168553
+   ],
+   "SHFINE": [
+    74,
+    74
+   ],
+   "SPARE_16": [
+    24576,
+    24576
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    26643,
+    26643
+   ],
+   "ana_ccd_p15": [
+    30825,
+    30825
+   ],
+   "ana_ccd_p32": [
+    22640,
+    22640
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    48,
+    48
+   ],
+   "ana_zynq_temp": [
+    7523,
+    7523
+   ],
+   "ana_zynq_vccPDro": [
+    9204,
+    9204
+   ],
+   "ana_zynq_vccaux": [
+    23743,
+    23743
+   ],
+   "ana_zynq_vccbram": [
+    49843,
+    49843
+   ],
+   "ana_zynq_vccint": [
+    58035,
+    58035
+   ],
+   "ana_zynq_vccpaux": [
+    48319,
+    48319
+   ],
+   "ana_zynq_vccpint": [
+    39602,
+    39602
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2467,
+    2467
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12224,
+    12224
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12322,
+    12322
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4089,
+    4089
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168553,
+    481168553
+   ],
+   "SHFINE": [
+    94,
+    94
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1000,
+    1000
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4090,
+    4090
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168554,
+    481168554
+   ],
+   "SHFINE": [
+    74,
+    74
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    982,
+    982
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4089,
+    4089
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168554,
+    481168554
+   ],
+   "SHFINE": [
+    94,
+    94
+   ],
+   "SPARE_16": [
+    28672,
+    28672
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    28691,
+    28691
+   ],
+   "ana_ccd_p15": [
+    28777,
+    28777
+   ],
+   "ana_ccd_p32": [
+    24688,
+    24688
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    184,
+    184
+   ],
+   "ana_zynq_temp": [
+    7523,
+    7523
+   ],
+   "ana_zynq_vccPDro": [
+    64496,
+    64496
+   ],
+   "ana_zynq_vccaux": [
+    17598,
+    17598
+   ],
+   "ana_zynq_vccbram": [
+    47796,
+    47796
+   ],
+   "ana_zynq_vccint": [
+    25265,
+    25265
+   ],
+   "ana_zynq_vccpaux": [
+    7358,
+    7358
+   ],
+   "ana_zynq_vccpint": [
+    49842,
+    49842
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2499,
+    2499
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12256,
+    12256
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12354,
+    12354
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4090,
+    4090
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168555,
+    481168555
+   ],
+   "SHFINE": [
+    94,
+    94
+   ],
+   "SPARE_16": [
+    36864,
+    36864
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    28691,
+    28691
+   ],
+   "ana_ccd_p15": [
+    28777,
+    28777
+   ],
+   "ana_ccd_p32": [
+    26736,
+    26736
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    216,
+    216
+   ],
+   "ana_zynq_temp": [
+    7520,
+    7520
+   ],
+   "ana_zynq_vccPDro": [
+    27632,
+    27632
+   ],
+   "ana_zynq_vccaux": [
+    23744,
+    23744
+   ],
+   "ana_zynq_vccbram": [
+    2739,
+    2739
+   ],
+   "ana_zynq_vccint": [
+    62131,
+    62131
+   ],
+   "ana_zynq_vccpaux": [
+    1214,
+    1214
+   ],
+   "ana_zynq_vccpint": [
+    31410,
+    31410
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2339,
+    2339
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12288,
+    12288
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12386,
+    12386
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4091,
+    4091
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168555,
+    481168555
+   ],
+   "SHFINE": [
+    114,
+    114
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1024,
+    1024
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4092,
+    4092
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168556,
+    481168556
+   ],
+   "SHFINE": [
+    94,
+    94
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1006,
+    1006
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4091,
+    4091
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168556,
+    481168556
+   ],
+   "SHFINE": [
+    114,
+    114
+   ],
+   "SPARE_16": [
+    38912,
+    38912
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    26643,
+    26643
+   ],
+   "ana_ccd_p15": [
+    28777,
+    28777
+   ],
+   "ana_ccd_p32": [
+    24688,
+    24688
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    184,
+    184
+   ],
+   "ana_zynq_temp": [
+    7523,
+    7523
+   ],
+   "ana_zynq_vccPDro": [
+    15343,
+    15343
+   ],
+   "ana_zynq_vccaux": [
+    23743,
+    23743
+   ],
+   "ana_zynq_vccbram": [
+    55985,
+    55985
+   ],
+   "ana_zynq_vccint": [
+    58034,
+    58034
+   ],
+   "ana_zynq_vccpaux": [
+    31936,
+    31936
+   ],
+   "ana_zynq_vccpint": [
+    17074,
+    17074
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2467,
+    2467
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12320,
+    12320
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12418,
+    12418
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4092,
+    4092
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168557,
+    481168557
+   ],
+   "SHFINE": [
+    114,
+    114
+   ],
+   "SPARE_16": [
+    63488,
+    63488
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    26643,
+    26643
+   ],
+   "ana_ccd_p15": [
+    26729,
+    26729
+   ],
+   "ana_ccd_p32": [
+    24688,
+    24688
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    144,
+    144
+   ],
+   "ana_zynq_temp": [
+    7523,
+    7523
+   ],
+   "ana_zynq_vccPDro": [
+    3059,
+    3059
+   ],
+   "ana_zynq_vccaux": [
+    64704,
+    64704
+   ],
+   "ana_zynq_vccbram": [
+    2740,
+    2740
+   ],
+   "ana_zynq_vccint": [
+    25266,
+    25266
+   ],
+   "ana_zynq_vccpaux": [
+    60606,
+    60606
+   ],
+   "ana_zynq_vccpint": [
+    2738,
+    2738
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2467,
+    2467
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12352,
+    12352
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12450,
+    12450
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4093,
+    4093
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168557,
+    481168557
+   ],
+   "SHFINE": [
+    134,
+    134
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1048,
+    1048
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4094,
+    4094
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168558,
+    481168558
+   ],
+   "SHFINE": [
+    114,
+    114
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1030,
+    1030
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4093,
+    4093
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168558,
+    481168558
+   ],
+   "SHFINE": [
+    134,
+    134
+   ],
+   "SPARE_16": [
+    12288,
+    12288
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    28691,
+    28691
+   ],
+   "ana_ccd_p15": [
+    26729,
+    26729
+   ],
+   "ana_ccd_p32": [
+    24688,
+    24688
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    208,
+    208
+   ],
+   "ana_zynq_temp": [
+    7521,
+    7521
+   ],
+   "ana_zynq_vccPDro": [
+    23540,
+    23540
+   ],
+   "ana_zynq_vccaux": [
+    3262,
+    3262
+   ],
+   "ana_zynq_vccbram": [
+    58035,
+    58035
+   ],
+   "ana_zynq_vccint": [
+    45747,
+    45747
+   ],
+   "ana_zynq_vccpaux": [
+    44223,
+    44223
+   ],
+   "ana_zynq_vccpint": [
+    47795,
+    47795
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2723,
+    2723
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    96,
+    96
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12384,
+    12384
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12482,
+    12482
+   ]
+  },
+  {
+   "PKT_APID": [
+    32,
+    32
+   ],
+   "PKT_LEN": [
+    27,
+    27
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4095,
+    4095
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168559,
+    481168559
+   ],
+   "SHFINE": [
+    134,
+    134
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "img_biasStatus_0": [
+    0,
+    0
+   ],
+   "img_biasStatus_1": [
+    0,
+    0
+   ],
+   "img_biasStatus_10": [
+    0,
+    0
+   ],
+   "img_biasStatus_11": [
+    0,
+    0
+   ],
+   "img_biasStatus_12": [
+    0,
+    0
+   ],
+   "img_biasStatus_13": [
+    0,
+    0
+   ],
+   "img_biasStatus_14": [
+    0,
+    0
+   ],
+   "img_biasStatus_15": [
+    0,
+    0
+   ],
+   "img_biasStatus_2": [
+    0,
+    0
+   ],
+   "img_biasStatus_3": [
+    0,
+    0
+   ],
+   "img_biasStatus_4": [
+    0,
+    0
+   ],
+   "img_biasStatus_5": [
+    0,
+    0
+   ],
+   "img_biasStatus_6": [
+    0,
+    0
+   ],
+   "img_biasStatus_7": [
+    0,
+    0
+   ],
+   "img_biasStatus_8": [
+    0,
+    0
+   ],
+   "img_biasStatus_9": [
+    0,
+    0
+   ],
+   "img_currprocType": [
+    0,
+    0
+   ],
+   "img_state": [
+    0,
+    0
+   ],
+   "packet_checksum": [
+    1052,
+    1052
+   ]
+  },
+  {
+   "PKT_APID": [
+    1,
+    1
+   ],
+   "PKT_LEN": [
+    107,
+    107
+   ],
+   "REUSABLE_SPARE_1": [
+    0,
+    0
+   ],
+   "SEC_HDR_FLAG": [
+    1,
+    1
+   ],
+   "SEQ_CTR": [
+    4094,
+    4094
+   ],
+   "SEQ_FLGS": [
+    3,
+    3
+   ],
+   "SHCOARSE": [
+    481168559,
+    481168559
+   ],
+   "SHFINE": [
+    154,
+    154
+   ],
+   "SPARE_16": [
+    36864,
+    36864
+   ],
+   "TYPE": [
+    0,
+    0
+   ],
+   "VERSION": [
+    0,
+    0
+   ],
+   "ana_ccd_n5": [
+    26643,
+    26643
+   ],
+   "ana_ccd_p15": [
+    26729,
+    26729
+   ],
+   "ana_ccd_p32": [
+    24688,
+    24688
+   ],
+   "ana_ccd_p5": [
+    32863,
+    32863
+   ],
+   "ana_proc_temp": [
+    19,
+    19
+   ],
+   "ana_zynq_status": [
+    48,
+    48
+   ],
+   "ana_zynq_temp": [
+    7519,
+    7519
+   ],
+   "ana_zynq_vccPDro": [
+    48115,
+    48115
+   ],
+   "ana_zynq_vccaux": [
+    27840,
+    27840
+   ],
+   "ana_zynq_vccbram": [
+    8882,
+    8882
+   ],
+   "ana_zynq_vccint": [
+    62129,
+    62129
+   ],
+   "ana_zynq_vccpaux": [
+    25791,
+    25791
+   ],
+   "ana_zynq_vccpint": [
+    29361,
+    29361
+   ],
+   "packet_checksum": [
+    2,
+    2
+   ],
+   "sw_ccd_ctrl_state": [
+    0,
+    0
+   ],
+   "sw_ccd_ena_state": [
+    0,
+    0
+   ],
+   "sw_ccd_frame_id": [
+    0,
+    0
+   ],
+   "sw_ccd_shutter": [
+    32,
+    32
+   ],
+   "sw_ccd_shutter_override": [
+    128,
+    128
+   ],
+   "sw_cmd_arm_state_debug": [
+    0,
+    0
+   ],
+   "sw_cmd_arm_state_sc": [
+    0,
+    0
+   ],
+   "sw_cmd_fail_code": [
+    0,
+    0
+   ],
+   "sw_cmd_recv_count": [
+    0,
+    0
+   ],
+   "sw_cmd_rjct_count": [
+    55296,
+    55296
+   ],
+   "sw_cmd_rjct_op": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_count": [
+    0,
+    0
+   ],
+   "sw_cmd_succ_op": [
+    55302,
+    55302
+   ],
+   "sw_fsw_mode": [
+    0,
+    0
+   ],
+   "sw_image_id": [
+    8,
+    8
+   ],
+   "sw_img_currprocType": [
+    0,
+    0
+   ],
+   "sw_img_state": [
+    0,
+    0
+   ],
+   "sw_log_drop_count": [
+    1696,
+    1696
+   ],
+   "sw_log_write_count": [
+    0,
+    0
+   ],
+   "sw_major_version": [
+    0,
+    0
+   ],
+   "sw_minor_version": [
+    1,
+    1
+   ],
+   "sw_os_cpu_max": [
+    2339,
+    2339
+   ],
+   "sw_os_cpu_usage": [
+    96,
+    96
+   ],
+   "sw_patch_version": [
+    4,
+    4
+   ],
+   "sw_sd_state_card0": [
+    0,
+    0
+   ],
+   "sw_sd_state_card1": [
+    0,
+    0
+   ],
+   "sw_tec_avg_curr": [
+    0,
+    0
+   ],
+   "sw_tec_ccd_rtd": [
+    0,
+    0
+   ],
+   "sw_tec_curr": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_1": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_2": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_3": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_4": [
+    0,
+    0
+   ],
+   "sw_tec_sc_rtd_5": [
+    0,
+    0
+   ],
+   "sw_tec_setpoint": [
+    {
+     "f": "-0x1.5048000000000p-76"
+    },
+    {
+     "f": "-0x1.5048000000000p-76"
+    }
+   ],
+   "sw_tec_shutter": [
+    0,
+    0
+   ],
+   "sw_tec_slew_rate": [
+    {
+     "f": "0x1.7b99900000000p-129"
+    },
+    {
+     "f": "0x1.7b99900000000p-129"
+    }
+   ],
+   "sw_tec_state": [
+    128,
+    128
+   ],
+   "sw_tec_volt": [
+    0,
+    0
+   ],
+   "sw_time_miss_count": [
+    12416,
+    12416
+   ],
+   "sw_time_pps_count": [
+    61538,
+    61538
+   ],
+   "sw_time_recv_count": [
+    12514,
+    12514
+   ]
+  }
+ ],
+ "detail_count": 64,
+ "digest_sha256": "ab7958f949698ae831c6da5ff1a0509788e2114ab773250e7b7ce61a2a27dd5b",
+ "packet_count": 1499,
+ "packets": "ctim/ccsds_2021_155_14_39_51",
+ "reference": {
+  "implementation": "lasp/space_packet_parser",
+  "load_seconds": 0.11889,
+  "parse_seconds": 4.773655
+ },
+ "root_container": "CCSDSTelemetryPacket",
+ "skip_header_bytes": 0,
+ "unrecognized_count": 0,
+ "xtce": "ctim/ctim_xtce_v1.xml"
+}

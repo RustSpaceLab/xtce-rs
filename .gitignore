@@ -1,0 +1,7 @@
+/target
+/.venv
+*.profraw
+
+# JetBrains workspace state — the shared parts are checked in deliberately.
+/.idea/workspace.xml
+/.idea/shelf

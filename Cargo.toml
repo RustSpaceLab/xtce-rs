@@ -1,0 +1,38 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mysma-9403/RustSpace"
+authors = ["Maciej Myszkiewicz"]
+
+[workspace.dependencies]
+xtce-model = { path = "crates/xtce-model", version = "0.1.0" }
+xtce-decode = { path = "crates/xtce-decode", version = "0.1.0" }
+
+# Keep this list short and justified — see CONTRIBUTING.md rule 7.
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+criterion = { version = "0.7", features = ["html_reports"] }
+proptest = "1"
+quick-xml = "0.38"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+lto = "thin"
+codegen-units = 1
+
+# Differential/benchmark runs are unusable at opt-level 0 on 1.6 MB XTCE files.
+[profile.dev.package."*"]
+opt-level = 2
