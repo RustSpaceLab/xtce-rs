@@ -277,7 +277,8 @@ impl<'d> Lowering<'d> {
         let name = element.attr(AttrKey::Name).unwrap_or_default();
         let name_id = self.interner.intern(name);
 
-        let encoding = self.lower_encoding(element, pending.space_system)?;
+        let mut encoding = self.lower_encoding(element, pending.space_system)?;
+        apply_time_unit_scaler(element, &mut encoding);
         let units = self.lower_units(element);
 
         let kind = match element.tag() {
@@ -1118,6 +1119,50 @@ fn normalize_into(out: &mut String, base: &str, reference: &str) {
     for segment in segments {
         out.push('/');
         out.push_str(segment);
+    }
+}
+
+/// Folds a time parameter type's `<Encoding offset=.. scale=..>` into a polynomial
+/// calibrator on its data encoding.
+///
+/// XTCE 4.3.2.4.8.3 expresses a time parameter's unit conversion as attributes rather than a
+/// calibrator, but the two mean the same thing, so representing it as one keeps the decoder
+/// from needing a special case. The offset term is emitted before the scale term: the terms
+/// are summed in document order and floating-point addition is not associative, so the order
+/// is part of the result.
+fn apply_time_unit_scaler(type_element: Element<'_>, encoding: &mut DataEncoding) {
+    let Some(element) = type_element.child(Tag::Encoding) else {
+        return;
+    };
+    let offset = element.attr(AttrKey::Offset).and_then(parse_f64);
+    let scale = element.attr(AttrKey::Scale).and_then(parse_f64);
+
+    let mut terms = Vec::new();
+    if let Some(offset) = offset {
+        terms.push(PolynomialTerm {
+            coefficient: offset,
+            exponent: 0,
+        });
+    }
+    match (scale, offset) {
+        (Some(scale), _) => terms.push(PolynomialTerm {
+            coefficient: scale,
+            exponent: 1,
+        }),
+        // An offset with no scale still needs the identity term, or the raw value would be
+        // dropped entirely.
+        (None, Some(_)) => terms.push(PolynomialTerm {
+            coefficient: 1.0,
+            exponent: 1,
+        }),
+        (None, None) => return,
+    }
+
+    let calibrator = Some(Calibrator::Polynomial(terms));
+    match encoding {
+        DataEncoding::Integer(integer) => integer.default_calibrator = calibrator,
+        DataEncoding::Float(float) => float.default_calibrator = calibrator,
+        DataEncoding::String(_) | DataEncoding::Binary(_) | DataEncoding::None => {}
     }
 }
 

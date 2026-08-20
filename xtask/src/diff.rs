@@ -1,0 +1,390 @@
+//! `cargo xtask diff` — decode every golden case and compare against the reference.
+//!
+//! Two checks per case, and both matter:
+//!
+//! * **Detail.** The first N packets are compared parameter by parameter, so a failure names
+//!   the packet, the parameter and both values.
+//! * **Digest.** A SHA-256 over the canonical encoding of *every* packet in the stream. The
+//!   detail section is truncated for size; without the digest, a divergence in packet 5000
+//!   of 7200 would go unnoticed. A digest mismatch with a clean detail section is still a
+//!   failure — it just means the first differing packet is past the detail window, and
+//!   `--detail-scan` will find it.
+
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
+use std::path::{Path, PathBuf};
+
+use xtce_decode::{DecodeError, Decoder, PacketIter};
+use xtce_model::XtceDb;
+
+use crate::encoding::{Scalar, eng_scalar, raw_scalar, write_blob};
+use crate::sha256::{Sha256, to_hex};
+
+/// One packet as a name-keyed map, which is how the reference stores it.
+type PacketMap = BTreeMap<String, (Scalar, Scalar)>;
+
+/// A golden file, as loaded.
+struct Golden {
+    case: String,
+    xtce: PathBuf,
+    packets: PathBuf,
+    root_container: Option<String>,
+    skip_header_bytes: usize,
+    packet_count: usize,
+    unrecognized_count: usize,
+    digest: String,
+    detail: Vec<Option<PacketMap>>,
+    reference_load_seconds: f64,
+    reference_parse_seconds: f64,
+}
+
+/// What happened for one case.
+pub struct CaseReport {
+    pub case: String,
+    pub packets: usize,
+    pub differences: Vec<String>,
+    pub digest_matches: bool,
+    pub load_seconds: f64,
+    pub decode_seconds: f64,
+    pub reference_load_seconds: f64,
+    pub reference_parse_seconds: f64,
+}
+
+impl CaseReport {
+    #[must_use]
+    pub fn passed(&self) -> bool {
+        self.differences.is_empty() && self.digest_matches
+    }
+}
+
+/// Runs every golden case found in `golden_dir`.
+///
+/// # Errors
+///
+/// Returns a message if the golden directory cannot be read or a case cannot be run at all.
+/// A *difference* is not an error here; it is reported in the [`CaseReport`].
+pub fn run(
+    testdata: &Path,
+    golden_dir: &Path,
+    only: &[String],
+    max_differences: usize,
+) -> Result<Vec<CaseReport>, String> {
+    let mut files: Vec<PathBuf> = std::fs::read_dir(golden_dir)
+        .map_err(|error| format!("cannot read {}: {error}", golden_dir.display()))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension().is_some_and(|ext| ext == "json")
+                && path
+                    .file_stem()
+                    .is_some_and(|stem| stem != "reference_timings")
+        })
+        .collect();
+    files.sort();
+
+    let mut reports = Vec::new();
+    for file in files {
+        let golden = load_golden(&file)?;
+        if !only.is_empty() && !only.contains(&golden.case) {
+            continue;
+        }
+        reports.push(run_case(testdata, &golden, max_differences)?);
+    }
+    Ok(reports)
+}
+
+fn load_golden(path: &Path) -> Result<Golden, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let value: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|error| format!("{} is not valid JSON: {error}", path.display()))?;
+
+    let string = |key: &str| -> Result<String, String> {
+        value
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+            .ok_or_else(|| format!("{}: missing string field {key:?}", path.display()))
+    };
+    let number = |key: &str| -> Result<u64, String> {
+        value
+            .get(key)
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| format!("{}: missing numeric field {key:?}", path.display()))
+    };
+
+    let mut detail = Vec::new();
+    if let Some(items) = value.get("detail").and_then(serde_json::Value::as_array) {
+        for item in items {
+            detail.push(parse_detail_packet(item)?);
+        }
+    }
+
+    let reference = value.get("reference");
+    let seconds = |key: &str| -> f64 {
+        reference
+            .and_then(|reference| reference.get(key))
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(f64::NAN)
+    };
+
+    Ok(Golden {
+        case: string("case")?,
+        xtce: PathBuf::from(string("xtce")?),
+        packets: PathBuf::from(string("packets")?),
+        root_container: value
+            .get("root_container")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        skip_header_bytes: usize::try_from(number("skip_header_bytes")?).unwrap_or(0),
+        packet_count: usize::try_from(number("packet_count")?).unwrap_or(0),
+        unrecognized_count: usize::try_from(number("unrecognized_count").unwrap_or(0)).unwrap_or(0),
+        digest: string("digest_sha256")?,
+        detail,
+        reference_load_seconds: seconds("load_seconds"),
+        reference_parse_seconds: seconds("parse_seconds"),
+    })
+}
+
+/// `None` means the reference refused to decode this packet.
+fn parse_detail_packet(value: &serde_json::Value) -> Result<Option<PacketMap>, String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| "detail entry is not an object".to_owned())?;
+    if object.contains_key("__unrecognized__") {
+        return Ok(None);
+    }
+    let mut map = PacketMap::new();
+    for (name, pair) in object {
+        let items = pair
+            .as_array()
+            .ok_or_else(|| format!("{name}: detail value is not a [raw, eng] pair"))?;
+        let raw = items
+            .first()
+            .ok_or_else(|| format!("{name}: detail value has no raw"))?;
+        let eng = items
+            .get(1)
+            .ok_or_else(|| format!("{name}: detail value has no eng"))?;
+        map.insert(
+            name.clone(),
+            (Scalar::from_json(raw)?, Scalar::from_json(eng)?),
+        );
+    }
+    Ok(Some(map))
+}
+
+fn run_case(
+    testdata: &Path,
+    golden: &Golden,
+    max_differences: usize,
+) -> Result<CaseReport, String> {
+    let xtce_path = testdata.join(&golden.xtce);
+    let packets_path = testdata.join(&golden.packets);
+
+    let load_start = std::time::Instant::now();
+    let db = XtceDb::from_path(&xtce_path)
+        .map_err(|error| format!("{}: {error}", xtce_path.display()))?;
+    let load_seconds = load_start.elapsed().as_secs_f64();
+
+    let decoder = match &golden.root_container {
+        Some(name) => Decoder::with_root(&db, name),
+        None => Decoder::new(&db),
+    }
+    .map_err(|error| format!("{}: {error}", golden.case))?;
+
+    let stream = std::fs::read(&packets_path)
+        .map_err(|error| format!("cannot read {}: {error}", packets_path.display()))?;
+
+    let mut differences = Vec::new();
+    let mut hasher = Sha256::new();
+    let mut canonical = Vec::with_capacity(4096);
+    let mut count = 0usize;
+    let mut unrecognized = 0usize;
+
+    let decode_start = std::time::Instant::now();
+    for (index, framed) in PacketIter::new(&stream, golden.skip_header_bytes).enumerate() {
+        let framed = framed.map_err(|error| format!("{}: packet {index}: {error}", golden.case))?;
+
+        let decoded = decoder.decode(framed.bytes());
+        canonical.clear();
+
+        let observed: Option<PacketMap> = match decoded {
+            Ok(packet) => {
+                let mut map = PacketMap::new();
+                for (name, value) in packet.iter_named() {
+                    map.insert(
+                        name.to_owned(),
+                        (raw_scalar(&value.raw), eng_scalar(&value.eng)),
+                    );
+                }
+                Some(map)
+            }
+            Err(DecodeError::UnrecognizedPacket { .. }) => {
+                unrecognized += 1;
+                None
+            }
+            Err(error) => {
+                if differences.len() < max_differences {
+                    differences.push(format!("packet {index}: decode failed: {error}"));
+                }
+                count += 1;
+                // A failed packet still has to advance the digest, or every subsequent
+                // packet would be blamed for this one.
+                canonical.push(b'?');
+                let mut framed_digest = Vec::new();
+                write_blob(&mut framed_digest, &canonical);
+                hasher.update(&framed_digest);
+                continue;
+            }
+        };
+
+        write_canonical_packet(&mut canonical, observed.as_ref());
+        let mut framed_digest = Vec::with_capacity(canonical.len() + 8);
+        write_blob(&mut framed_digest, &canonical);
+        hasher.update(&framed_digest);
+
+        if let Some(expected) = golden.detail.get(index) {
+            compare_packet(
+                index,
+                expected.as_ref(),
+                observed.as_ref(),
+                &mut differences,
+                max_differences,
+            );
+        }
+        count += 1;
+    }
+    let decode_seconds = decode_start.elapsed().as_secs_f64();
+
+    if count != golden.packet_count {
+        differences.push(format!(
+            "packet count: reference {} vs {count}",
+            golden.packet_count
+        ));
+    }
+    if unrecognized != golden.unrecognized_count {
+        differences.push(format!(
+            "unrecognised packets: reference {} vs {unrecognized}",
+            golden.unrecognized_count
+        ));
+    }
+
+    let digest = to_hex(&hasher.finalize());
+    Ok(CaseReport {
+        case: golden.case.clone(),
+        packets: count,
+        differences,
+        digest_matches: digest == golden.digest,
+        load_seconds,
+        decode_seconds,
+        reference_load_seconds: golden.reference_load_seconds,
+        reference_parse_seconds: golden.reference_parse_seconds,
+    })
+}
+
+/// Mirrors `canonical_packet` in `tools/gen_goldens.py`.
+fn write_canonical_packet(out: &mut Vec<u8>, packet: Option<&PacketMap>) {
+    let Some(packet) = packet else {
+        out.push(b'!');
+        return;
+    };
+    // `BTreeMap` iterates in byte order, which for UTF-8 is code-point order — the same
+    // order Python's `sorted()` produces.
+    for (name, (raw, eng)) in packet {
+        write_blob(out, name.as_bytes());
+        raw.write_canonical(out);
+        eng.write_canonical(out);
+    }
+}
+
+fn compare_packet(
+    index: usize,
+    expected: Option<&PacketMap>,
+    observed: Option<&PacketMap>,
+    differences: &mut Vec<String>,
+    max_differences: usize,
+) {
+    let mut report = |message: String| {
+        if differences.len() < max_differences {
+            differences.push(message);
+        }
+    };
+
+    match (expected, observed) {
+        (None, None) => {}
+        (None, Some(map)) => report(format!(
+            "packet {index}: reference rejected this packet, we decoded {} parameter(s)",
+            map.len()
+        )),
+        (Some(_), None) => report(format!(
+            "packet {index}: reference decoded this packet, we rejected it"
+        )),
+        (Some(expected), Some(observed)) => {
+            for (name, want) in expected {
+                match observed.get(name) {
+                    None => report(format!("packet {index}: {name}: missing from our output")),
+                    Some(got) => {
+                        if got.0 != want.0 {
+                            report(format!(
+                                "packet {index}: {name}: raw differs — reference {:?}, ours {:?}",
+                                want.0, got.0
+                            ));
+                        }
+                        if got.1 != want.1 {
+                            report(format!(
+                                "packet {index}: {name}: eng differs — reference {:?}, ours {:?}",
+                                want.1, got.1
+                            ));
+                        }
+                    }
+                }
+            }
+            for name in observed.keys() {
+                if !expected.contains_key(name) {
+                    report(format!(
+                        "packet {index}: {name}: present in our output but not the reference"
+                    ));
+                }
+            }
+        }
+    }
+}
+
+/// Renders a report block for one case.
+#[must_use]
+pub fn format_report(report: &CaseReport) -> String {
+    let mut out = String::new();
+    let verdict = if report.passed() { "ok" } else { "FAILED" };
+    let _ = writeln!(out, "{:<28} {verdict}", report.case);
+    let _ = writeln!(
+        out,
+        "  {} packets   load {:.1}x   decode {:.1}x   digest {}",
+        report.packets,
+        report.reference_load_seconds / report.load_seconds.max(f64::MIN_POSITIVE),
+        report.reference_parse_seconds / report.decode_seconds.max(f64::MIN_POSITIVE),
+        if report.digest_matches {
+            "ok"
+        } else {
+            "MISMATCH"
+        },
+    );
+    let _ = writeln!(
+        out,
+        "  load {:.1} ms (reference {:.1} ms)   decode {:.1} ms (reference {:.1} ms)",
+        report.load_seconds * 1e3,
+        report.reference_load_seconds * 1e3,
+        report.decode_seconds * 1e3,
+        report.reference_parse_seconds * 1e3,
+    );
+    for difference in &report.differences {
+        let _ = writeln!(out, "    {difference}");
+    }
+    if !report.differences.is_empty() {
+        let _ = writeln!(
+            out,
+            "    ({} difference(s) shown)",
+            report.differences.len()
+        );
+    }
+    out
+}

@@ -1,5 +1,16 @@
 [package]
 name = "xtce-decode"
+description = "Decode CCSDS telemetry packets against an XTCE definition"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
 [dependencies]
+xtce-model.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

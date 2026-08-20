@@ -62,7 +62,8 @@ make the differential tests impossible to run at all.
 | `BaseContainer` + `RestrictionCriteria` | Decodable | |
 | `Comparison`, `ComparisonList` | Decodable | all six operators, in every accepted spelling |
 | `BooleanExpression` (`Condition`, `ANDedConditions`, `ORedConditions`) | Decodable | required by `contrived_inheritance_structure.xml` |
-| `LocationInContainerInBits` | Decodable | `previousEntry`, `containerStart`, `containerEnd`, `nextEntry` |
+| `LocationInContainerInBits` | Decodable | `previousEntry` and `containerStart` |
+| `LocationInContainerInBits` with `containerEnd` / `nextEntry` | Represented | needs a container size that is only known once decoding finishes; reported at decode time |
 | `RepeatEntry` with a fixed `Count` | Decodable | |
 | `RepeatEntry` with `DynamicValue` | Represented | entry decodes once, then reports unsupported |
 | `IndirectParameterRefEntry` | Represented | `EntryKind::Unsupported` |
@@ -90,6 +91,8 @@ covered by a test.
 | `signMagnitude` / `onesComplement` | rejected | decoded |
 | Enumeration `maxValue` ranges | not implemented | honoured |
 | Out-of-scope construct | raises at load | represented; raises at decode |
+| Spline query equal to the largest raw value | raises (`list.index(True)` finds nothing) | clamps to the final segment, which XTCE's inclusive range implies |
+| Container entry lists that reference each other cyclically | recurses until the stack overflows | bounded at 64 levels and reported |
 
 None of the bundled test files exercise a divergence, so the differential tests are
 unaffected by them.

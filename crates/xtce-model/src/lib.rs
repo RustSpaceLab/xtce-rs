@@ -28,6 +28,17 @@
 #![deny(clippy::todo, clippy::unimplemented)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
+// Tests are allowed to assert loudly; the no-panic rule is about library code reached by a
+// live downlink, not about test setup.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::float_cmp
+    )
+)]
 
 pub mod containers;
 pub mod db;

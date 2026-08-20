@@ -9115,13 +9115,13 @@
   }
  ],
  "detail_count": 64,
- "digest_sha256": "532359bb86c5c16d35b24086f3f7b0a0b2c9c533ce2b653dbe1a76ca7b455789",
+ "digest_sha256": "0cb19a7f02642805c081868a14e6434a81ba7f9aed4620c3d0a0cbf513c66784",
  "packet_count": 78,
  "packets": "idex/sciData_2023_052_14_45_05",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.021563,
-  "parse_seconds": 0.021278
+  "load_seconds": 0.021094,
+  "parse_seconds": 0.019548
  },
  "root_container": null,
  "skip_header_bytes": 0,

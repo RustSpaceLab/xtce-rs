@@ -2,31 +2,31 @@
  {
   "case": "jpss_geolocation",
   "packet_count": 7200,
-  "load_seconds": 0.008672,
-  "parse_seconds": 1.03186
+  "load_seconds": 0.010236,
+  "parse_seconds": 0.953711
  },
  {
   "case": "jpss_contrived_inheritance",
   "packet_count": 7200,
-  "load_seconds": 0.003016,
-  "parse_seconds": 1.154283
+  "load_seconds": 0.002752,
+  "parse_seconds": 1.058907
  },
  {
   "case": "ctim",
   "packet_count": 1499,
-  "load_seconds": 0.11889,
-  "parse_seconds": 4.773655
+  "load_seconds": 0.119682,
+  "parse_seconds": 5.109016
  },
  {
   "case": "suda",
   "packet_count": 13,
-  "load_seconds": 0.019756,
-  "parse_seconds": 0.003564
+  "load_seconds": 0.019747,
+  "parse_seconds": 0.003971
  },
  {
   "case": "idex",
   "packet_count": 78,
-  "load_seconds": 0.021563,
-  "parse_seconds": 0.021278
+  "load_seconds": 0.021094,
+  "parse_seconds": 0.019548
  }
 ]

@@ -1849,13 +1849,13 @@
   }
  ],
  "detail_count": 13,
- "digest_sha256": "82939f40e529e555a76b45b65809b46ab745c879e86972b6000ee434b645133d",
+ "digest_sha256": "48f639ea31042d73b2e6cb6ca028bab3237e195afedde7428891f80ea69d3c28",
  "packet_count": 13,
  "packets": "suda/sciData_2022_130_17_41_53.spl",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.019756,
-  "parse_seconds": 0.003564
+  "load_seconds": 0.019747,
+  "parse_seconds": 0.003971
  },
  "root_container": null,
  "skip_header_bytes": 4,
