@@ -197,3 +197,50 @@ benchmark above meaningless.
 ### Next
 
 M7, the PyO3 bindings, is the last milestone in the specification.
+
+## 2026-08-21 — M7: Python bindings, and the last milestone
+
+`import xtce` works. The specification's exit condition was "decodes the same file"; what it
+actually does is decode four real mission files and match `space_packet_parser` field by
+field, engineering values and raw values both, through the same standard the Rust side is
+held to.
+
+```
+$ pytest crates/xtce-py/tests -q
+14 passed
+```
+
+7200 JPSS packets decode in 38 ms including the construction of every Python dictionary,
+against the reference's 954 ms — 25×. The pure Rust figure is 9.3 ms, so about three quarters
+of the remaining time is building Python objects, which is the floor for any binding that
+returns dictionaries.
+
+### Three decisions
+
+**Its own workspace, not a member.** Adding `xtce-py` to `members` would make
+`cargo build --workspace` require libpython, and the three CI jobs that prove this project
+builds with nothing but a Rust toolchain would stop proving it. It is in `exclude`, has its
+own lockfile, and is built by `maturin`. `cargo tree --workspace | grep pyo3` returns nothing.
+
+**Batch-shaped API.** The decoder is two orders of magnitude faster than the reference and a
+per-packet call would return all of that to the interpreter. `decode_stream` frames and
+decodes a whole buffer in one call and releases the GIL around the Rust loop, so values are
+materialised as owned Rust values with the GIL released and converted in one pass with it
+held. There is a test that a counter thread keeps running during a long decode, because
+without it the binding would serialise every consumer behind itself and nothing else would
+notice.
+
+**Names interned once.** Parameter names become Python string objects when the definition
+loads, indexed by parameter id, so a 7200-packet stream allocates no strings for dictionary
+keys at all.
+
+### CI
+
+A fourth job builds the wheel and runs the Python differential tests. It is advisory — it
+needs a Python toolchain and a network install of the reference, neither of which this
+repository controls — for the same reason the latest-stable clippy job is advisory. The three
+blocking jobs are unchanged.
+
+### All milestones complete
+
+M0 through M7. `BLOCKERS.md` says where a next session should start.

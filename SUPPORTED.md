@@ -126,3 +126,10 @@ Of the ten bundled definitions, `jpss1_geolocation_xtce_v1.xml` compiles complet
 other nine are refused with the element named — CTIM on its strings, IDEX and SUDA on their
 dynamically sized binary fields, `contrived_inheritance_structure.xml` on its
 `BooleanExpression`. All nine decode fine through the interpreter.
+
+## Python bindings
+
+`xtce-py` exposes the interpreted decoder, so its coverage is exactly the "Decodable" column
+above — not the narrower code-generation subset. A construct that is represented but not
+decodable raises `ValueError` naming the element, and `Definition.unsupported()` lists them
+before you decode anything.

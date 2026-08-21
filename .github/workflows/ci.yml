@@ -55,6 +55,31 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
+  python:
+    name: python bindings (advisory)
+    runs-on: ubuntu-latest
+    # Advisory for the same reason as the toolchain job: this needs a Python toolchain and a
+    # network install of the reference implementation, neither of which is this repository's
+    # to keep working. The three jobs above must stay green on their own.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install build and test tools
+        run: pip install maturin pytest space_packet_parser==6.1.2
+
+      - name: Build and install the extension module
+        run: maturin develop --release --manifest-path crates/xtce-py/Cargo.toml
+
+      # Compares the bindings against the reference field by field, on four real files.
+      - name: Differential tests through Python
+        run: pytest crates/xtce-py/tests -q
+
   msrv:
     name: minimum supported Rust version
     runs-on: ubuntu-latest

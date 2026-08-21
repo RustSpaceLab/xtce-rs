@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "xtask"]
+# The Python bindings are their own workspace. Including them here would make
+# `cargo build --workspace` require libpython, and the CI jobs that prove this project builds
+# with nothing but a Rust toolchain would stop proving it. `maturin` builds that crate.
+exclude = ["crates/xtce-py"]
 
 [workspace.package]
 version = "0.1.0"

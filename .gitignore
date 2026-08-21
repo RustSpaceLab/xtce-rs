@@ -5,3 +5,6 @@
 # JetBrains workspace state — the shared parts are checked in deliberately.
 /.idea/workspace.xml
 /.idea/shelf
+
+# maturin build output for the Python bindings
+/crates/xtce-py/target

@@ -1,0 +1,28 @@
+# Its own workspace on purpose. Adding this crate to the root workspace would make
+# `cargo build --workspace` require libpython, and the three CI jobs that currently prove the
+# project builds with nothing but a Rust toolchain would stop proving it.
+[workspace]
+
+[package]
+name = "xtce-py"
+description = "Python bindings for xtce-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mysma-9403/RustSpace"
+authors = ["Maciej Myszkiewicz"]
+publish = false
+
+[lib]
+name = "xtce"
+crate-type = ["cdylib"]
+
+[dependencies]
+xtce-model = { path = "../xtce-model" }
+xtce-decode = { path = "../xtce-decode" }
+pyo3 = { version = "0.28", features = ["abi3-py310", "extension-module"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

@@ -20,7 +20,8 @@ validated against that same implementation packet for packet.
 | `xtce-model` | XTCE XML → arena-backed IR, reference resolution, validation |
 | `xtce-decode` | IR + `&[u8]` → parameter values |
 | `xtce-codegen` | IR → a static Rust decoder with every offset baked in |
-| `xtce-cli` | `xtce info`, `xtce decode`, `xtce bench` |
+| `xtce-cli` | `xtce info`, `xtce decode`, `xtce codegen`, `xtce bench` |
+| `xtce-py` | Python bindings (PyO3), built by `maturin` |
 | `xtask` | differential test harness against the Python reference |
 
 Scope is a deliberate subset of XTCE, documented in [`SUPPORTED.md`](SUPPORTED.md).
@@ -68,6 +69,24 @@ $ cargo run --release -p xtce-cli -- codegen \\
 $ cargo xtask diff
 $ cargo bench
 ```
+
+From Python:
+
+```python
+import xtce
+
+definition = xtce.Definition("jpss1_geolocation_xtce_v1.xml")
+packets = definition.decode_stream(open("telemetry.dat", "rb").read())
+print(len(packets), packets[0]["PKT_APID"])
+```
+
+`decode_stream` frames and decodes a whole buffer in one call, releasing the GIL for the Rust
+part. That matters: a per-packet round trip would give the speed-up back to the interpreter.
+7200 JPSS packets take 38 ms including building every Python dictionary, against the
+reference's 954 ms.
+
+The bindings are their own Cargo workspace, so `cargo build --workspace` never needs
+libpython. Build them with `maturin develop --release --manifest-path crates/xtce-py/Cargo.toml`.
 
 ## Layout
 
