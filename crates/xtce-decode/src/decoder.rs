@@ -28,6 +28,12 @@ const MAX_CONTAINER_DEPTH: usize = 64;
 pub struct Decoder<'db> {
     db: &'db XtceDb,
     root: ContainerId,
+    /// Upper bound on how many parameters one packet can produce from this root.
+    ///
+    /// Computed once so that a decoded packet reserves its storage in one go instead of
+    /// regrowing a `Vec` and a hash table as it fills. CTIM's containers hold about 250
+    /// entries each, which is eight doublings per packet without this.
+    capacity_hint: usize,
 }
 
 impl<'db> Decoder<'db> {
@@ -43,7 +49,7 @@ impl<'db> Decoder<'db> {
             .ok_or_else(|| DecodeError::AmbiguousRoot {
                 candidates: db.root_containers().len(),
             })?;
-        Ok(Self { db, root })
+        Ok(Self::rooted(db, root))
     }
 
     /// Builds a decoder rooted at a named container.
@@ -57,7 +63,15 @@ impl<'db> Decoder<'db> {
             .ok_or_else(|| DecodeError::NoSuchContainer {
                 name: name.to_owned(),
             })?;
-        Ok(Self { db, root })
+        Ok(Self::rooted(db, root))
+    }
+
+    fn rooted(db: &'db XtceDb, root: ContainerId) -> Self {
+        Self {
+            db,
+            root,
+            capacity_hint: longest_path_entries(db, root),
+        }
     }
 
     /// The database being decoded against.
@@ -83,12 +97,46 @@ impl<'db> Decoder<'db> {
     /// See [`DecodeError`]. Notably, a packet whose type the definition does not describe
     /// yields [`DecodeError::UnrecognizedPacket`] rather than a partial result.
     pub fn decode<'p>(&self, data: &'p [u8]) -> Result<DecodedPacket<'db, 'p>, DecodeError> {
-        let mut packet = DecodedPacket::new(self.db, data, self.root);
+        let mut packet = DecodedPacket::with_capacity(self.db, data, self.root, self.capacity_hint);
+        self.decode_into(&mut packet, data)?;
+        Ok(packet)
+    }
+
+    /// Decodes one packet into an existing buffer, reusing its allocations.
+    ///
+    /// Decoding a stream this way allocates nothing after the first packet. All the packets
+    /// must share a lifetime, which they do when they are slices of one buffer — the usual
+    /// case for a file or a receive window.
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let db = xtce_model::XtceDb::from_path("d.xml")?;
+    /// # let stream = std::fs::read("t.bin")?;
+    /// let decoder = xtce_decode::Decoder::new(&db)?;
+    /// let mut packet = decoder.new_packet(&stream);
+    /// for framed in xtce_decode::PacketIter::new(&stream, 0) {
+    ///     decoder.decode_into(&mut packet, framed?.bytes())?;
+    ///     println!("{} parameters", packet.len());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::decode`]. On failure the buffer holds whatever was decoded before the
+    /// error, which is useful for diagnosis and must not be mistaken for a complete packet.
+    pub fn decode_into<'p>(
+        &self,
+        packet: &mut DecodedPacket<'db, 'p>,
+        data: &'p [u8],
+    ) -> Result<(), DecodeError> {
+        packet.reset(data, self.root);
         let mut cursor = BitCursor::new(data);
         let mut current = self.root;
 
         loop {
-            self.decode_container(current, &mut cursor, &mut packet, 0)?;
+            self.decode_container(current, &mut cursor, packet, 0)?;
 
             let container = self
                 .db
@@ -98,7 +146,7 @@ impl<'db> Decoder<'db> {
             let mut matched: Option<ContainerId> = None;
             let mut extra: Vec<ContainerId> = Vec::new();
             for &inheritor in &container.inheritors {
-                if self.inheritor_matches(inheritor, &packet)? {
+                if self.inheritor_matches(inheritor, packet)? {
                     match matched {
                         None => matched = Some(inheritor),
                         Some(_) => extra.push(inheritor),
@@ -137,7 +185,13 @@ impl<'db> Decoder<'db> {
 
         packet.set_container(current);
         packet.set_bits_consumed(cursor.position());
-        Ok(packet)
+        Ok(())
+    }
+
+    /// An empty packet buffer sized for this decoder, for use with [`Self::decode_into`].
+    #[must_use]
+    pub fn new_packet<'p>(&self, data: &'p [u8]) -> DecodedPacket<'db, 'p> {
+        DecodedPacket::with_capacity(self.db, data, self.root, self.capacity_hint)
     }
 
     /// Decodes one container's own entry list, expanding `<ContainerRefEntry>` inline.
@@ -808,6 +862,50 @@ impl<'db> Decoder<'db> {
             .parameter(id)
             .map_or_else(|| "?".to_owned(), |p| self.db.name(p.name).to_owned())
     }
+}
+
+/// The largest number of entries any single decode path from `root` can visit.
+///
+/// A decode walks from the root down one chain of inheritors, decoding each container's own
+/// entry list and expanding any `<ContainerRefEntry>` inline. This is the deepest such walk,
+/// used to size a packet's storage once instead of regrowing it.
+///
+/// Bounded work: each container is expanded at most once per path, and the recursion is
+/// depth-limited exactly as decoding is, so a cyclic entry list cannot hang the constructor.
+fn longest_path_entries(db: &XtceDb, root: ContainerId) -> usize {
+    fn own_entries(db: &XtceDb, id: ContainerId, depth: usize) -> usize {
+        if depth > MAX_CONTAINER_DEPTH {
+            return 0;
+        }
+        db.container_entries(id)
+            .iter()
+            .map(|entry| {
+                let repeat = entry.repeat.unwrap_or(1) as usize;
+                match entry.kind {
+                    EntryKind::Container(child) => own_entries(db, child, depth + 1) * repeat,
+                    _ => repeat,
+                }
+            })
+            .sum()
+    }
+
+    fn walk(db: &XtceDb, id: ContainerId, depth: usize) -> usize {
+        if depth > MAX_CONTAINER_DEPTH {
+            return 0;
+        }
+        let here = own_entries(db, id, 0);
+        let deepest = db.container(id).map_or(0, |container| {
+            container
+                .inheritors
+                .iter()
+                .map(|&child| walk(db, child, depth + 1))
+                .max()
+                .unwrap_or(0)
+        });
+        here + deepest
+    }
+
+    walk(db, root, 0)
 }
 
 /// A comparable view of a value.

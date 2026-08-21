@@ -170,15 +170,36 @@ pub struct DecodedPacket<'db, 'p> {
 }
 
 impl<'db, 'p> DecodedPacket<'db, 'p> {
-    pub(crate) fn new(db: &'db XtceDb, data: &'p [u8], container: ContainerId) -> Self {
+    pub(crate) fn with_capacity(
+        db: &'db XtceDb,
+        data: &'p [u8],
+        container: ContainerId,
+        capacity: usize,
+    ) -> Self {
         Self {
             db,
             data,
-            values: Vec::new(),
-            slots: FxHashMap::default(),
+            values: Vec::with_capacity(capacity),
+            slots: FxHashMap::with_capacity_and_hasher(
+                capacity,
+                std::hash::BuildHasherDefault::default(),
+            ),
             container,
             bits_consumed: 0,
         }
+    }
+
+    /// Empties the packet for reuse, keeping its allocations.
+    ///
+    /// This is what makes [`crate::Decoder::decode_into`] allocation-free after the first
+    /// packet: decoding a stream otherwise allocates a `Vec` and a table per packet, and a
+    /// large container regrows both several times on the way.
+    pub(crate) fn reset(&mut self, data: &'p [u8], container: ContainerId) {
+        self.values.clear();
+        self.slots.clear();
+        self.data = data;
+        self.container = container;
+        self.bits_consumed = 0;
     }
 
     pub(crate) fn insert(&mut self, value: ParameterValue<'db, 'p>) {

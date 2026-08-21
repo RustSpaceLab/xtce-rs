@@ -49,6 +49,13 @@ pub(crate) struct Lowering<'d> {
     interner: Interner,
 
     space_systems: Vec<SpaceSystem>,
+    /// Qualified path of each space system, owned separately from the interner.
+    ///
+    /// Building `"{parent}/{name}"` needs to read a path while writing to the interner. Held
+    /// as its own `Vec`, the two are disjoint fields and the borrow checker allows it; read
+    /// back out of the interner, every call would have to clone the parent path first —
+    /// which is one allocation per definition, and a large database has ten thousand.
+    ss_paths: Vec<String>,
     pending_types: Vec<Pending<'d>>,
     pending_params: Vec<Pending<'d>>,
     pending_containers: Vec<Pending<'d>>,
@@ -67,11 +74,15 @@ pub(crate) struct Lowering<'d> {
 
 impl<'d> Lowering<'d> {
     pub(crate) fn new(dom: &'d Dom) -> Self {
-        let interner = Interner::with_capacity(dom.len() / 2, dom.len() * 8);
+        // Two names per element is a generous upper bound (a definition contributes its own
+        // name and its qualified path), and over-reserving here costs one allocation while
+        // under-reserving costs a full rehash part-way through lowering.
+        let interner = Interner::with_capacity(dom.len() * 2, dom.len() * 8);
         Self {
             dom,
             interner,
             space_systems: Vec::new(),
+            ss_paths: Vec::new(),
             pending_types: Vec::new(),
             pending_params: Vec::new(),
             pending_containers: Vec::new(),
@@ -144,17 +155,17 @@ impl<'d> Lowering<'d> {
                 path: element.path(),
             })?;
 
-        let qualified = match parent {
-            Some(parent) => {
-                let parent_path = self.qualified_of(parent).to_owned();
-                format!("{parent_path}/{name}")
-            }
-            None => format!("/{name}"),
-        };
+        let mut qualified = String::new();
+        if let Some(parent) = parent {
+            qualified.push_str(self.ss_paths.get(parent.index()).map_or("", String::as_str));
+        }
+        qualified.push('/');
+        qualified.push_str(name);
 
         let id = SpaceSystemId::new(u32::try_from(self.space_systems.len()).unwrap_or(u32::MAX));
         let name_id = self.interner.intern(name);
         let qualified_id = self.interner.intern(&qualified);
+        self.ss_paths.push(qualified);
         self.space_systems.push(SpaceSystem {
             name: name_id,
             qualified_name: qualified_id,
@@ -203,10 +214,20 @@ impl<'d> Lowering<'d> {
                 path: element.path(),
             });
         };
-        let parent_path = self.qualified_of(space_system).to_owned();
-        let qualified = format!("{parent_path}/{name}");
-        let qualified_id = self.interner.intern(&qualified);
+        // `scratch` is moved out and back so that reading a space-system path and writing to
+        // the interner do not overlap; no allocation happens after the first definition.
+        let mut scratch = std::mem::take(&mut self.scratch);
+        scratch.clear();
+        scratch.push_str(
+            self.ss_paths
+                .get(space_system.index())
+                .map_or("", String::as_str),
+        );
+        scratch.push('/');
+        scratch.push_str(name);
+        let qualified_id = self.interner.intern(&scratch);
         let leaf_id = self.interner.intern(name);
+        let qualified = &scratch;
 
         let pending = Pending {
             element,
@@ -223,7 +244,7 @@ impl<'d> Lowering<'d> {
                     qualified_id,
                     id,
                     RefKind::ParameterType,
-                    &qualified,
+                    qualified,
                     &element,
                 )?;
                 self.type_by_leaf.entry(leaf_id).or_insert(id);
@@ -236,7 +257,7 @@ impl<'d> Lowering<'d> {
                     qualified_id,
                     id,
                     RefKind::Parameter,
-                    &qualified,
+                    qualified,
                     &element,
                 )?;
                 self.param_by_leaf.entry(leaf_id).or_insert(id);
@@ -251,12 +272,13 @@ impl<'d> Lowering<'d> {
                     qualified_id,
                     id,
                     RefKind::Container,
-                    &qualified,
+                    qualified,
                     &element,
                 )?;
                 self.container_by_leaf.entry(leaf_id).or_insert(id);
             }
         }
+        self.scratch = scratch;
         Ok(())
     }
 
@@ -993,13 +1015,6 @@ impl<'d> Lowering<'d> {
 
     // ------------------------------------------------------------------- resolution
 
-    fn qualified_of(&self, id: SpaceSystemId) -> &str {
-        self.space_systems
-            .get(id.index())
-            .map(|system| self.interner.resolve(system.qualified_name))
-            .unwrap_or_default()
-    }
-
     fn resolve_parameter_opt(&mut self, reference: &str, from: SpaceSystemId) -> Option<ParamId> {
         self.resolve(reference, from, RefKind::Parameter)
             .map(ParamId::new)
@@ -1021,36 +1036,57 @@ impl<'d> Lowering<'d> {
         if reference.is_empty() {
             return None;
         }
+        let is_path = reference.contains('/');
 
-        if reference.starts_with('/') {
-            normalize_into(&mut self.scratch, "", reference);
-            if let Some(id) = self.lookup_qualified(kind) {
-                return Some(id);
-            }
-        } else {
-            let mut cursor = Some(from);
-            while let Some(system) = cursor {
-                let base = self.qualified_of(system);
-                // `normalize_into` borrows `self.scratch` mutably while `base` borrows
-                // `self` immutably, so the base has to be copied out first. It is short.
-                let base = base.to_owned();
-                normalize_into(&mut self.scratch, &base, reference);
-                if let Some(id) = self.lookup_qualified(kind) {
-                    return Some(id);
-                }
-                cursor = self
-                    .space_systems
-                    .get(system.index())
-                    .and_then(|system| system.parent);
-                if reference.contains('/') {
-                    // Path-shaped references are only tried relative to the current system
-                    // and absolutely; they do not walk up the tree.
-                    break;
-                }
-            }
+        // With a single space system — which is every file in `testdata`, and most databases
+        // that are not assembled from several missions — the current system's table and the
+        // document-wide leaf table hold exactly the same entries, so building and hashing a
+        // qualified name would be pure overhead. This is not a different resolution rule,
+        // just the same one arrived at directly.
+        if !is_path && self.space_systems.len() == 1 {
+            return self.lookup_leaf(reference, kind);
         }
 
-        let leaf = reference.rsplit('/').next().unwrap_or(reference);
+        let mut scratch = std::mem::take(&mut self.scratch);
+        let found = self.resolve_by_path(&mut scratch, reference, from, kind, is_path);
+        self.scratch = scratch;
+        found.or_else(|| self.lookup_leaf(last_segment(reference), kind))
+    }
+
+    fn resolve_by_path(
+        &self,
+        scratch: &mut String,
+        reference: &str,
+        from: SpaceSystemId,
+        kind: RefKind,
+        is_path: bool,
+    ) -> Option<u32> {
+        if reference.starts_with('/') {
+            normalize_into(scratch, "", reference);
+            return self.lookup_qualified(scratch, kind);
+        }
+
+        let mut cursor = Some(from);
+        while let Some(system) = cursor {
+            let base = self.ss_paths.get(system.index()).map_or("", String::as_str);
+            normalize_into(scratch, base, reference);
+            if let Some(id) = self.lookup_qualified(scratch, kind) {
+                return Some(id);
+            }
+            if is_path {
+                // Path-shaped references are tried relative to the current system and
+                // absolutely; they do not walk up the tree.
+                break;
+            }
+            cursor = self
+                .space_systems
+                .get(system.index())
+                .and_then(|system| system.parent);
+        }
+        None
+    }
+
+    fn lookup_leaf(&self, leaf: &str, kind: RefKind) -> Option<u32> {
         let leaf_id = self.interner.get(leaf)?;
         match kind {
             RefKind::Parameter => self.param_by_leaf.get(&leaf_id).map(|id| id.raw()),
@@ -1059,8 +1095,8 @@ impl<'d> Lowering<'d> {
         }
     }
 
-    fn lookup_qualified(&self, kind: RefKind) -> Option<u32> {
-        let id = self.interner.get(&self.scratch)?;
+    fn lookup_qualified(&self, qualified: &str, kind: RefKind) -> Option<u32> {
+        let id = self.interner.get(qualified)?;
         match kind {
             RefKind::Parameter => self.param_by_qualified.get(&id).map(|id| id.raw()),
             RefKind::ParameterType => self.type_by_qualified.get(&id).map(|id| id.raw()),
@@ -1103,7 +1139,24 @@ fn insert_unique<T: Copy>(
 }
 
 /// Writes `base/reference` into `out`, resolving `.` and `..` segments.
+/// Writes `base/reference` into `out`, resolving `.` and `..` segments.
+///
+/// Almost every reference in a real database is a plain name or a plain path, so the common
+/// case is a concatenation with no segment analysis and no allocation. The general case
+/// falls back to walking segments, which needs a stack because `..` pops.
 fn normalize_into(out: &mut String, base: &str, reference: &str) {
+    out.clear();
+    if !needs_normalising(reference) {
+        if !reference.starts_with('/') {
+            out.push_str(base);
+        }
+        if !reference.starts_with('/') {
+            out.push('/');
+        }
+        out.push_str(reference);
+        return;
+    }
+
     let mut segments: Vec<&str> = Vec::new();
     if !reference.starts_with('/') {
         segments.extend(base.split('/').filter(|part| !part.is_empty()));
@@ -1117,10 +1170,27 @@ fn normalize_into(out: &mut String, base: &str, reference: &str) {
             other => segments.push(other),
         }
     }
-    out.clear();
     for segment in segments {
         out.push('/');
         out.push_str(segment);
+    }
+}
+
+/// Whether a reference contains `.`, `..` or empty segments that need resolving.
+fn needs_normalising(reference: &str) -> bool {
+    if !reference.contains('.') && !reference.contains("//") {
+        return false;
+    }
+    reference
+        .split('/')
+        .any(|part| part.is_empty() || part == "." || part == "..")
+}
+
+/// The part of a reference after the last `/`.
+fn last_segment(reference: &str) -> &str {
+    match reference.rsplit_once('/') {
+        Some((_, leaf)) => leaf,
+        None => reference,
     }
 }
 

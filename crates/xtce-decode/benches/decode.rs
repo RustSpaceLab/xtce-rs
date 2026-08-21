@@ -126,5 +126,50 @@ fn decode_single_packet(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, decode_streams, decode_single_packet);
+/// The same streams through `decode_into`, which reuses one packet buffer.
+///
+/// The difference against `decode` is exactly the cost of the per-packet allocations.
+fn decode_reusing_buffer(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("decode_into");
+    for case in CASES {
+        let Ok(db) = XtceDb::from_path(testdata(case.xtce)) else {
+            continue;
+        };
+        let decoder = match case.root {
+            Some(name) => Decoder::with_root(&db, name),
+            None => Decoder::new(&db),
+        };
+        let Ok(decoder) = decoder else { continue };
+        let Ok(stream) = std::fs::read(testdata(case.packets)) else {
+            continue;
+        };
+        let packets: Vec<&[u8]> = PacketIter::new(&stream, case.skip_header_bytes)
+            .filter_map(Result::ok)
+            .map(|packet| packet.bytes())
+            .collect();
+        if packets.is_empty() {
+            continue;
+        }
+
+        let bytes: usize = packets.iter().map(|packet| packet.len()).sum();
+        group.throughput(Throughput::Bytes(bytes as u64));
+        group.bench_function(case.name, |bencher| {
+            bencher.iter(|| {
+                let mut buffer = decoder.new_packet(&stream);
+                for packet in &packets {
+                    let outcome = decoder.decode_into(&mut buffer, black_box(packet));
+                    black_box(outcome.is_ok() as usize + buffer.len());
+                }
+            });
+        });
+    }
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    decode_streams,
+    decode_reusing_buffer,
+    decode_single_packet
+);
 criterion_main!(benches);

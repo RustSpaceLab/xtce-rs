@@ -61,5 +61,41 @@ fn parse_xml_only(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, load_definitions, parse_xml_only);
+/// The XML reader with no tree built at all.
+///
+/// This is the ceiling: no implementation of `parse_xml` can be faster than iterating the
+/// events it has to see. Keeping it in the suite stops "the parser is slow" from being
+/// asserted without knowing how much of the time is unavoidable.
+fn raw_events(criterion: &mut Criterion) {
+    use quick_xml::Reader;
+    use quick_xml::events::Event;
+
+    let mut group = criterion.benchmark_group("raw_events");
+    for (name, relative) in FILES {
+        let Ok(text) = std::fs::read_to_string(testdata(relative)) else {
+            continue;
+        };
+        group.throughput(Throughput::Bytes(text.len() as u64));
+        group.bench_function(*name, |bencher| {
+            bencher.iter(|| {
+                let mut reader = Reader::from_str(black_box(&text));
+                reader.config_mut().trim_text(true);
+                let mut count = 0usize;
+                loop {
+                    match reader.read_event() {
+                        Ok(Event::Eof) | Err(_) => break,
+                        Ok(Event::Start(start) | Event::Empty(start)) => {
+                            count += start.attributes().count();
+                        }
+                        Ok(_) => count += 1,
+                    }
+                }
+                black_box(count)
+            });
+        });
+    }
+    group.finish();
+}
+
+criterion_group!(benches, load_definitions, parse_xml_only, raw_events);
 criterion_main!(benches);

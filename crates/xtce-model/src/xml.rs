@@ -11,17 +11,27 @@
 //!
 //! # Why it is still fast
 //!
-//! Nothing here allocates per element. Element names, attribute keys, attribute values and
-//! text all become [`NameId`]s in a shared [`Interner`], so the tree is three flat `Vec`s of
-//! `Copy` records with no `String`, no `Rc`, and no per-node allocation. XTCE repeats its
-//! vocabulary heavily — `encoding="unsigned"` appears 205 times in one of the test files —
-//! so interning values deduplicates as well as compacts.
+//! Nothing here allocates per element. Element names, attribute names, attribute values and
+//! text are appended to one shared `String` arena and addressed by `(start, len)`, so the
+//! tree is three flat `Vec`s of `Copy` records with no `String`, no `Rc`, and no per-node
+//! allocation.
+//!
+//! The arena deliberately does *not* deduplicate. An earlier version interned every
+//! attribute value, which sounds attractive — `encoding="unsigned"` appears 205 times in one
+//! test file — but interning costs a hash lookup per value where the arena costs a memcpy of
+//! about eight bytes, and the 1.6 MB test file has roughly a quarter of a million of them.
+//! Deduplication belongs in the IR, which keeps only the names it actually needs; the tree is
+//! transient and is dropped as soon as lowering finishes.
+//!
+//! Tag and attribute-key recognition is a `match` on the local name rather than a hash
+//! lookup: the vocabulary is a small closed set of short strings, which `rustc` compiles into
+//! a length switch and a handful of comparisons.
 
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use crate::error::{ParseError, ParseErrorKind};
-use crate::intern::{FxHashMap, Interner, NameId};
+use crate::ids::Span;
 
 /// Sentinel for "no node"; the arena can never hold `u32::MAX` nodes.
 const NONE: u32 = u32::MAX;
@@ -49,6 +59,16 @@ macro_rules! symbols {
                 match self {
                     $($name::$variant => $text,)*
                     $name::Other => "",
+                }
+            }
+
+            /// Recognises a local name, returning [`Self::Other`] for anything outside the
+            /// vocabulary.
+            #[must_use]
+            $vis fn from_text(text: &str) -> Self {
+                match text {
+                    $($text => $name::$variant,)*
+                    _ => $name::Other,
                 }
             }
         }
@@ -134,6 +154,32 @@ symbols! {
         OffsetFrom => "OffsetFrom",
         RepeatEntry => "RepeatEntry",
         Count => "Count",
+        ServiceSet => "ServiceSet",
+        MessageSet => "MessageSet",
+        StreamSet => "StreamSet",
+        AlgorithmSet => "AlgorithmSet",
+        AliasSet => "AliasSet",
+        AncillaryDataSet => "AncillaryDataSet",
+    }
+}
+
+impl Tag {
+    /// Whether this element opens a section telemetry decoding never reads.
+    ///
+    /// Checked as an enum comparison rather than by scanning a list of strings: this runs
+    /// once per element, and the largest test file has twenty thousand of them.
+    #[must_use]
+    const fn is_skipped_section(self) -> bool {
+        matches!(
+            self,
+            Self::CommandMetaData
+                | Self::ServiceSet
+                | Self::MessageSet
+                | Self::StreamSet
+                | Self::AlgorithmSet
+                | Self::AliasSet
+                | Self::AncillaryDataSet
+        )
     }
 }
 
@@ -173,41 +219,32 @@ symbols! {
     }
 }
 
-/// Sections of an XTCE document that telemetry decoding never reads.
-///
-/// Their subtrees are dropped during parsing rather than materialised and ignored. In a
-/// real mission database `CommandMetaData` can be larger than the telemetry half, so this
-/// is a load-time saving, not just tidiness. Skipped sections are counted so `xtce info`
-/// can report what the file contained but this crate did not model.
-const SKIPPED_SECTIONS: &[&str] = &[
-    "CommandMetaData",
-    "ServiceSet",
-    "MessageSet",
-    "StreamSet",
-    "AlgorithmSet",
-    "AliasSet",
-    "AncillaryDataSet",
-];
+// Sections of an XTCE document that telemetry decoding never reads are dropped during
+// parsing rather than materialised and ignored — see `Tag::is_skipped_section`. In a real
+// mission database `CommandMetaData` can be larger than the telemetry half, so this is a
+// load-time saving, not just tidiness. Skipped sections are recorded so `xtce info` can
+// report what the file contained but this crate did not model.
 
 /// One element in the arena.
 #[derive(Clone, Copy, Debug)]
 pub struct Node {
     tag: Tag,
-    name: NameId,
+    name: Span,
     parent: u32,
     first_child: u32,
     next_sibling: u32,
     attr_start: u32,
     attr_len: u32,
-    /// Interned text content, present only for elements with no element children.
-    text: Option<NameId>,
+    /// Text content, present only for elements with no element children.
+    text: Span,
+    has_text: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
 struct Attr {
     key: AttrKey,
-    name: NameId,
-    value: NameId,
+    name: Span,
+    value: Span,
 }
 
 /// A parsed XTCE document: a flat arena of elements plus the interner backing every name.
@@ -219,9 +256,8 @@ pub struct Dom {
     /// appending O(1) for wide parents such as `ParameterSet`, which holds thousands of
     /// children in the larger test files.
     last_child: Vec<u32>,
-    interner: Interner,
-    tag_by_name: FxHashMap<NameId, Tag>,
-    attr_by_name: FxHashMap<NameId, AttrKey>,
+    /// Every name, attribute value and text run, concatenated.
+    arena: String,
     skipped_sections: Vec<String>,
     xmlns: Option<String>,
 }
@@ -244,32 +280,39 @@ impl Dom {
     /// Returns [`ParseError`] if the input is not well-formed XML or contains no root
     /// element.
     pub fn parse(input: &str) -> Result<Self, ParseError> {
-        // These capacities are sized from the largest file in `testdata` (1.6 MB, ~46 k
-        // elements) so that typical documents never reallocate mid-parse.
+        // Sized from the largest file in `testdata` (1.6 MB, ~46 k elements, ~100 k
+        // attributes) so that a typical document never reallocates mid-parse. The arena
+        // holds names and values only, which is a fraction of the source.
         let approx_elements = input.len() / 48;
-        let mut interner = Interner::with_capacity(approx_elements / 4, input.len() / 8);
-
-        let mut tag_by_name = FxHashMap::default();
-        for &tag in Tag::ALL {
-            tag_by_name.insert(interner.intern(tag.text()), tag);
-        }
-        let mut attr_by_name = FxHashMap::default();
-        for &key in AttrKey::ALL {
-            attr_by_name.insert(interner.intern(key.text()), key);
-        }
-
         let mut dom = Self {
             nodes: Vec::with_capacity(approx_elements),
-            attrs: Vec::with_capacity(approx_elements),
+            attrs: Vec::with_capacity(approx_elements * 2),
             last_child: Vec::with_capacity(approx_elements),
-            interner,
-            tag_by_name,
-            attr_by_name,
+            // Only unrecognised names and attribute values reach the arena, which on real
+            // XTCE is a small fraction of the source; a quarter of the input length has
+            // never needed to grow on the bundled files.
+            arena: String::with_capacity(input.len() / 4),
             skipped_sections: Vec::new(),
             xmlns: None,
         };
         dom.run(input)?;
         Ok(dom)
+    }
+
+    /// Appends `text` to the arena and returns its span.
+    #[inline]
+    fn push_text(&mut self, text: &str) -> Span {
+        let start = self.arena.len();
+        self.arena.push_str(text);
+        Span::between(start, self.arena.len())
+    }
+
+    #[inline]
+    fn str_at(&self, span: Span) -> &str {
+        let start = span.start();
+        self.arena
+            .get(start..start + span.len())
+            .unwrap_or_default()
     }
 
     fn run(&mut self, input: &str) -> Result<(), ParseError> {
@@ -318,9 +361,10 @@ impl Dom {
                     None => {
                         if let Some(index) = open.pop() {
                             if !scratch.trim().is_empty() {
-                                let id = self.interner.intern(&scratch);
+                                let span = self.push_text(&scratch);
                                 if let Some(node) = self.nodes.get_mut(index as usize) {
-                                    node.text = Some(id);
+                                    node.text = span;
+                                    node.has_text = true;
                                 }
                             }
                         }
@@ -377,11 +421,12 @@ impl Dom {
     ) -> Result<Option<u32>, ParseError> {
         let local = start.local_name();
         let local = std::str::from_utf8(local.as_ref()).unwrap_or_default();
-        if SKIPPED_SECTIONS.contains(&local) {
+        let tag = Tag::from_text(local);
+        if tag.is_skipped_section() {
             self.skipped_sections.push(local.to_owned());
             return Ok(None);
         }
-        let index = self.push_node(local, parent);
+        let index = self.push_node(tag, local, parent);
         self.push_attributes(index, start)?;
         if index == 0 {
             self.xmlns = element_namespace(start);
@@ -389,9 +434,14 @@ impl Dom {
         Ok(Some(index))
     }
 
-    fn push_node(&mut self, local: &str, parent: Option<u32>) -> u32 {
-        let name = self.interner.intern(local);
-        let tag = self.tag_by_name.get(&name).copied().unwrap_or(Tag::Other);
+    fn push_node(&mut self, tag: Tag, local: &str, parent: Option<u32>) -> u32 {
+        // A recognised tag already carries its spelling, so only unknown names go in the
+        // arena. On the largest test file that is most of a megabyte of memcpy avoided.
+        let name = if tag == Tag::Other {
+            self.push_text(local)
+        } else {
+            Span::EMPTY
+        };
         let index = u32::try_from(self.nodes.len()).unwrap_or(NONE);
         self.nodes.push(Node {
             tag,
@@ -401,7 +451,8 @@ impl Dom {
             next_sibling: NONE,
             attr_start: u32::try_from(self.attrs.len()).unwrap_or(0),
             attr_len: 0,
-            text: None,
+            text: Span::EMPTY,
+            has_text: false,
         });
         self.last_child.push(NONE);
 
@@ -442,13 +493,13 @@ impl Dom {
             let value = attr
                 .unescape_value()
                 .map_err(|source| ParseError::new(source.into()))?;
-            let name = self.interner.intern(key_local);
-            let key = self
-                .attr_by_name
-                .get(&name)
-                .copied()
-                .unwrap_or(AttrKey::Other);
-            let value = self.interner.intern(&value);
+            let key = AttrKey::from_text(key_local);
+            let name = if key == AttrKey::Other {
+                self.push_text(key_local)
+            } else {
+                Span::EMPTY
+            };
+            let value = self.push_text(&value);
             self.attrs.push(Attr { key, name, value });
         }
         if let Some(node) = self.nodes.get_mut(index as usize) {
@@ -465,19 +516,6 @@ impl Dom {
             dom: self,
             index: 0,
         }
-    }
-
-    /// The interner holding every name in this document.
-    #[must_use]
-    pub fn interner(&self) -> &Interner {
-        &self.interner
-    }
-
-    /// Consumes the tree, returning its interner so the IR can keep using the same
-    /// [`NameId`] space without re-interning.
-    #[must_use]
-    pub fn into_interner(self) -> Interner {
-        self.interner
     }
 
     /// Names of sections dropped during parsing, in document order.
@@ -521,7 +559,11 @@ impl<'d> Element<'d> {
     /// This element's local name as written in the document.
     #[must_use]
     pub fn name(self) -> &'d str {
-        self.dom.interner.resolve(self.node().name)
+        let node = self.node();
+        match node.tag {
+            Tag::Other => self.dom.str_at(node.name),
+            tag => tag.text(),
+        }
     }
 
     /// The parent element, or `None` at the root.
@@ -587,33 +629,30 @@ impl<'d> Element<'d> {
         self.attrs_raw()
             .iter()
             .find(|attr| attr.key == key)
-            .map(|attr| self.dom.interner.resolve(attr.value))
-    }
-
-    /// An attribute value as an interned handle, for cheap comparison and lookup.
-    #[must_use]
-    pub fn attr_id(self, key: AttrKey) -> Option<NameId> {
-        self.attrs_raw()
-            .iter()
-            .find(|attr| attr.key == key)
-            .map(|attr| attr.value)
+            .map(|attr| self.dom.str_at(attr.value))
     }
 
     /// An attribute value by literal name, for attributes outside [`AttrKey`].
     #[must_use]
     pub fn attr_named(self, name: &str) -> Option<&'d str> {
-        let id = self.dom.interner.get(name)?;
         self.attrs_raw()
             .iter()
-            .find(|attr| attr.name == id)
-            .map(|attr| self.dom.interner.resolve(attr.value))
+            .find(|attr| self.attr_name(attr) == name)
+            .map(|attr| self.dom.str_at(attr.value))
     }
 
     /// Attribute names present on this element, in document order.
     pub fn attr_names(self) -> impl Iterator<Item = &'d str> {
         self.attrs_raw()
             .iter()
-            .map(move |attr| self.dom.interner.resolve(attr.name))
+            .map(move |attr| self.attr_name(attr))
+    }
+
+    fn attr_name(self, attr: &Attr) -> &'d str {
+        match attr.key {
+            AttrKey::Other => self.dom.str_at(attr.name),
+            key => key.text(),
+        }
     }
 
     fn attrs_raw(self) -> &'d [Attr] {
@@ -626,9 +665,8 @@ impl<'d> Element<'d> {
     /// Text content, if this element has any and no element children.
     #[must_use]
     pub fn text(self) -> Option<&'d str> {
-        self.node()
-            .text
-            .map(|id| self.dom.interner.resolve(id).trim())
+        let node = self.node();
+        node.has_text.then(|| self.dom.str_at(node.text).trim())
     }
 
     /// The `/`-joined element path from the root to this element, for diagnostics.
@@ -647,13 +685,14 @@ impl<'d> Element<'d> {
 
 static DETACHED: Node = Node {
     tag: Tag::Other,
-    name: NameId::ZERO,
+    name: Span::EMPTY,
     parent: NONE,
     first_child: NONE,
     next_sibling: NONE,
     attr_start: 0,
     attr_len: 0,
-    text: None,
+    text: Span::EMPTY,
+    has_text: false,
 };
 
 /// Iterator over the direct children of an element.

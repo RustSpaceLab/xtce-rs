@@ -87,6 +87,13 @@ impl Span {
         }
     }
 
+    /// Index of the first covered element.
+    #[inline]
+    #[must_use]
+    pub const fn start(self) -> usize {
+        self.start as usize
+    }
+
     /// Number of elements covered.
     #[inline]
     #[must_use]
