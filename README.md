@@ -19,6 +19,7 @@ validated against that same implementation packet for packet.
 |---|---|
 | `xtce-model` | XTCE XML → arena-backed IR, reference resolution, validation |
 | `xtce-decode` | IR + `&[u8]` → parameter values |
+| `xtce-codegen` | IR → a static Rust decoder with every offset baked in |
 | `xtce-cli` | `xtce info`, `xtce decode`, `xtce bench` |
 | `xtask` | differential test harness against the Python reference |
 
@@ -48,6 +49,12 @@ Measured with criterion against the same reference on the same inputs
 | Load a 1.6 MB definition (CTIM, 9 493 parameters) | 10.5 ms | 120 ms | **11×** |
 | Decode 1499 CTIM packets | 48 ms | 5109 ms | **106×** |
 | Decode 7200 JPSS packets | 9.3 ms | 954 ms | **102×** |
+| The same, through a **generated** decoder | 84 µs | 954 ms | **11 400×** |
+
+The generated decoder is what `xtce-codegen` produces: a `struct` per container whose
+`decode` is loads, shifts and masks with every bit offset already a literal. It compiles a
+narrower subset than the interpreter and refuses anything else by name rather than falling
+back — see [`SUPPORTED.md`](SUPPORTED.md).
 
 #### Try it
 
@@ -56,6 +63,8 @@ $ cargo run --release -p xtce-cli -- info testdata/spp/ctim/ctim_xtce_v1.xml
 $ cargo run --release -p xtce-cli -- decode \
       testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml \
       testdata/spp/jpss/J01_G011_LZ_2021-04-09T00-00-00Z_V01.DAT1 --limit 3 --raw
+$ cargo run --release -p xtce-cli -- codegen \\
+      testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml
 $ cargo xtask diff
 $ cargo bench
 ```

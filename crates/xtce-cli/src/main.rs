@@ -64,6 +64,20 @@ enum Command {
         raw: bool,
     },
 
+    /// Compile a definition into a static Rust decoder.
+    Codegen {
+        /// XTCE definition.
+        definition: PathBuf,
+
+        /// Container to start from.
+        #[arg(long)]
+        root: Option<String>,
+
+        /// Write here instead of standard output.
+        #[arg(long, short)]
+        out: Option<PathBuf>,
+    },
+
     /// Time loading an XTCE file.
     Bench {
         /// XTCE file to load.
@@ -129,6 +143,32 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             format,
             show_raw: raw,
         }),
+
+        Command::Codegen {
+            definition,
+            root,
+            out,
+        } => {
+            let db = XtceDb::from_path(&definition)?;
+            let source = xtce_codegen::generate(
+                &db,
+                &xtce_codegen::Options {
+                    root,
+                    source_label: Some(definition.display().to_string()),
+                },
+            )?;
+            match out {
+                Some(path) => {
+                    std::fs::write(&path, source)?;
+                    eprintln!("wrote {}", path.display());
+                    eprintln!(
+                        "include it inside a module that carries the lint allowances                          generated code needs; see the header of the file"
+                    );
+                }
+                None => print!("{source}"),
+            }
+            Ok(())
+        }
 
         Command::Bench { file, iterations } => {
             let bytes = std::fs::metadata(&file).map(|meta| meta.len()).unwrap_or(0);

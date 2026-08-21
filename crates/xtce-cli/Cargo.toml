@@ -15,4 +15,5 @@ path = "src/main.rs"
 [dependencies]
 xtce-model.workspace = true
 xtce-decode.workspace = true
+xtce-codegen.workspace = true
 clap.workspace = true

@@ -136,3 +136,64 @@ definition does not describe the whole packet, which is worth seeing.
 ### Next
 
 M5 (`xtce-codegen`) and M7 (PyO3 bindings) are the remaining milestones.
+
+## 2026-08-21 — M5: the code generator
+
+`xtce-codegen` turns a definition into a `struct` per container whose `decode` is a sequence
+of loads, shifts and masks with every offset already a literal. Nothing consults the XTCE
+model at run time.
+
+### Does it earn its complexity
+
+That was the open question, so the benchmark puts both decoders in one criterion group. Same
+7200-packet JPSS stream, framing done outside the loop:
+
+| | time | vs interpreted | vs the Python reference |
+|---|---|---|---|
+| interpreted | 8.67 ms | — | 110× |
+| **generated** | **83.8 µs** | **103×** | **11 400×** |
+| generated, then visiting every field | 347 µs | 25× | 2 750× |
+| generated, dispatch only | 17.4 µs | *(not a decode figure — see below)* | |
+
+The middle row is the honest headline: the whole struct is consumed, so every field is really
+read. The last row only consumes the discriminators, which lets the optimiser drop the other
+field reads; it is the cost of *choosing* a container, and is labelled that way in the
+benchmark so it cannot be quoted as the decoder's speed. The third row is closest to what the
+interpreter actually does, since that also hands back a name and both values per field.
+
+So: yes. Two orders of magnitude over an interpreter that is already two orders over the
+reference.
+
+### How correctness is established
+
+The generated decoder is compared against the *interpreted* one over every one of the 7200
+packets, field by field, with floats compared by bit pattern. The interpreted decoder is
+already proven equal to the Python reference over every packet of six streams, so this is
+equality with the reference — without the test needing to parse a golden file or reimplement
+the comparison.
+
+The generated file is committed rather than produced by a build script. It is meant to be
+read; a diff shows exactly what a change to the emitter did; and a test fails if it drifts
+from what the generator currently produces.
+
+### Two things the shape of the output forced
+
+**No inner attributes.** The first version emitted `#![doc]` and `#![allow]` at the top of the
+file. Those are illegal inside `include!`, which is exactly how a `build.rs` consumer uses
+generated code — so the primary use case was broken. The header is now ordinary `//`
+comments, the caller supplies the lint allowances on the surrounding module, and the emitter
+avoids redundant parentheses so `unused_parens` never fires.
+
+**`include!`, not `#[path] mod`.** With `#[path]`, `cargo fmt` reformats the generated file
+and the drift test fails on whitespace. Comparing token streams instead does not help:
+rustfmt also moves braces and trailing commas, which changes the tokens. Under `include!`,
+rustfmt does not follow the file at all and the committed bytes stay exactly what the
+generator wrote.
+
+**Refusals are fatal, by design.** Nine of the ten bundled definitions cannot be compiled, and
+each is refused with the element named. Falling back to interpretation would have made the
+benchmark above meaningless.
+
+### Next
+
+M7, the PyO3 bindings, is the last milestone in the specification.

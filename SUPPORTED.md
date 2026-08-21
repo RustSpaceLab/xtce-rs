@@ -96,3 +96,32 @@ covered by a test.
 
 None of the bundled test files exercise a divergence, so the differential tests are
 unaffected by them.
+
+## Code generation
+
+`xtce-codegen` compiles a definition into a static Rust decoder. It handles a *narrower*
+subset than the interpreter, because a layout can only be compiled when it is fixed at load
+time — every field at a known offset and width, with nothing depending on packet content.
+
+A construct outside that subset is **refused by name**, never handed back to the interpreter.
+A silent fallback would hide from the caller that half their database is still interpreted,
+and would make a generated-versus-interpreted benchmark meaningless.
+
+| Construct | Compiled | Note |
+|---|---|---|
+| `IntegerDataEncoding`, big-endian, 1–64 bits | Yes | all four signed codings |
+| `FloatDataEncoding`, IEEE-754 16/32/64, big-endian | Yes | |
+| `EnumeratedParameterType`, `BooleanParameterType` | Yes | label lookup emitted as a `match` |
+| `BaseContainer` + `Comparison` / `ComparisonList` | Yes | inheritance chain flattened into one struct |
+| `ContainerRefEntry` | Yes | expanded inline |
+| `leastSignificantByteFirst` | Refused | |
+| Calibrators | Refused | the interpreter sums polynomial terms in document order with exact integer powers; until the emitted arithmetic is proved identical, compiling it risks a silent last-bit divergence |
+| `StringDataEncoding`, `BinaryDataEncoding` | Refused | width can depend on packet content |
+| `LocationInContainerInBits`, `RepeatEntry` | Refused | |
+| `BooleanExpression` criteria | Refused | |
+| MIL-STD-1750A floats | Refused | |
+
+Of the ten bundled definitions, `jpss1_geolocation_xtce_v1.xml` compiles completely. The
+other nine are refused with the element named — CTIM on its strings, IDEX and SUDA on their
+dynamically sized binary fields, `contrived_inheritance_structure.xml` on its
+`BooleanExpression`. All nine decode fine through the interpreter.

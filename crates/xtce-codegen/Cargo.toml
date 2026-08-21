@@ -1,0 +1,25 @@
+[package]
+name = "xtce-codegen"
+description = "Compile an XTCE telemetry definition into a static Rust decoder"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+xtce-model.workspace = true
+thiserror.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+prettyplease.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+xtce-decode.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "generated"
+harness = false
