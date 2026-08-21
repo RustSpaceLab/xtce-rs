@@ -95,8 +95,17 @@ tools/           the golden-file generator
 
 ## Licence
 
-MIT OR Apache-2.0. Vendored test data keeps its own licence; see
-[`testdata/SOURCES.md`](testdata/SOURCES.md).
+Dual-licensed under either [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your
+option.
+
+The vendored test data under `testdata/spp/` keeps its own licence — BSD 3-Clause,
+© 2023 University of Colorado — and is redistributed with the copyright notice that licence
+requires. Provenance for every file is in [`testdata/SOURCES.md`](testdata/SOURCES.md).
+
+### Contributing
+
+Unless you state otherwise, any contribution you intentionally submit for inclusion in this
+work shall be dual-licensed as above, without any additional terms or conditions.
 
 [spp]: https://github.com/lasp/space_packet_parser
 [issue112]: https://github.com/lasp/space_packet_parser/issues/112
