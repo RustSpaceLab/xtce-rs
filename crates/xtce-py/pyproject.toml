@@ -16,7 +16,7 @@ classifiers = [
 dynamic = ["version"]
 
 [project.urls]
-Repository = "https://github.com/mysma-9403/RustSpace"
+Repository = "https://github.com/RustSpaceLab/xtce-rs"
 
 [tool.maturin]
 # The wheel is abi3, so one build works on CPython 3.10 and later.

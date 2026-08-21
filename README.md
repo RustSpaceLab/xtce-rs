@@ -1,13 +1,7 @@
-# RustSpace
+# xtce-rs
 
-High-performance Rust libraries for space data systems.
-
-## Projects
-
-### `xtce-rs` — CCSDS telemetry decoding from XTCE
-
-Decodes CCSDS space packets according to an [XTCE](https://www.omg.org/spec/XTCE/) telemetry
-definition.
+Decode CCSDS telemetry packets in Rust, according to an [XTCE](https://www.omg.org/spec/XTCE/)
+definition. Part of [RustSpaceLab](https://github.com/RustSpaceLab).
 
 The reference implementation in this niche, [`lasp/space_packet_parser`][spp], has a known
 performance problem: on real mission databases, loading the XTCE file costs more than parsing
