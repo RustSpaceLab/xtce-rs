@@ -1,0 +1,210 @@
+{
+ "case": "jpss_definition_over_ctim_stream",
+ "detail": [
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  },
+  {
+   "__unrecognized__": true
+  }
+ ],
+ "detail_count": 64,
+ "digest_sha256": "cfc14eea84053186dc4e72ade9a23e96fe3ac95e23980a4f195895f360df2b9a",
+ "packet_count": 1499,
+ "packets": "ctim/ccsds_2021_155_14_39_51",
+ "reference": {
+  "implementation": "lasp/space_packet_parser",
+  "load_seconds": 0.004809,
+  "parse_seconds": 0.038867
+ },
+ "root_container": null,
+ "skip_header_bytes": 0,
+ "unrecognized_count": 1499,
+ "xtce": "jpss/jpss1_geolocation_xtce_v1.xml"
+}

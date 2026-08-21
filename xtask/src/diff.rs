@@ -42,6 +42,8 @@ struct Golden {
 pub struct CaseReport {
     pub case: String,
     pub packets: usize,
+    pub unrecognized: usize,
+    pub trailing: usize,
     pub differences: Vec<String>,
     pub digest_matches: bool,
     pub load_seconds: f64,
@@ -200,6 +202,7 @@ fn run_case(
     let mut canonical = Vec::with_capacity(4096);
     let mut count = 0usize;
     let mut unrecognized = 0usize;
+    let mut trailing = 0usize;
 
     let decode_start = std::time::Instant::now();
     for (index, framed) in PacketIter::new(&stream, golden.skip_header_bytes).enumerate() {
@@ -210,6 +213,9 @@ fn run_case(
 
         let observed: Option<PacketMap> = match decoded {
             Ok(packet) => {
+                if packet.trailing_bits() != 0 {
+                    trailing += 1;
+                }
                 let mut map = PacketMap::new();
                 for (name, value) in packet.iter_named() {
                     map.insert(
@@ -273,6 +279,8 @@ fn run_case(
     Ok(CaseReport {
         case: golden.case.clone(),
         packets: count,
+        unrecognized,
+        trailing,
         differences,
         digest_matches: digest == golden.digest,
         load_seconds,
@@ -358,8 +366,9 @@ pub fn format_report(report: &CaseReport) -> String {
     let _ = writeln!(out, "{:<28} {verdict}", report.case);
     let _ = writeln!(
         out,
-        "  {} packets   load {:.1}x   decode {:.1}x   digest {}",
+        "  {} packets ({} not described)   load {:.1}x   decode {:.1}x   digest {}",
         report.packets,
+        report.unrecognized,
         report.reference_load_seconds / report.load_seconds.max(f64::MIN_POSITIVE),
         report.reference_parse_seconds / report.decode_seconds.max(f64::MIN_POSITIVE),
         if report.digest_matches {
@@ -368,14 +377,28 @@ pub fn format_report(report: &CaseReport) -> String {
             "MISMATCH"
         },
     );
+    // The decode figure below includes this harness's own per-packet work — name lookup,
+    // map building, digesting — so it is a floor on the speed-up, not a decoder benchmark.
+    // `cargo bench -p xtce-decode` measures the decoder.
     let _ = writeln!(
         out,
-        "  load {:.1} ms (reference {:.1} ms)   decode {:.1} ms (reference {:.1} ms)",
+        "  load {:.1} ms (reference {:.1} ms)   decode {:.1} ms incl. harness (reference {:.1} ms)",
         report.load_seconds * 1e3,
         report.reference_load_seconds * 1e3,
         report.decode_seconds * 1e3,
         report.reference_parse_seconds * 1e3,
     );
+    if report.trailing > 0 {
+        // The reference only warns about this, and the golden generator suppresses warnings,
+        // so without reporting it here a definition that does not cover its own packets is
+        // invisible to both sides. It is not a mismatch — both implementations agree on
+        // every value — but it says the definition is incomplete.
+        let _ = writeln!(
+            out,
+            "  {} packet(s) had bits no entry claimed (both implementations agree on the values)",
+            report.trailing
+        );
+    }
     for difference in &report.differences {
         let _ = writeln!(out, "    {difference}");
     }

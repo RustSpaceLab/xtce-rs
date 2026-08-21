@@ -7,6 +7,7 @@ use std::time::Instant;
 use clap::{Parser, Subcommand};
 use xtce_model::XtceDb;
 
+mod decode;
 mod info;
 
 #[derive(Parser)]
@@ -27,6 +28,40 @@ enum Command {
         /// Print the full space-system tree with every parameter and container.
         #[arg(long)]
         verbose: bool,
+    },
+
+    /// Decode a CCSDS packet stream against an XTCE definition.
+    Decode {
+        /// XTCE definition.
+        definition: PathBuf,
+
+        /// File of concatenated CCSDS packets.
+        packets: PathBuf,
+
+        /// Container to start from. Defaults to CCSDSPacket, CCSDSTelemetryPacket, or the
+        /// only container without a base.
+        #[arg(long)]
+        root: Option<String>,
+
+        /// Bytes of per-packet wrapper to skip before each CCSDS header.
+        #[arg(long, default_value_t = 0)]
+        skip_header_bytes: usize,
+
+        /// Stop after this many packets.
+        #[arg(long)]
+        limit: Option<usize>,
+
+        /// Show only these parameters. Repeatable.
+        #[arg(long = "param")]
+        params: Vec<String>,
+
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = decode::Format::Table)]
+        format: decode::Format,
+
+        /// Also show the raw value alongside the engineering value.
+        #[arg(long)]
+        raw: bool,
     },
 
     /// Time loading an XTCE file.
@@ -74,6 +109,26 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(())
         }
+
+        Command::Decode {
+            definition,
+            packets,
+            root,
+            skip_header_bytes,
+            limit,
+            params,
+            format,
+            raw,
+        } => decode::run(&decode::Options {
+            definition: &definition,
+            packets: &packets,
+            root: root.as_deref(),
+            skip_header_bytes,
+            limit,
+            only: &params,
+            format,
+            show_raw: raw,
+        }),
 
         Command::Bench { file, iterations } => {
             let bytes = std::fs::metadata(&file).map(|meta| meta.len()).unwrap_or(0);

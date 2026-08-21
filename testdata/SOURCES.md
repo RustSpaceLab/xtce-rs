@@ -28,6 +28,7 @@ text are retained, which `testdata/spp/LICENSE.txt` does.
 | `ctim/ctim_xtce_v1.xml` | `ctim/ccsds_2021_155_14_39_51` | 1499 | 1.6 MB definition, `twosComplement`, fixed-size UTF-8 strings |
 | `suda/suda_combined_science_definition.xml` | `suda/sciData_2022_130_17_41_53.spl` | 13 | enumerations, dynamically sized binary (`DynamicValue` + `LinearAdjustment`); stream needs `skip_header_bytes=4` |
 | `idex/idex_combined_science_definition.xml` | `idex/sciData_2023_052_14_45_05` | 78 | polymorphic containers, dynamically sized binary |
+| `jpss/jpss1_geolocation_xtce_v1.xml` | `ctim/ccsds_2021_155_14_39_51` | 1499 | **rejection case**: a definition pointed at a stream it does not describe, so both implementations must refuse every packet. Without it, the "we agree this cannot be decoded" half of the contract goes untested — the other five cases have no unrecognised packets at all |
 
 ### Definitions only (parser coverage)
 

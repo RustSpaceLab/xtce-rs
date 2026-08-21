@@ -103,6 +103,17 @@ CASES: tuple[Case, ...] = (
         xtce="idex/idex_combined_science_definition.xml",
         packets="idex/sciData_2023_052_14_45_05",
     ),
+    # A definition pointed at a stream it does not describe. Every packet reaches the
+    # abstract root and finds no inheritor whose restriction criteria hold, so the reference
+    # raises UnrecognizedPacketTypeError for all of them. Without this case the rejection
+    # path is never exercised on either side: the five above have no unrecognised packets at
+    # all, so the "we agree that this packet cannot be decoded" half of the contract would
+    # go untested.
+    Case(
+        name="jpss_definition_over_ctim_stream",
+        xtce="jpss/jpss1_geolocation_xtce_v1.xml",
+        packets="ctim/ccsds_2021_155_14_39_51",
+    ),
 )
 
 

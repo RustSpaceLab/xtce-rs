@@ -918,6 +918,7 @@ name = "xtce-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "xtce-decode",
  "xtce-model",
 ]
 

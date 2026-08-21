@@ -23,15 +23,41 @@ validated against that same implementation packet for packet.
 | `xtask` | differential test harness against the Python reference |
 
 Scope is a deliberate subset of XTCE, documented in [`SUPPORTED.md`](SUPPORTED.md).
-Correctness is defined by agreement with the reference: `testdata/golden/` holds its output
-for five real mission definition/packet pairs, and `cargo xtask diff` checks every packet
-against it.
+
+#### Correctness
+
+Correctness is defined as agreement with the reference, not as passing tests written
+alongside the code. `testdata/golden/` holds the reference's output for six real
+definition/packet pairs, and `cargo xtask diff` re-derives all of it:
+
+* every raw and engineering value of the first 64 packets, compared field by field;
+* a SHA-256 over a canonical encoding of **all** ~17 000 packets, so a divergence past the
+  detail window cannot hide;
+* one case is a definition pointed at a stream it does not describe, so the "both refuse this
+  packet" half of the contract is tested too.
+
+All six agree.
+
+#### Speed
+
+Measured with criterion against the same reference on the same inputs
+(`testdata/golden/reference_timings.json`):
+
+| | xtce-rs | `space_packet_parser` | |
+|---|---|---|---|
+| Load a 1.6 MB definition (CTIM, 9 493 parameters) | 10.5 ms | 120 ms | **11×** |
+| Decode 1499 CTIM packets | 48 ms | 5109 ms | **106×** |
+| Decode 7200 JPSS packets | 9.3 ms | 954 ms | **102×** |
+
+#### Try it
 
 ```console
-$ cargo run -p xtce-cli -- info testdata/spp/ctim/ctim_xtce_v1.xml
-$ cargo run -p xtce-cli -- decode testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml \
-      testdata/spp/jpss/J01_G011_LZ_2021-04-09T00-00-00Z_V01.DAT1 --limit 3
-$ cargo run -p xtask --release -- diff
+$ cargo run --release -p xtce-cli -- info testdata/spp/ctim/ctim_xtce_v1.xml
+$ cargo run --release -p xtce-cli -- decode \
+      testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml \
+      testdata/spp/jpss/J01_G011_LZ_2021-04-09T00-00-00Z_V01.DAT1 --limit 3 --raw
+$ cargo xtask diff
+$ cargo bench
 ```
 
 ## Layout

@@ -92,3 +92,47 @@ green without them. Nothing was skipped; the boundary moved.
 
 Optimise loading, with the benchmarks above as the baseline. Then M5 (codegen) and M7
 (PyO3 bindings).
+
+## 2026-08-21 — M6: measure, then optimise
+
+Benchmarks first, then changes justified by them, then the differential suite re-run after
+each. All six golden cases still agree, digest included.
+
+| | before | after | reference | speed-up |
+|---|---|---|---|---|
+| load ctim (1.6 MB) | 23.2 ms | 10.5 ms | 120 ms | 11.4× |
+| load jpss | 175 µs | 72 µs | 10 ms | 139× |
+| decode ctim (1499 packets) | 77.1 ms | 48.0 ms | 5109 ms | 106× |
+| decode jpss (7200 packets) | 15.8 ms | 9.3 ms | 954 ms | 102× |
+| decode idex (78 packets) | 206 µs | 128 µs | 19.5 ms | 153× |
+
+`raw_events` is in the benchmark suite as the ceiling: quick-xml iterating the events with no
+tree built is 3.2 ms on ctim against `parse_xml`'s 6.5 ms, so tree construction is no longer
+the dominant cost and further work there has little room.
+
+### What actually mattered
+
+**Interning attribute values was a pessimisation.** It trades a hash lookup for a memcpy of
+about eight bytes, and the 1.6 MB file has a quarter of a million of them. The tree is
+transient; deduplication belongs in the IR, which keeps only the names it needs.
+
+**The hand-rolled interner needed a hash finalizer.** Replacing `HashMap<Box<str>, NameId>`
+with open addressing over the arena removed one allocation per unique name — and made ctim
+*31 % slower*. FxHash is fast but its low bits carry little entropy, and a bucket index is
+exactly the low bits; every CTIM parameter name starts `CTIM__`. A splitmix64 finalizer took
+16.5 ms back to 10.5 ms. Worth recording as the reason the mixer is not optional.
+
+**Reserving a packet's storage once was 40 % of decode.** CTIM containers hold ~250 entries,
+so every packet was regrowing a `Vec` and a hash table through eight doublings. The bound is
+computed at decoder construction over the longest path from the root.
+
+### What the new reporting found
+
+`xtce decode` and `xtask diff` now report packets with bits no entry claimed. On CTIM that is
+105 of 1499. Both implementations agree on every value, so it is not a decoding difference —
+the reference warns about it and the golden generator suppresses the warning. It says the
+definition does not describe the whole packet, which is worth seeing.
+
+### Next
+
+M5 (`xtce-codegen`) and M7 (PyO3 bindings) are the remaining milestones.
