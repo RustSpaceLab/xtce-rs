@@ -73,8 +73,14 @@ jobs:
       - name: Install build and test tools
         run: pip install maturin pytest space_packet_parser==6.1.2
 
-      - name: Build and install the extension module
-        run: maturin develop --release --manifest-path crates/xtce-py/Cargo.toml
+      # `maturin develop` needs an activated virtualenv, which a runner does not have.
+      # Building a wheel and installing it is what maturin itself suggests instead, and it
+      # exercises the artefact a user would actually get.
+      - name: Build the extension module
+        run: maturin build --release --out dist --manifest-path crates/xtce-py/Cargo.toml
+
+      - name: Install the wheel
+        run: pip install --find-links dist --no-index xtce
 
       # Compares the bindings against the reference field by field, on four real files.
       - name: Differential tests through Python
