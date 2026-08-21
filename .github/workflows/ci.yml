@@ -7,7 +7,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
 
 jobs:
   check:
@@ -16,7 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      # Pinned rather than `stable`. Clippy gains lints with every release, so an unpinned
+      # gate turns red for reasons unrelated to any change in this repository, and cannot be
+      # reproduced locally without guessing which toolchain the runner picked up. New lints
+      # are still surfaced, by the advisory job below.
+      - uses: dtolnay/rust-toolchain@1.93.1
         with:
           components: rustfmt, clippy
 
@@ -25,6 +28,10 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
+      # `-D warnings` is passed to clippy rather than set in RUSTFLAGS: as an environment
+      # variable it would also apply to dependencies, so an unrelated crate emitting a
+      # warning would fail this build for reasons nothing here can fix. Clippy is a rustc
+      # driver, so this denies rustc's own lints as well as clippy's.
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
@@ -33,6 +40,20 @@ jobs:
 
       - name: Differential tests against committed golden files
         run: cargo run -p xtask --release -- diff
+
+  latest:
+    name: latest stable (advisory)
+    runs-on: ubuntu-latest
+    # New lints are worth knowing about, but they are not this repository's fault and must
+    # not block a merge on the day they ship.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -D warnings
 
   msrv:
     name: minimum supported Rust version
