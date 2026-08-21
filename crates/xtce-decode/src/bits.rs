@@ -277,19 +277,19 @@ impl<'a> BitCursor<'a> {
 }
 
 /// Reinterprets an unsigned field of `width` bits as a signed integer.
+///
+/// Sign-extends by shifting rather than by subtracting `2^width`. The subtraction form
+/// overflows at width 63 — `1i64 << 63` is `i64::MIN`, so `positive - i64::MIN` wraps — which
+/// release builds happen to get right and debug builds panic on, so no differential test
+/// against real packets would ever have caught it. Shifting is branchless and correct for
+/// every width from 1 to 64.
 #[must_use]
 pub fn twos_complement(value: u64, width: u32) -> i64 {
     if width == 0 || width > 64 {
         return value as i64;
     }
-    let sign_bit = 1u64 << (width - 1);
-    if value & sign_bit == 0 {
-        return value as i64;
-    }
-    if width == 64 {
-        return value as i64;
-    }
-    (value as i64) - (1i64 << width)
+    let shift = 64 - width;
+    ((value << shift) as i64) >> shift
 }
 
 /// Reinterprets an unsigned field as sign-magnitude: top bit is the sign, rest the
@@ -442,12 +442,29 @@ mod tests {
         assert_eq!(&*bytes, &[0xBC, 0xD0]);
     }
 
+    /// Sign extension written the slow, obvious way, as an oracle.
+    fn naive_twos_complement(value: u64, width: u32) -> i128 {
+        let modulus = 1i128 << width;
+        let value = i128::from(value) % modulus;
+        if value >= modulus / 2 {
+            value - modulus
+        } else {
+            value
+        }
+    }
+
     #[test]
     fn signed_interpretations() {
         assert_eq!(twos_complement(0xFF, 8), -1);
         assert_eq!(twos_complement(0x80, 8), -128);
         assert_eq!(twos_complement(0x7F, 8), 127);
         assert_eq!(twos_complement(u64::MAX, 64), -1);
+        // Width 63 is where subtracting 2^width overflows; nothing else reaches it.
+        assert_eq!(twos_complement(1 << 62, 63), -(1i64 << 62));
+        assert_eq!(twos_complement((1 << 62) - 1, 63), (1i64 << 62) - 1);
+        assert_eq!(twos_complement(u64::MAX >> 1, 63), -1);
+        assert_eq!(twos_complement(1, 1), -1);
+        assert_eq!(twos_complement(0, 1), 0);
 
         assert_eq!(sign_magnitude(0b1000_0001, 8), -1);
         assert_eq!(sign_magnitude(0b0000_0001, 8), 1);
@@ -528,6 +545,24 @@ mod tests {
             }
             proptest::prop_assert_eq!(rebuilt, integer);
             proptest::prop_assert_eq!(as_int.position(), as_bytes.position());
+        }
+
+        /// Sign extension at every width, against the arbitrary-precision oracle.
+        ///
+        /// Width 63 is the interesting one and a uniform generator finds it once in sixty
+        /// runs, so widths are drawn across the whole range deliberately.
+        #[test]
+        fn twos_complement_matches_naive_reference(
+            bits in proptest::num::u64::ANY,
+            width in 1u32..=64,
+        ) {
+            let mask = if width == 64 { u64::MAX } else { (1u64 << width) - 1 };
+            let value = bits & mask;
+            proptest::prop_assert_eq!(
+                i128::from(twos_complement(value, width)),
+                naive_twos_complement(value, width),
+                "value {} width {}", value, width
+            );
         }
 
         /// A read never panics and never moves the cursor on failure.

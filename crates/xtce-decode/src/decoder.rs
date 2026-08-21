@@ -870,42 +870,76 @@ impl<'db> Decoder<'db> {
 /// entry list and expanding any `<ContainerRefEntry>` inline. This is the deepest such walk,
 /// used to size a packet's storage once instead of regrowing it.
 ///
-/// Bounded work: each container is expanded at most once per path, and the recursion is
-/// depth-limited exactly as decoding is, so a cyclic entry list cannot hang the constructor.
+/// Container expansion is memoised, which is what actually bounds the work: the depth limit
+/// alone would not: a chain of forty containers each referencing the next twice is 2^40
+/// calls before the cap ever fires. Decoding has the same shape but is braked by running out
+/// of packet; this runs at construction time with no such brake.
 fn longest_path_entries(db: &XtceDb, root: ContainerId) -> usize {
-    fn own_entries(db: &XtceDb, id: ContainerId, depth: usize) -> usize {
-        if depth > MAX_CONTAINER_DEPTH {
-            return 0;
-        }
-        db.container_entries(id)
+    let mut expanded: Vec<Option<usize>> = vec![None; db.containers().len()];
+    let mut deepest: Vec<Option<usize>> = vec![None; db.containers().len()];
+    walk(db, root, 0, &mut expanded, &mut deepest)
+}
+
+/// Entries contributed by one container's own list, with `<ContainerRefEntry>` expanded.
+fn own_entries(db: &XtceDb, id: ContainerId, depth: usize, memo: &mut Vec<Option<usize>>) -> usize {
+    if depth > MAX_CONTAINER_DEPTH {
+        return 0;
+    }
+    if let Some(Some(cached)) = memo.get(id.index()) {
+        return *cached;
+    }
+    // Marked before recursing, so a cycle resolves to zero rather than recursing forever.
+    if let Some(slot) = memo.get_mut(id.index()) {
+        *slot = Some(0);
+    }
+    let total = db
+        .container_entries(id)
+        .iter()
+        .map(|entry| {
+            let repeat = entry.repeat.unwrap_or(1) as usize;
+            match entry.kind {
+                EntryKind::Container(child) => own_entries(db, child, depth + 1, memo) * repeat,
+                _ => repeat,
+            }
+        })
+        .sum();
+    if let Some(slot) = memo.get_mut(id.index()) {
+        *slot = Some(total);
+    }
+    total
+}
+
+/// The longest root-to-leaf walk of the inheritance tree below `id`.
+fn walk(
+    db: &XtceDb,
+    id: ContainerId,
+    depth: usize,
+    expanded: &mut Vec<Option<usize>>,
+    deepest: &mut Vec<Option<usize>>,
+) -> usize {
+    if depth > MAX_CONTAINER_DEPTH {
+        return 0;
+    }
+    if let Some(Some(cached)) = deepest.get(id.index()) {
+        return *cached;
+    }
+    if let Some(slot) = deepest.get_mut(id.index()) {
+        *slot = Some(0);
+    }
+    let here = own_entries(db, id, 0, expanded);
+    let below = db.container(id).map_or(0, |container| {
+        container
+            .inheritors
             .iter()
-            .map(|entry| {
-                let repeat = entry.repeat.unwrap_or(1) as usize;
-                match entry.kind {
-                    EntryKind::Container(child) => own_entries(db, child, depth + 1) * repeat,
-                    _ => repeat,
-                }
-            })
-            .sum()
+            .map(|&child| walk(db, child, depth + 1, expanded, deepest))
+            .max()
+            .unwrap_or(0)
+    });
+    let total = here + below;
+    if let Some(slot) = deepest.get_mut(id.index()) {
+        *slot = Some(total);
     }
-
-    fn walk(db: &XtceDb, id: ContainerId, depth: usize) -> usize {
-        if depth > MAX_CONTAINER_DEPTH {
-            return 0;
-        }
-        let here = own_entries(db, id, 0);
-        let deepest = db.container(id).map_or(0, |container| {
-            container
-                .inheritors
-                .iter()
-                .map(|&child| walk(db, child, depth + 1))
-                .max()
-                .unwrap_or(0)
-        });
-        here + deepest
-    }
-
-    walk(db, root, 0)
+    total
 }
 
 /// A comparable view of a value.

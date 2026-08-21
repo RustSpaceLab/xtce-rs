@@ -694,3 +694,144 @@ fn namespace_spelling_does_not_change_the_result() {
         assert_eq!(values[0].1, RawValue::Unsigned(0x5A));
     }
 }
+
+/// Every reference shape XTCE allows, across nested space systems.
+///
+/// All ten bundled test files have exactly one `SpaceSystem`, so nothing in `testdata`
+/// reaches path resolution, ancestor search, or `.`/`..` segments. This is the only coverage
+/// those paths have.
+#[test]
+fn references_resolve_across_nested_space_systems() {
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="Root">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="Shared8"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <!-- Only visible to descendants through the ancestor walk. -->
+      <Parameter name="FROM_ROOT" parameterTypeRef="Shared8"/>
+    </ParameterSet>
+  </TelemetryMetaData>
+
+  <SpaceSystem name="Bus">
+    <TelemetryMetaData>
+      <ParameterTypeSet>
+        <IntegerParameterType name="Local16"><IntegerDataEncoding sizeInBits="16" encoding="unsigned"/></IntegerParameterType>
+        <!-- Same leaf name as Payload/Width, and registered first. A resolver that fell
+             back to the document-wide leaf table would pick this one from anywhere. -->
+        <IntegerParameterType name="Width"><IntegerDataEncoding sizeInBits="32" encoding="unsigned"/></IntegerParameterType>
+      </ParameterTypeSet>
+      <ParameterSet>
+        <Parameter name="BUS_VOLTAGE" parameterTypeRef="Local16"/>
+      </ParameterSet>
+    </TelemetryMetaData>
+  </SpaceSystem>
+
+  <SpaceSystem name="Payload">
+    <TelemetryMetaData>
+      <ParameterTypeSet>
+        <IntegerParameterType name="Local8"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>
+        <IntegerParameterType name="Width"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>
+      </ParameterTypeSet>
+      <ParameterSet>
+        <!-- Bare name: resolved by walking up to Root. -->
+        <Parameter name="P_ANCESTOR" parameterTypeRef="Shared8"/>
+        <Parameter name="P_LOCAL" parameterTypeRef="Local8"/>
+        <!-- Absolute path into a sibling space system. -->
+        <Parameter name="P_ABSOLUTE" parameterTypeRef="/Root/Bus/Local16"/>
+        <!-- Relative path with `..`, reaching the same sibling. -->
+        <Parameter name="P_RELATIVE" parameterTypeRef="../Bus/Local16"/>
+        <!-- Explicit `.` prefix for a local type. -->
+        <Parameter name="P_DOT" parameterTypeRef="./Local8"/>
+        <!-- The discriminating pair: both name a type called `Width`, and the leaf table
+             holds only Bus's. Only real path resolution gets these right. -->
+        <Parameter name="P_LOCAL_WIDTH" parameterTypeRef="./Width"/>
+        <Parameter name="P_SIBLING_WIDTH" parameterTypeRef="/Root/Bus/Width"/>
+      </ParameterSet>
+      <ContainerSet>
+        <SequenceContainer name="Packet">
+          <EntryList>
+            <ParameterRefEntry parameterRef="P_ANCESTOR"/>
+            <ParameterRefEntry parameterRef="P_LOCAL"/>
+            <ParameterRefEntry parameterRef="P_ABSOLUTE"/>
+            <ParameterRefEntry parameterRef="P_RELATIVE"/>
+            <ParameterRefEntry parameterRef="P_DOT"/>
+            <ParameterRefEntry parameterRef="P_LOCAL_WIDTH"/>
+            <ParameterRefEntry parameterRef="/Root/FROM_ROOT"/>
+            <ParameterRefEntry parameterRef="../Bus/BUS_VOLTAGE"/>
+          </EntryList>
+        </SequenceContainer>
+      </ContainerSet>
+    </TelemetryMetaData>
+  </SpaceSystem>
+</SpaceSystem>"#;
+
+    let db = load(xml);
+    assert_eq!(db.stats().space_systems, 3);
+
+    // Qualified names must reflect the nesting.
+    let payload_local = db
+        .find_type("/Root/Payload/Local8")
+        .expect("qualified type");
+    assert_eq!(
+        db.name(db.parameter_type(payload_local).expect("resolves").name),
+        "Local8"
+    );
+
+    // Each reference shape must have found the right width: 8 bits except the two that
+    // reach `Bus/Local16`.
+    let widths: Vec<u32> = [
+        "P_ANCESTOR",
+        "P_LOCAL",
+        "P_ABSOLUTE",
+        "P_RELATIVE",
+        "P_DOT",
+        // 8 from Payload/Width, not 32 from Bus/Width, which is what the leaf table holds.
+        "P_LOCAL_WIDTH",
+        "P_SIBLING_WIDTH",
+    ]
+    .iter()
+    .map(|name| {
+        let id = db
+            .find_parameter(name)
+            .unwrap_or_else(|| panic!("{name} exists"));
+        db.type_of(id)
+            .and_then(xtce_model::ParameterType::fixed_size_in_bits)
+            .unwrap_or_else(|| panic!("{name} has a fixed size"))
+    })
+    .collect();
+    assert_eq!(widths, vec![8, 8, 16, 16, 8, 8, 32]);
+
+    // And the container's entry list resolved both a path and an ancestor reference.
+    let decoder = Decoder::with_root(&db, "Packet").expect("root");
+    let decoded = decoder
+        .decode(&[1, 2, 0x00, 0x03, 0x00, 0x04, 5, 9, 6, 0x00, 0x07])
+        .expect("decodes");
+    assert_eq!(decoded.len(), 8);
+    assert_eq!(
+        decoded.get_by_name("P_ABSOLUTE").map(|v| v.raw.clone()),
+        Some(RawValue::Unsigned(3))
+    );
+    assert_eq!(
+        decoded.get_by_name("BUS_VOLTAGE").map(|v| v.raw.clone()),
+        Some(RawValue::Unsigned(7))
+    );
+    assert_eq!(decoded.trailing_bits(), 0);
+}
+
+#[test]
+fn an_unresolvable_reference_names_itself() {
+    let xml = simple(
+        r#"<IntegerParameterType name="T"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>"#,
+        r#"<Parameter name="A" parameterTypeRef="NoSuchType"/>"#,
+        r#"<ParameterRefEntry parameterRef="A"/>"#,
+    );
+    match XtceDb::from_xml(&xml) {
+        Err(xtce_model::XtceError::UnresolvedReference { reference, .. }) => {
+            assert_eq!(reference, "NoSuchType");
+        }
+        Err(other) => panic!("expected an unresolved reference, got {other}"),
+        Ok(_) => panic!("a dangling reference must not load"),
+    }
+}
