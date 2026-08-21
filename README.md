@@ -1,5 +1,7 @@
 # xtce-rs
 
+[![CI](https://github.com/RustSpaceLab/xtce-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/RustSpaceLab/xtce-rs/actions/workflows/ci.yml)
+
 Decode CCSDS telemetry packets in Rust, according to an [XTCE](https://www.omg.org/spec/XTCE/)
 definition. Part of [RustSpaceLab](https://github.com/RustSpaceLab).
 
