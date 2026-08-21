@@ -91,6 +91,7 @@ covered by a test.
 | `signMagnitude` / `onesComplement` | rejected | decoded |
 | Enumeration `maxValue` ranges | not implemented | honoured |
 | Out-of-scope construct | raises at load | represented; raises at decode |
+| Comparing a text value against a number (`Condition` with two parameter operands) | `==` false, `!=` true, ordering raises `TypeError` | the same three outcomes, the ordering case as `DecodeError::IncomparableValue` |
 | Spline query equal to the largest raw value | raises (`list.index(True)` finds nothing) | clamps to the final segment, which XTCE's inclusive range implies |
 | Container entry lists that reference each other cyclically | recurses until the stack overflows | bounded at 64 levels and reported |
 

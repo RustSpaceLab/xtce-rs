@@ -3,9 +3,9 @@
 use std::borrow::Cow;
 
 use xtce_model::{
-    BooleanExpr, Calibrator, Comparison, ComparisonValue, Condition, ContainerId, DataEncoding,
-    DiscreteLookup, EntryKind, FloatCoding, IntegerCoding, LocationReference, MatchCriteria,
-    NameId, Operand, ParamId, ParameterType, SizeSpec, StringDelimiter, TypeKind, XtceDb,
+    BooleanExpr, Calibrator, CompareOp, Comparison, ComparisonValue, Condition, ContainerId,
+    DataEncoding, DiscreteLookup, EntryKind, FloatCoding, IntegerCoding, LocationReference,
+    MatchCriteria, Operand, ParamId, ParameterType, SizeSpec, StringDelimiter, TypeKind, XtceDb,
 };
 
 use crate::bits::{BitCursor, ones_complement, sign_magnitude, swap_byte_order, twos_complement};
@@ -721,6 +721,7 @@ impl<'db> Decoder<'db> {
         current: Option<&RawValue<'_>>,
     ) -> Result<bool, DecodeError> {
         let literal_text = self.db.name(comparison.value.text);
+        let operator = comparison.operator;
 
         let outcome = match packet.get(comparison.parameter) {
             Some(value) => {
@@ -729,15 +730,18 @@ impl<'db> Decoder<'db> {
                 } else {
                     Scalar::from_raw(&value.raw)
                 };
-                compare_with_literal(scalar, &comparison.value, literal_text)
+                test_literal(scalar, operator, &comparison.value, literal_text)
             }
             // The referenced parameter is not in the packet, so this must be a comparison
             // against the value currently being decoded — how a context calibrator refers to
             // its own uncalibrated value.
             None => match current {
-                Some(raw) => {
-                    compare_with_literal(Scalar::from_raw(raw), &comparison.value, literal_text)
-                }
+                Some(raw) => test_literal(
+                    Scalar::from_raw(raw),
+                    operator,
+                    &comparison.value,
+                    literal_text,
+                ),
                 None => {
                     return Err(DecodeError::ParameterNotYetDecoded {
                         context: "comparison",
@@ -747,16 +751,11 @@ impl<'db> Decoder<'db> {
             },
         };
 
-        match outcome {
-            // Unordered: a NaN was involved, and no operator holds over a NaN.
-            Ok(None) => Ok(false),
-            Ok(Some(ordering)) => Ok(comparison.operator.matches(ordering)),
-            Err(failure) => Err(DecodeError::IncomparableValue {
-                parameter: self.parameter_name(comparison.parameter),
-                value_kind: failure.value_kind,
-                literal: literal_text.to_owned(),
-            }),
-        }
+        outcome.map_err(|failure| DecodeError::IncomparableValue {
+            parameter: self.parameter_name(comparison.parameter),
+            value_kind: failure.value_kind,
+            literal: literal_text.to_owned(),
+        })
     }
 
     fn evaluate_boolean(
@@ -793,23 +792,25 @@ impl<'db> Decoder<'db> {
         let left = self.operand_value(condition.left, packet)?;
 
         let outcome = match condition.right {
-            Operand::Literal(literal) => {
-                compare_with_literal(left, &literal, self.db.name(literal.text))
-            }
-            Operand::Parameter { .. } => {
-                compare_scalars(left, self.operand_value(condition.right, packet)?)
-            }
+            // The literal was pre-coerced at load time, so this is a comparison, not a parse.
+            Operand::Literal(literal) => test_literal(
+                left,
+                condition.operator,
+                &literal,
+                self.db.name(literal.text),
+            ),
+            Operand::Parameter { .. } => test_scalars(
+                left,
+                condition.operator,
+                self.operand_value(condition.right, packet)?,
+            ),
         };
 
-        match outcome {
-            Ok(None) => Ok(false),
-            Ok(Some(ordering)) => Ok(condition.operator.matches(ordering)),
-            Err(failure) => Err(DecodeError::IncomparableValue {
-                parameter: self.operand_name(condition.left),
-                value_kind: failure.value_kind,
-                literal: self.operand_name(condition.right),
-            }),
-        }
+        outcome.map_err(|failure| DecodeError::IncomparableValue {
+            parameter: self.operand_name(condition.left),
+            value_kind: failure.value_kind,
+            literal: self.operand_name(condition.right),
+        })
     }
 
     /// Resolves one side of a condition to a comparable scalar.
@@ -988,67 +989,87 @@ impl<'a> Scalar<'a> {
     }
 }
 
-/// The literal could not be read as the kind of value it was compared against.
+/// A comparison whose operands cannot be ordered against each other.
 ///
-/// Deliberately carries no owned data: it is turned into a [`DecodeError`] with names and
-/// text attached only at the call site, and only when a comparison actually fails.
+/// Deliberately carries no owned data: it becomes a [`DecodeError`] with names and text
+/// attached only at the call site, and only when a comparison actually fails.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct Incomparable {
     value_kind: &'static str,
 }
 
-/// The outcome of a comparison.
+/// The result of an operator applied to two values that have no ordering.
 ///
-/// `Ok(None)` means *unordered*, which in IEEE-754 is what any comparison involving NaN is.
-/// The reference implementation gets this from Python, where every operator on a NaN returns
-/// false; here it has to be explicit, because `Ord` on `f64` would happily report `Equal` for
-/// two NaNs and quietly select the wrong container.
-type Comparison3 = Result<Option<std::cmp::Ordering>, Incomparable>;
+/// IEEE-754 calls this *unordered*, and Python agrees with it: every operator on a NaN is
+/// false except `!=`, which is true. `Ord` on `f64` would instead report two NaNs as equal
+/// and silently select the wrong container.
+const fn unordered(operator: CompareOp) -> bool {
+    matches!(operator, CompareOp::NotEqual)
+}
 
-/// Compares a value against a pre-coerced literal.
+/// Applies `operator` to a value and a pre-coerced literal from the definition.
 ///
 /// XTCE does not type comparison literals, so the reading used is chosen by what the value
 /// turned out to be: an integer parameter compares numerically, an enumerated one as text.
 /// That mirrors the reference implementation, where the coercion is literally
-/// `type(parsed_value)(required_value)` — except that the parsing happened once at load time.
-fn compare_with_literal(value: Scalar<'_>, literal: &ComparisonValue, text: &str) -> Comparison3 {
+/// `type(parsed_value)(required_value)` — except that the parsing happened at load time.
+fn test_literal(
+    value: Scalar<'_>,
+    operator: CompareOp,
+    literal: &ComparisonValue,
+    text: &str,
+) -> Result<bool, Incomparable> {
     let incomparable = Incomparable {
         value_kind: value.kind(),
     };
     match value {
         Scalar::Integer(left) => match literal.as_int {
-            Some(right) => Ok(Some(left.cmp(&right))),
+            Some(right) => Ok(operator.matches(left.cmp(&right))),
             None => Err(incomparable),
         },
         Scalar::Float(left) => match literal.as_float {
-            Some(right) => Ok(left.partial_cmp(&right)),
+            Some(right) => Ok(ordering(operator, left.partial_cmp(&right))),
             None => Err(incomparable),
         },
-        Scalar::Text(left) => Ok(Some(left.cmp(text))),
+        Scalar::Text(left) => Ok(operator.matches(left.cmp(text))),
         Scalar::Opaque(_) => Err(incomparable),
     }
 }
 
-/// Compares two decoded values against each other.
-fn compare_scalars(left: Scalar<'_>, right: Scalar<'_>) -> Comparison3 {
-    use std::cmp::Ordering;
+/// Applies `operator` to two decoded values.
+fn test_scalars(
+    left: Scalar<'_>,
+    operator: CompareOp,
+    right: Scalar<'_>,
+) -> Result<bool, Incomparable> {
     match (left, right) {
-        (Scalar::Integer(a), Scalar::Integer(b)) => Ok(Some(a.cmp(&b))),
-        (Scalar::Float(a), Scalar::Float(b)) => Ok(a.partial_cmp(&b)),
-        (Scalar::Integer(a), Scalar::Float(b)) => Ok((a as f64).partial_cmp(&b)),
-        (Scalar::Float(a), Scalar::Integer(b)) => Ok(a.partial_cmp(&(b as f64))),
-        (Scalar::Text(a), Scalar::Text(b)) => Ok(Some(a.cmp(b))),
-        // A number against text: read the text as a number, as the reference does.
-        (Scalar::Integer(_) | Scalar::Float(_), Scalar::Text(text)) => {
-            compare_with_literal(left, &ComparisonValue::new(NameId::ZERO, text), text)
+        (Scalar::Integer(a), Scalar::Integer(b)) => Ok(operator.matches(a.cmp(&b))),
+        (Scalar::Float(a), Scalar::Float(b)) => Ok(ordering(operator, a.partial_cmp(&b))),
+        (Scalar::Integer(a), Scalar::Float(b)) => {
+            Ok(ordering(operator, (a as f64).partial_cmp(&b)))
         }
-        (Scalar::Text(text), Scalar::Integer(_) | Scalar::Float(_)) => {
-            compare_with_literal(right, &ComparisonValue::new(NameId::ZERO, text), text)
-                .map(|ordering| ordering.map(Ordering::reverse))
+        (Scalar::Float(a), Scalar::Integer(b)) => {
+            Ok(ordering(operator, a.partial_cmp(&(b as f64))))
         }
-        _ => Err(Incomparable {
-            value_kind: left.kind(),
-        }),
+        (Scalar::Text(a), Scalar::Text(b)) => Ok(operator.matches(a.cmp(b))),
+        // Text against a number, with no literal to coerce. Python answers `False` for `==`
+        // and `True` for `!=`, and raises `TypeError` for the ordering operators; this
+        // reports the same three outcomes.
+        _ => match operator {
+            CompareOp::Equal => Ok(false),
+            CompareOp::NotEqual => Ok(true),
+            _ => Err(Incomparable {
+                value_kind: left.kind(),
+            }),
+        },
+    }
+}
+
+/// Applies an operator to a partial ordering, treating `None` as unordered.
+fn ordering(operator: CompareOp, ordering: Option<std::cmp::Ordering>) -> bool {
+    match ordering {
+        Some(ordering) => operator.matches(ordering),
+        None => unordered(operator),
     }
 }
 
@@ -1113,6 +1134,7 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use xtce_model::NameId;
 
     /// The reference for half-precision: the exact rational value of the encoding.
     ///
@@ -1192,61 +1214,107 @@ mod tests {
     }
 
     #[test]
-    fn nan_is_unordered_so_no_operator_holds() {
+    fn nan_is_unordered_exactly_as_python_treats_it() {
+        use CompareOp::{Equal, Greater, GreaterOrEqual, Less, LessOrEqual, NotEqual};
         let nan = Scalar::Float(f64::NAN);
-        // Python's `float('nan') == float('nan')` is False, and so is every other operator.
-        // `Ord::cmp` on f64 would report Equal here and silently select a container.
-        assert_eq!(compare_with_literal(nan, &literal("0"), "0"), Ok(None));
-        assert_eq!(compare_with_literal(nan, &literal("nan"), "nan"), Ok(None));
-        assert_eq!(compare_scalars(nan, Scalar::Float(f64::NAN)), Ok(None));
-        assert_eq!(compare_scalars(nan, Scalar::Integer(0)), Ok(None));
+
+        // Python: nan == nan is False, nan != nan is True, every ordering is False. `Ord` on
+        // f64 would report two NaNs equal, and silently select the wrong container.
+        for (operator, expected) in [
+            (Equal, false),
+            (NotEqual, true),
+            (Less, false),
+            (LessOrEqual, false),
+            (Greater, false),
+            (GreaterOrEqual, false),
+        ] {
+            assert_eq!(
+                test_literal(nan, operator, &literal("0"), "0"),
+                Ok(expected),
+                "{operator:?} against a literal"
+            );
+            assert_eq!(
+                test_scalars(nan, operator, Scalar::Float(f64::NAN)),
+                Ok(expected),
+                "{operator:?} against another NaN"
+            );
+            assert_eq!(
+                test_scalars(nan, operator, Scalar::Integer(0)),
+                Ok(expected),
+                "{operator:?} against an integer"
+            );
+        }
     }
 
     #[test]
     fn negative_zero_equals_zero() {
         // IEEE-754 says -0.0 == 0.0; a total ordering says it is less.
         assert_eq!(
-            compare_with_literal(Scalar::Float(-0.0), &literal("0.0"), "0.0"),
-            Ok(Some(std::cmp::Ordering::Equal))
+            test_literal(
+                Scalar::Float(-0.0),
+                CompareOp::Equal,
+                &literal("0.0"),
+                "0.0"
+            ),
+            Ok(true)
         );
         assert_eq!(
-            compare_scalars(Scalar::Float(-0.0), Scalar::Float(0.0)),
-            Ok(Some(std::cmp::Ordering::Equal))
+            test_scalars(Scalar::Float(-0.0), CompareOp::Equal, Scalar::Float(0.0)),
+            Ok(true)
         );
     }
 
     #[test]
     fn literals_are_coerced_to_the_value_they_meet() {
-        use std::cmp::Ordering;
         assert_eq!(
-            compare_with_literal(Scalar::Integer(11), &literal("11"), "11"),
-            Ok(Some(Ordering::Equal))
+            test_literal(Scalar::Integer(11), CompareOp::Equal, &literal("11"), "11"),
+            Ok(true)
         );
-        // A float literal cannot be read as an integer, which is what Python's
-        // `int("3.5")` does too.
-        assert!(compare_with_literal(Scalar::Integer(3), &literal("3.5"), "3.5").is_err());
+        // A float literal cannot be read as an integer, which is what Python's `int("3.5")`
+        // does too.
+        assert!(
+            test_literal(Scalar::Integer(3), CompareOp::Equal, &literal("3.5"), "3.5").is_err()
+        );
         // But an integer literal reads fine as a float.
         assert_eq!(
-            compare_with_literal(Scalar::Float(3.0), &literal("3"), "3"),
-            Ok(Some(Ordering::Equal))
+            test_literal(Scalar::Float(3.0), CompareOp::Equal, &literal("3"), "3"),
+            Ok(true)
         );
         // Enumerated parameters compare as text, so their labels never parse as numbers.
         assert_eq!(
-            compare_with_literal(Scalar::Text("ON"), &literal("ON"), "ON"),
-            Ok(Some(Ordering::Equal))
+            test_literal(Scalar::Text("ON"), CompareOp::Equal, &literal("ON"), "ON"),
+            Ok(true)
         );
         assert_eq!(
-            compare_with_literal(Scalar::Text("OFF"), &literal("ON"), "ON"),
-            Ok(Some(Ordering::Less))
+            test_literal(Scalar::Text("OFF"), CompareOp::Less, &literal("ON"), "ON"),
+            Ok(true)
         );
         // Binary is not comparable at all.
-        assert!(compare_with_literal(Scalar::Opaque("binary"), &literal("0"), "0").is_err());
+        assert!(
+            test_literal(
+                Scalar::Opaque("binary"),
+                CompareOp::Equal,
+                &literal("0"),
+                "0"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn text_against_a_number_follows_python() {
+        // Python: "ON" == 5 is False, "ON" != 5 is True, "ON" < 5 raises TypeError.
+        let text = Scalar::Text("ON");
+        let number = Scalar::Integer(5);
+        assert_eq!(test_scalars(text, CompareOp::Equal, number), Ok(false));
+        assert_eq!(test_scalars(text, CompareOp::NotEqual, number), Ok(true));
+        assert!(test_scalars(text, CompareOp::Less, number).is_err());
+        assert!(test_scalars(number, CompareOp::Greater, text).is_err());
     }
 
     #[test]
     fn operators_over_an_ordering() {
         use std::cmp::Ordering::{Equal, Greater, Less};
-        use xtce_model::CompareOp;
         assert!(CompareOp::Equal.matches(Equal));
         assert!(!CompareOp::Equal.matches(Less));
         assert!(CompareOp::NotEqual.matches(Less));
