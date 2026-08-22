@@ -32,6 +32,21 @@ pub enum DecodeError {
         /// The container being specialised.
         container: &'static str,
     },
+    /// A string field's bytes are not valid text in its declared character set.
+    InvalidText {
+        /// The parameter being decoded.
+        parameter: &'static str,
+    },
+    /// A string declares a termination character its buffer does not contain.
+    UnterminatedString {
+        /// The parameter being decoded.
+        parameter: &'static str,
+    },
+    /// A leading-size prefix declares a length its buffer cannot hold.
+    BadStringLength {
+        /// The parameter being decoded.
+        parameter: &'static str,
+    },
 }
 impl core::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -45,13 +60,24 @@ impl core::fmt::Display for DecodeError {
             Self::Ambiguous { container } => {
                 write!(f, "more than one inheritor of {container} matches")
             }
+            Self::InvalidText { parameter } => {
+                write!(f, "{parameter}: bytes are not valid text")
+            }
+            Self::UnterminatedString { parameter } => {
+                write!(f, "{parameter}: termination character not found")
+            }
+            Self::BadStringLength { parameter } => {
+                write!(f, "{parameter}: leading size is larger than the buffer")
+            }
         }
     }
 }
 impl core::error::Error for DecodeError {}
 /// A decoded value, in the same shape the interpreted decoder produces.
+///
+/// Text and binary values borrow from the packet, so nothing is copied out of it.
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum Value {
+pub enum Value<'a> {
     /// An unsigned integer field.
     Unsigned(u64),
     /// A signed integer field.
@@ -62,6 +88,10 @@ pub enum Value {
     Bool(bool),
     /// An enumeration label.
     Label(&'static str),
+    /// Text decoded from the packet.
+    Text(&'a str),
+    /// Bytes as they appear in the packet.
+    Bytes(&'a [u8]),
 }
 /// `JPSS_ATT_EPHEM`: 27 field(s) in 568 bit(s).
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
@@ -162,16 +192,17 @@ impl JpssAttEphem {
     ///
     /// # Errors
     ///
-    /// [`DecodeError::TooShort`] if the packet is smaller than [`Self::BYTE_LENGTH`].
+    /// [`DecodeError::TooShort`] if the packet is smaller than [`Self::BYTE_LENGTH`],
+    /// or a text error if a string field does not hold valid text.
     #[inline]
     pub fn decode(data: &[u8]) -> Result<Self, DecodeError> {
-        let packet: &[u8; Self::BYTE_LENGTH] = match data.get(..Self::BYTE_LENGTH) {
+        let packet: &[u8; 71] = match data.get(..71) {
             Some(prefix) => {
                 match prefix.try_into() {
                     Ok(array) => array,
                     Err(_) => {
                         return Err(DecodeError::TooShort {
-                            needed: Self::BYTE_LENGTH,
+                            needed: 71,
                             got: data.len(),
                         });
                     }
@@ -179,203 +210,111 @@ impl JpssAttEphem {
             }
             None => {
                 return Err(DecodeError::TooShort {
-                    needed: Self::BYTE_LENGTH,
+                    needed: 71,
                     got: data.len(),
                 });
             }
         };
         Ok(Self {
-            version: (u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, packet[0]]) >> 5) & 7,
-            type_: (u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, packet[0]]) >> 4) & 1,
-            sec_hdr_flg: (u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, packet[0]]) >> 3) & 1,
-            pkt_apid: u64::from_be_bytes([0, 0, 0, 0, 0, 0, packet[0], packet[1]])
-                & 2047,
-            seq_flgs: (u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, packet[2]]) >> 6) & 3,
-            src_seq_ctr: u64::from_be_bytes([0, 0, 0, 0, 0, 0, packet[2], packet[3]])
-                & 16383,
-            pkt_len: u64::from_be_bytes([0, 0, 0, 0, 0, 0, packet[4], packet[5]]),
-            doy: u64::from_be_bytes([0, 0, 0, 0, 0, 0, packet[6], packet[7]]),
-            msec: u64::from_be_bytes([
-                0,
-                0,
-                0,
-                0,
-                packet[8],
-                packet[9],
-                packet[10],
-                packet[11],
-            ]),
-            usec: u64::from_be_bytes([0, 0, 0, 0, 0, 0, packet[12], packet[13]]),
-            adaescid: u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, packet[14]]),
-            adaet1day: u64::from_be_bytes([0, 0, 0, 0, 0, 0, packet[15], packet[16]]),
-            adaet1ms: u64::from_be_bytes([
-                0,
-                0,
-                0,
-                0,
+            version: (packet[0] as u64 >> 5) & 7,
+            type_: (packet[0] as u64 >> 4) & 1,
+            sec_hdr_flg: (packet[0] as u64 >> 3) & 1,
+            pkt_apid: (u16::from_be_bytes([packet[0], packet[1]]) as u64) & 2047,
+            seq_flgs: (packet[2] as u64 >> 6) & 3,
+            src_seq_ctr: (u16::from_be_bytes([packet[2], packet[3]]) as u64) & 16383,
+            pkt_len: u16::from_be_bytes([packet[4], packet[5]]) as u64,
+            doy: u16::from_be_bytes([packet[6], packet[7]]) as u64,
+            msec: u32::from_be_bytes([packet[8], packet[9], packet[10], packet[11]])
+                as u64,
+            usec: u16::from_be_bytes([packet[12], packet[13]]) as u64,
+            adaescid: packet[14] as u64,
+            adaet1day: u16::from_be_bytes([packet[15], packet[16]]) as u64,
+            adaet1ms: u32::from_be_bytes([
                 packet[17],
                 packet[18],
                 packet[19],
                 packet[20],
-            ]),
-            adaet1us: u64::from_be_bytes([0, 0, 0, 0, 0, 0, packet[21], packet[22]]),
+            ]) as u64,
+            adaet1us: u16::from_be_bytes([packet[21], packet[22]]) as u64,
             adgpsposx: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[23],
-                        packet[24],
-                        packet[25],
-                        packet[26],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[23], packet[24], packet[25], packet[26]])
+                        as u64 as u32,
                 ),
             ),
             adgpsposy: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[27],
-                        packet[28],
-                        packet[29],
-                        packet[30],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[27], packet[28], packet[29], packet[30]])
+                        as u64 as u32,
                 ),
             ),
             adgpsposz: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[31],
-                        packet[32],
-                        packet[33],
-                        packet[34],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[31], packet[32], packet[33], packet[34]])
+                        as u64 as u32,
                 ),
             ),
             adgpsvelx: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[35],
-                        packet[36],
-                        packet[37],
-                        packet[38],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[35], packet[36], packet[37], packet[38]])
+                        as u64 as u32,
                 ),
             ),
             adgpsvely: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[39],
-                        packet[40],
-                        packet[41],
-                        packet[42],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[39], packet[40], packet[41], packet[42]])
+                        as u64 as u32,
                 ),
             ),
             adgpsvelz: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[43],
-                        packet[44],
-                        packet[45],
-                        packet[46],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[43], packet[44], packet[45], packet[46]])
+                        as u64 as u32,
                 ),
             ),
-            adaet2day: u64::from_be_bytes([0, 0, 0, 0, 0, 0, packet[47], packet[48]]),
-            adaet2ms: u64::from_be_bytes([
-                0,
-                0,
-                0,
-                0,
+            adaet2day: u16::from_be_bytes([packet[47], packet[48]]) as u64,
+            adaet2ms: u32::from_be_bytes([
                 packet[49],
                 packet[50],
                 packet[51],
                 packet[52],
-            ]),
-            adaet2us: u64::from_be_bytes([0, 0, 0, 0, 0, 0, packet[53], packet[54]]),
+            ]) as u64,
+            adaet2us: u16::from_be_bytes([packet[53], packet[54]]) as u64,
             adcfaq1: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[55],
-                        packet[56],
-                        packet[57],
-                        packet[58],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[55], packet[56], packet[57], packet[58]])
+                        as u64 as u32,
                 ),
             ),
             adcfaq2: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[59],
-                        packet[60],
-                        packet[61],
-                        packet[62],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[59], packet[60], packet[61], packet[62]])
+                        as u64 as u32,
                 ),
             ),
             adcfaq3: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[63],
-                        packet[64],
-                        packet[65],
-                        packet[66],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[63], packet[64], packet[65], packet[66]])
+                        as u64 as u32,
                 ),
             ),
             adcfaq4: f64::from(
                 f32::from_bits(
-                    u64::from_be_bytes([
-                        0,
-                        0,
-                        0,
-                        0,
-                        packet[67],
-                        packet[68],
-                        packet[69],
-                        packet[70],
-                    ]) as u32,
+                    u32::from_be_bytes([packet[67], packet[68], packet[69], packet[70]])
+                        as u64 as u32,
                 ),
             ),
         })
     }
     /// Calls `visit(name, raw, engineering)` for every field, in decode order.
+    ///
+    /// The values borrow for as long as `self` does, so a caller may collect them
+    /// rather than only look at them in passing.
     #[inline]
-    pub fn for_each_value(&self, mut visit: impl FnMut(&'static str, Value, Value)) {
+    pub fn for_each_value<'v>(
+        &'v self,
+        mut visit: impl FnMut(&'static str, Value<'v>, Value<'v>),
+    ) {
         visit("VERSION", Value::Unsigned(self.version), Value::Unsigned(self.version));
         visit("TYPE", Value::Unsigned(self.type_), Value::Unsigned(self.type_));
         visit(
@@ -464,8 +403,14 @@ impl Packet {
         }
     }
     /// Calls `visit(name, raw, engineering)` for every field, in decode order.
+    ///
+    /// The values borrow for as long as `self` does, so a caller may collect them
+    /// rather than only look at them in passing.
     #[inline]
-    pub fn for_each_value(&self, visit: impl FnMut(&'static str, Value, Value)) {
+    pub fn for_each_value<'v>(
+        &'v self,
+        visit: impl FnMut(&'static str, Value<'v>, Value<'v>),
+    ) {
         match self {
             Self::JpssAttEphem(packet) => packet.for_each_value(visit),
         }
@@ -504,9 +449,7 @@ pub fn decode(data: &[u8]) -> Result<Packet, DecodeError> {
     {
         let mut matched = 0u32;
         let mut which = usize::MAX;
-        if (u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, head[0]]) >> 5) & 7 == 0
-            && (u64::from_be_bytes([0, 0, 0, 0, 0, 0, 0, head[0]]) >> 4) & 1 == 0
-        {
+        if (head[0] as u64 >> 5) & 7 == 0 && (head[0] as u64 >> 4) & 1 == 0 {
             matched += 1;
             which = 0;
         }
@@ -519,8 +462,7 @@ pub fn decode(data: &[u8]) -> Result<Packet, DecodeError> {
             0 => {
                 let mut matched = 0u32;
                 let mut which = usize::MAX;
-                if u64::from_be_bytes([0, 0, 0, 0, 0, 0, head[0], head[1]]) & 2047 == 11
-                {
+                if (u16::from_be_bytes([head[0], head[1]]) as u64) & 2047 == 11 {
                     matched += 1;
                     which = 0;
                 }

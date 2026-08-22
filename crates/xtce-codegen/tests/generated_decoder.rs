@@ -71,7 +71,6 @@ fn generated_matches_interpreted_on_every_packet() {
 
     let mut interpreted_packet = decoder.new_packet(&stream);
     let mut compared = 0usize;
-    let mut fields = Vec::new();
 
     for (index, framed) in PacketIter::new(&stream, 0).enumerate() {
         let framed = framed.expect("the stream is well framed");
@@ -93,7 +92,9 @@ fn generated_matches_interpreted_on_every_packet() {
             "packet {index}: the two decoders chose different containers"
         );
 
-        fields.clear();
+        // Declared per packet: the collected values borrow from `compiled`, which does not
+        // outlive this iteration.
+        let mut fields = Vec::new();
         compiled.for_each_value(|name, raw, eng| fields.push((name, raw, eng)));
 
         assert_eq!(
@@ -194,8 +195,9 @@ fn a_packet_of_another_type_is_refused() {
 /// Out-of-scope constructs must be refused by name, never silently interpreted.
 #[test]
 fn unsupported_constructs_are_named_not_ignored() {
+    // CTIM is deliberately absent: its fixed-size strings are compiled now, and
+    // `xtce-codegen-e2e` checks the result against the interpreter on the real stream.
     let cases = [
-        ("ctim/ctim_xtce_v1.xml", Some("CCSDSTelemetryPacket")),
         ("idex/idex_combined_science_definition.xml", None),
         ("suda/suda_combined_science_definition.xml", None),
         ("jpss/contrived_inheritance_structure.xml", None),

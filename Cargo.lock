@@ -948,6 +948,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "xtce-codegen-e2e"
+version = "0.1.0"
+dependencies = [
+ "xtce-codegen",
+ "xtce-decode",
+ "xtce-model",
+]
+
+[[package]]
 name = "xtce-decode"
 version = "0.1.0"
 dependencies = [

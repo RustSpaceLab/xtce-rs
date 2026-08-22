@@ -9,8 +9,8 @@
 use std::collections::HashMap;
 
 use xtce_model::{
-    Calibrator, CompareOp, ContainerId, DataEncoding, EntryKind, FloatCoding, IntegerCoding,
-    MatchCriteria, ParamId, TypeKind, XtceDb,
+    Calibrator, Charset, CompareOp, ContainerId, DataEncoding, EntryKind, FloatCoding,
+    IntegerCoding, MatchCriteria, ParamId, SizeSpec, StringDelimiter, TypeKind, XtceDb,
 };
 
 use crate::CodegenError;
@@ -32,6 +32,43 @@ pub enum Repr {
     Bool,
     /// An enumeration: `(value, max_value, label)` sorted by value.
     Enumerated(Vec<(i128, i128, String)>),
+    /// Text: the raw buffer plus how to find the string inside it.
+    Text {
+        /// Character set of the decoded text.
+        charset: TextCharset,
+        /// How the string is delimited inside its buffer.
+        delimiter: TextDelimiter,
+    },
+    /// A binary field: the bytes as they appear in the packet.
+    Binary,
+}
+
+/// Character sets the generator can decode without transcoding.
+///
+/// Both of these validate to a `&str` that borrows the packet. Anything else — Latin-1,
+/// Windows-1252, UTF-16, UTF-32 — needs a new allocation per field, which would put an
+/// allocator call on the hot path of generated code whose whole purpose is not to have one.
+/// Those are refused by name; the interpreter decodes them.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TextCharset {
+    /// `UTF-8`, validated.
+    Utf8,
+    /// `US-ASCII`, validated as UTF-8 and additionally checked for the high bit.
+    UsAscii,
+}
+
+/// How the derived string is delimited inside its raw buffer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TextDelimiter {
+    /// The whole buffer is the string.
+    WholeBuffer,
+    /// The string ends at the first occurrence of these bytes.
+    TerminationChar(Vec<u8>),
+    /// The buffer starts with a length, in bits, of this width.
+    LeadingSize {
+        /// Width of the length prefix, in bits.
+        size_in_bits: u32,
+    },
 }
 
 impl Repr {
@@ -40,6 +77,12 @@ impl Repr {
     #[must_use]
     pub fn is_integral(&self) -> bool {
         matches!(self, Self::Unsigned | Self::Signed(_) | Self::Bool)
+    }
+
+    /// Whether this field borrows from the packet rather than owning a scalar.
+    #[must_use]
+    pub fn borrows(&self) -> bool {
+        matches!(self, Self::Text { .. } | Self::Binary)
     }
 }
 
@@ -52,6 +95,11 @@ pub struct Field {
     pub xtce_name: String,
     /// Name of the generated struct field.
     pub ident: String,
+    /// For a text field, the name of the companion field holding the raw buffer.
+    ///
+    /// XTCE gives a string two values — the buffer as allocated, and the string found inside
+    /// it — and both are needed to reproduce the reference exactly, so both are stored.
+    pub raw_ident: Option<String>,
     /// Bit offset from the start of the packet.
     pub bit_offset: usize,
     /// Field width in bits.
@@ -176,6 +224,7 @@ impl<'db> Builder<'db> {
         let mut fields = inherited.to_vec();
         let mut offset = bit_offset;
         self.flatten(id, &mut fields, &mut offset, 0)?;
+        assign_unique_idents(&mut fields);
 
         let plan = if container.is_abstract {
             None
@@ -302,19 +351,34 @@ impl<'db> Builder<'db> {
         }
 
         let (bit_width, numeric) = encoding_repr(&ty.encoding, &refuse)?;
+        let repr = self.kind_repr(ty, numeric, &refuse)?;
 
-        if bit_width == 0 || bit_width > 64 {
+        if repr.borrows() {
+            // Text and binary fields are handed out as slices of the packet. That is only
+            // possible when the field starts on a byte boundary and is a whole number of
+            // bytes; otherwise every byte would have to be shifted into a new buffer, which
+            // means allocating, which is what this generator exists to avoid. The
+            // interpreter handles the unaligned case.
+            if bit_offset % 8 != 0 || bit_width % 8 != 0 {
+                return Err(refuse(
+                    "sizeInBits",
+                    "the field is not byte-aligned, so it cannot be borrowed from the packet",
+                ));
+            }
+            if bit_width == 0 {
+                return Err(refuse("sizeInBits", "the field is empty"));
+            }
+        } else if bit_width == 0 || bit_width > 64 {
             return Err(refuse(
                 "sizeInBits",
-                "only fields of 1 to 64 bits are compiled",
+                "only numeric fields of 1 to 64 bits are compiled",
             ));
         }
-
-        let repr = self.kind_repr(ty, numeric, &refuse)?;
 
         Ok(Field {
             parameter,
             ident: field_ident(&xtce_name),
+            raw_ident: None,
             xtce_name,
             bit_offset,
             bit_width,
@@ -329,6 +393,13 @@ impl<'db> Builder<'db> {
         numeric: Repr,
         refuse: &impl Fn(&str, &'static str) -> CodegenError,
     ) -> Result<Repr, CodegenError> {
+        if numeric.borrows() && !matches!(ty.kind, TypeKind::String | TypeKind::Binary) {
+            return Err(refuse(
+                ty.kind.label(),
+                "a numeric or enumerated type over a string or binary encoding is not compiled",
+            ));
+        }
+
         Ok(match &ty.kind {
             TypeKind::Integer | TypeKind::Float | TypeKind::AbsoluteTime { .. } => numeric,
             TypeKind::Boolean { .. } => Repr::Bool,
@@ -352,19 +423,61 @@ impl<'db> Builder<'db> {
                         .collect(),
                 )
             }
+            // A string or binary parameter type must actually carry the matching encoding.
+            // XTCE does not enforce that, and the reference implementation would decode the
+            // mismatch as bytes; rather than guess, this refuses and names the mismatch.
+            TypeKind::String => match numeric {
+                Repr::Text { .. } => numeric,
+                _ => {
+                    return Err(refuse(
+                        "StringParameterType",
+                        "the type is a string but its encoding is not a StringDataEncoding",
+                    ));
+                }
+            },
+            TypeKind::Binary => match numeric {
+                Repr::Binary => numeric,
+                _ => {
+                    return Err(refuse(
+                        "BinaryParameterType",
+                        "the type is binary but its encoding is not a BinaryDataEncoding",
+                    ));
+                }
+            },
             TypeKind::Unsupported { element } => {
                 return Err(refuse(
                     self.db.name(*element),
                     "the parameter type is outside the modelled subset",
                 ));
             }
-            TypeKind::RelativeTime | TypeKind::String | TypeKind::Binary => {
+            TypeKind::RelativeTime => {
                 return Err(refuse(
                     ty.kind.label(),
                     "the parameter type is not compiled yet",
                 ));
             }
         })
+    }
+}
+
+/// The width of a string or binary field, when it is fixed at load time.
+fn fixed_width(
+    size: &SizeSpec,
+    element: &str,
+    refuse: &impl Fn(&str, &'static str) -> CodegenError,
+) -> Result<u32, CodegenError> {
+    match size {
+        SizeSpec::Fixed(bits) => Ok(*bits),
+        SizeSpec::Dynamic { .. } => Err(refuse(
+            element,
+            "the width comes from another parameter, so no offset after it is known at \
+             generation time",
+        )),
+        SizeSpec::DiscreteLookup(_) => Err(refuse(
+            element,
+            "the width comes from a DiscreteLookupList, which is not compiled",
+        )),
+        SizeSpec::Unsupported { .. } => Err(refuse(element, "the width could not be modelled")),
     }
 }
 
@@ -413,17 +526,33 @@ fn encoding_repr(
             };
             (encoding.size_in_bits, repr)
         }
-        DataEncoding::String(_) => {
-            return Err(refuse(
-                "StringDataEncoding",
-                "strings are not compiled yet; the interpreter handles them",
-            ));
+        DataEncoding::String(encoding) => {
+            let charset = match encoding.charset {
+                Charset::Utf8 => TextCharset::Utf8,
+                Charset::UsAscii => TextCharset::UsAscii,
+                _ => {
+                    return Err(refuse(
+                        "StringDataEncoding",
+                        "only UTF-8 and US-ASCII are compiled; the others need transcoding, \
+                         which would allocate per field",
+                    ));
+                }
+            };
+            let delimiter = match &encoding.delimiter {
+                StringDelimiter::WholeBuffer => TextDelimiter::WholeBuffer,
+                StringDelimiter::TerminationChar(bytes) => {
+                    TextDelimiter::TerminationChar(bytes.clone())
+                }
+                StringDelimiter::LeadingSize { size_in_bits } => TextDelimiter::LeadingSize {
+                    size_in_bits: *size_in_bits,
+                },
+            };
+            let width = fixed_width(&encoding.raw_size, "StringDataEncoding", refuse)?;
+            (width, Repr::Text { charset, delimiter })
         }
-        DataEncoding::Binary(_) => {
-            return Err(refuse(
-                "BinaryDataEncoding",
-                "binary fields are not compiled yet; the interpreter handles them",
-            ));
+        DataEncoding::Binary(encoding) => {
+            let width = fixed_width(&encoding.size, "BinaryDataEncoding", refuse)?;
+            (width, Repr::Binary)
         }
         DataEncoding::None => {
             return Err(refuse("DataEncoding", "the parameter type has no encoding"));
@@ -512,6 +641,38 @@ impl Builder<'_> {
             // Two XTCE names can sanitise to the same Rust identifier; the suffix keeps the
             // generated module compiling rather than silently dropping one.
             format!("{base}{count}")
+        }
+    }
+}
+
+/// Makes every generated field name unique within a container.
+///
+/// Two XTCE names can sanitise to the same Rust identifier — `A-B` and `A_B` both become
+/// `a_b` — and a text field additionally needs a companion name for its raw buffer, which
+/// could itself collide with a real parameter called `X_RAW`. Resolving both here means the
+/// emitter never has to think about it, and a collision produces a suffix rather than a
+/// module that does not compile.
+fn assign_unique_idents(fields: &mut [Field]) {
+    let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    let claim = |wanted: &str, used: &mut std::collections::HashSet<String>| -> String {
+        if used.insert(wanted.to_owned()) {
+            return wanted.to_owned();
+        }
+        for suffix in 2u32.. {
+            let candidate = format!("{wanted}_{suffix}");
+            if used.insert(candidate.clone()) {
+                return candidate;
+            }
+        }
+        wanted.to_owned()
+    };
+
+    for field in fields.iter_mut() {
+        field.ident = claim(&field.ident, &mut used);
+        if field.repr.borrows() && matches!(field.repr, Repr::Text { .. }) {
+            let wanted = format!("{}_raw", field.ident);
+            field.raw_ident = Some(claim(&wanted, &mut used));
         }
     }
 }

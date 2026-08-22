@@ -1,0 +1,18 @@
+[package]
+name = "xtce-codegen-e2e"
+description = "Generating decoders in build.rs, and checking them against the interpreter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[build-dependencies]
+xtce-model.workspace = true
+xtce-codegen.workspace = true
+
+[dev-dependencies]
+xtce-model.workspace = true
+xtce-decode.workspace = true

@@ -117,7 +117,11 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | `ContainerRefEntry` | Yes | expanded inline |
 | `leastSignificantByteFirst` | Refused | |
 | Calibrators | Refused | the interpreter sums polynomial terms in document order with exact integer powers; until the emitted arithmetic is proved identical, compiling it risks a silent last-bit divergence |
-| `StringDataEncoding`, `BinaryDataEncoding` | Refused | width can depend on packet content |
+| `StringDataEncoding`, fixed size, byte-aligned | Yes | UTF-8 and US-ASCII; `TerminationChar` and `LeadingSize` delimiters; the string borrows the packet |
+| `BinaryDataEncoding`, fixed size, byte-aligned | Yes | borrows the packet |
+| Text or binary not on a byte boundary | Refused | borrowing is impossible, and copying would put an allocation on the hot path |
+| Text in a charset needing transcoding | Refused | Latin-1, Windows-1252, UTF-16, UTF-32 cannot borrow |
+| `StringDataEncoding`/`BinaryDataEncoding` of variable width | Refused | no offset after it is known at generation time |
 | `LocationInContainerInBits`, `RepeatEntry` | Refused | |
 | `BooleanExpression` criteria | Refused | |
 | MIL-STD-1750A floats | Refused | |
