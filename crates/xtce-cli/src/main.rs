@@ -162,7 +162,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     std::fs::write(&path, source)?;
                     eprintln!("wrote {}", path.display());
                     eprintln!(
-                        "include it inside a module that carries the lint allowances                          generated code needs; see the header of the file"
+                        "include it inside a module carrying the lint allowances generated \
+                         code needs; the file's header shows how"
                     );
                 }
                 None => print!("{source}"),

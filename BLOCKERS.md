@@ -5,11 +5,17 @@ verified; see `PROGRESS.md` for what each one produced and what it measured.
 
 ## Where a next session should start
 
-1. **Widen `xtce-codegen`.** It compiles one of the ten bundled definitions. Strings and
-   fixed-size binary fields are the next tranche and are mechanical — the layout is still
-   static. Calibrators are the one to be careful with: the interpreter sums polynomial terms
-   in document order with exact integer powers, and the emitted arithmetic has to be proved
-   identical before it can ship, or it becomes a silent last-bit divergence.
+1. **Calibrators in `xtce-codegen`.** Ten of the eleven bundled definitions compile now —
+   strings, binaries and data-dependent widths all landed; see `PROGRESS.md`, 2026-08-22.
+   Calibration is the largest thing left, and the one to be careful with: the interpreter
+   sums polynomial terms in document order with exact integer powers, and the emitted
+   arithmetic has to be proved identical before it can ship, or it becomes a silent last-bit
+   divergence. `BooleanExpression` restriction criteria are the other gap, and are what
+   `contrived_inheritance_structure.xml` is still refused on.
+
+   Worth knowing before starting: the two bugs `numeric_edges.xml` caught were both in paths
+   no mission file reaches. Anything added here needs a definition written to reach it, not
+   just a mission file that happens to use it.
 
 2. **Give the differential harness a `--full` mode.** The golden files hold full detail for
    the first 64 packets of each stream and a digest over all of them. A digest mismatch

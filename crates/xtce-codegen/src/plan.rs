@@ -10,7 +10,8 @@ use std::collections::HashMap;
 
 use xtce_model::{
     Calibrator, Charset, CompareOp, ContainerId, DataEncoding, EntryKind, FloatCoding,
-    IntegerCoding, MatchCriteria, ParamId, SizeSpec, StringDelimiter, TypeKind, XtceDb,
+    IntegerCoding, LinearAdjustment, MatchCriteria, ParamId, SizeSpec, StringDelimiter, TypeKind,
+    XtceDb,
 };
 
 use crate::CodegenError;
@@ -86,6 +87,34 @@ impl Repr {
     }
 }
 
+/// How wide a field is.
+#[derive(Clone, Copy, Debug)]
+pub enum Width {
+    /// Known at generation time.
+    Fixed(u32),
+    /// Read from another parameter while decoding.
+    ///
+    /// Everything after such a field has a run-time offset, which is why this exists at all:
+    /// a container holding one cannot be laid out entirely in literals.
+    Dynamic {
+        /// Index, within the same container, of the field holding the size.
+        source: usize,
+        /// `slope * x + intercept`, applied to the source value.
+        adjustment: Option<LinearAdjustment>,
+    },
+}
+
+impl Width {
+    /// The width, when it is fixed.
+    #[must_use]
+    pub const fn fixed(self) -> Option<u32> {
+        match self {
+            Self::Fixed(bits) => Some(bits),
+            Self::Dynamic { .. } => None,
+        }
+    }
+}
+
 /// One decoded field in a flattened container.
 #[derive(Clone, Debug)]
 pub struct Field {
@@ -100,12 +129,22 @@ pub struct Field {
     /// XTCE gives a string two values — the buffer as allocated, and the string found inside
     /// it — and both are needed to reproduce the reference exactly, so both are stored.
     pub raw_ident: Option<String>,
-    /// Bit offset from the start of the packet.
-    pub bit_offset: usize,
-    /// Field width in bits.
-    pub bit_width: u32,
+    /// Bit offset from the start of the packet, when it is known at generation time.
+    ///
+    /// `None` once an earlier field in the same container has a data-dependent width.
+    pub bit_offset: Option<usize>,
+    /// How wide the field is.
+    pub width: Width,
     /// How the bits become a value.
     pub repr: Repr,
+}
+
+impl Field {
+    /// The offset and width, when both are known at generation time.
+    #[must_use]
+    pub fn static_span(&self) -> Option<(usize, u32)> {
+        Some((self.bit_offset?, self.width.fixed()?))
+    }
 }
 
 /// One concrete container, with its whole inheritance chain flattened.
@@ -115,10 +154,23 @@ pub struct ContainerPlan {
     pub xtce_name: String,
     /// Name of the generated struct.
     pub type_ident: String,
-    /// Total width of the flattened layout, in bits.
-    pub bit_length: usize,
+    /// Total width of the flattened layout, when every field has a fixed width.
+    pub bit_length: Option<usize>,
+    /// Width of the leading run of fields whose offsets are known at generation time.
+    ///
+    /// The generated decoder narrows the packet to this many bits once and reads that whole
+    /// run with literal offsets; only what follows needs a cursor.
+    pub static_prefix_bits: usize,
     /// Fields in decode order.
     pub fields: Vec<Field>,
+}
+
+impl ContainerPlan {
+    /// Whether any field's width depends on packet content.
+    #[must_use]
+    pub fn is_dynamic(&self) -> bool {
+        self.bit_length.is_none()
+    }
 }
 
 /// One `<Comparison>` from a restriction criterion, resolved to a static bit range.
@@ -126,7 +178,8 @@ pub struct ContainerPlan {
 pub struct Guard {
     /// The parameter being tested, for diagnostics.
     pub xtce_name: String,
-    /// Where its value sits in the flattened layout.
+    /// Where its value sits in the flattened layout. Always known: a criterion may only
+    /// test a field the dispatcher can reach before any dynamic width intervenes.
     pub bit_offset: usize,
     /// How wide it is.
     pub bit_width: u32,
@@ -175,7 +228,7 @@ pub fn build(db: &XtceDb, root: ContainerId) -> Result<Plan, CodegenError> {
         idents: HashMap::new(),
     };
     let root_name = builder.container_name(root)?.to_owned();
-    let node = builder.node(root, &[], 0, 0)?;
+    let node = builder.node(root, &[], Some(0), 0)?;
     Ok(Plan {
         root: node,
         containers: builder.containers,
@@ -194,6 +247,25 @@ struct Builder<'db> {
 /// Guards against a `<ContainerRefEntry>` cycle, matching the decoder's own limit.
 const MAX_DEPTH: usize = 64;
 
+/// How far into the packet the layout has reached, while it is still knowable.
+///
+/// Becomes `None` the moment a field's width comes from the data: from there on the offsets
+/// are whatever the packet says, and the generated decoder has to carry a cursor.
+type Cursor = Option<usize>;
+
+trait CursorExt {
+    fn advance(self, width: Width) -> Cursor;
+}
+
+impl CursorExt for Cursor {
+    fn advance(self, width: Width) -> Cursor {
+        match (self, width) {
+            (Some(offset), Width::Fixed(bits)) => Some(offset + bits as usize),
+            _ => None,
+        }
+    }
+}
+
 impl<'db> Builder<'db> {
     fn container_name(&self, id: ContainerId) -> Result<&'db str, CodegenError> {
         self.db
@@ -207,7 +279,7 @@ impl<'db> Builder<'db> {
         &mut self,
         id: ContainerId,
         inherited: &[Field],
-        bit_offset: usize,
+        bit_offset: Cursor,
         depth: usize,
     ) -> Result<Node, CodegenError> {
         if depth > MAX_DEPTH {
@@ -230,10 +302,19 @@ impl<'db> Builder<'db> {
             None
         } else {
             let type_ident = self.unique_type_ident(&name);
+            let static_prefix_bits = fields
+                .iter()
+                .take_while(|field| field.bit_offset.is_some())
+                .filter_map(Field::static_span)
+                .map(|(offset, width)| offset + width as usize)
+                .last()
+                .unwrap_or(0);
+            let dynamic = fields.iter().any(|field| field.bit_offset.is_none());
             self.containers.push(ContainerPlan {
                 xtce_name: name.clone(),
                 type_ident,
-                bit_length: offset,
+                bit_length: if dynamic { None } else { offset },
+                static_prefix_bits,
                 fields: fields.clone(),
             });
             Some(self.containers.len() - 1)
@@ -258,7 +339,7 @@ impl<'db> Builder<'db> {
         &mut self,
         id: ContainerId,
         fields: &mut Vec<Field>,
-        offset: &mut usize,
+        offset: &mut Cursor,
         depth: usize,
     ) -> Result<(), CodegenError> {
         if depth > MAX_DEPTH {
@@ -303,8 +384,8 @@ impl<'db> Builder<'db> {
                             reason: "a repeated parameter has no single value to store",
                         });
                     }
-                    let field = self.field(parameter, *offset, &container_name)?;
-                    *offset += field.bit_width as usize;
+                    let field = self.field(parameter, *offset, fields, &container_name)?;
+                    *offset = offset.advance(field.width);
                     fields.push(field);
                 }
             }
@@ -315,7 +396,8 @@ impl<'db> Builder<'db> {
     fn field(
         &mut self,
         parameter: ParamId,
-        bit_offset: usize,
+        bit_offset: Cursor,
+        preceding: &[Field],
         container: &str,
     ) -> Result<Field, CodegenError> {
         let param = self
@@ -350,29 +432,46 @@ impl<'db> Builder<'db> {
             ));
         }
 
-        let (bit_width, numeric) = encoding_repr(&ty.encoding, &refuse)?;
+        let (width, numeric) = encoding_repr(&ty.encoding, preceding, &refuse)?;
         let repr = self.kind_repr(ty, numeric, &refuse)?;
 
         if repr.borrows() {
-            // Text and binary fields are handed out as slices of the packet. That is only
-            // possible when the field starts on a byte boundary and is a whole number of
-            // bytes; otherwise every byte would have to be shifted into a new buffer, which
-            // means allocating, which is what this generator exists to avoid. The
-            // interpreter handles the unaligned case.
-            if bit_offset % 8 != 0 || bit_width % 8 != 0 {
-                return Err(refuse(
-                    "sizeInBits",
-                    "the field is not byte-aligned, so it cannot be borrowed from the packet",
-                ));
+            // Text and binary are handed out as slices of the packet, which is only possible
+            // on a byte boundary and a whole number of bytes; otherwise every byte would have
+            // to be shifted into a new buffer, which means allocating — the thing this
+            // generator exists to avoid. The interpreter handles those.
+            //
+            // A dynamic width is checked in the decoder instead, because only the packet
+            // says what it is.
+            if let Width::Fixed(bits) = width {
+                if bit_offset.is_some_and(|offset| offset % 8 != 0) || bits % 8 != 0 {
+                    return Err(refuse(
+                        "sizeInBits",
+                        "the field is not byte-aligned, so it cannot be borrowed from the packet",
+                    ));
+                }
+                if bits == 0 {
+                    return Err(refuse("sizeInBits", "the field is empty"));
+                }
             }
-            if bit_width == 0 {
-                return Err(refuse("sizeInBits", "the field is empty"));
+        } else {
+            match width {
+                // A number's width picks its Rust type, so it cannot be a property of the
+                // packet, and the widest integer emitted is 64 bits.
+                Width::Dynamic { .. } => {
+                    return Err(refuse(
+                        "sizeInBits",
+                        "only text and binary fields may have a data-dependent width",
+                    ));
+                }
+                Width::Fixed(bits) if !(1..=64).contains(&bits) => {
+                    return Err(refuse(
+                        "sizeInBits",
+                        "only numeric fields of 1 to 64 bits are compiled",
+                    ));
+                }
+                Width::Fixed(_) => {}
             }
-        } else if bit_width == 0 || bit_width > 64 {
-            return Err(refuse(
-                "sizeInBits",
-                "only numeric fields of 1 to 64 bits are compiled",
-            ));
         }
 
         Ok(Field {
@@ -381,7 +480,7 @@ impl<'db> Builder<'db> {
             raw_ident: None,
             xtce_name,
             bit_offset,
-            bit_width,
+            width,
             repr,
         })
     }
@@ -460,19 +559,46 @@ impl<'db> Builder<'db> {
     }
 }
 
-/// The width of a string or binary field, when it is fixed at load time.
-fn fixed_width(
+/// How wide a string or binary field is: a literal, or a reference to an earlier field.
+fn size_width(
     size: &SizeSpec,
     element: &str,
+    preceding: &[Field],
     refuse: &impl Fn(&str, &'static str) -> CodegenError,
-) -> Result<u32, CodegenError> {
+) -> Result<Width, CodegenError> {
     match size {
-        SizeSpec::Fixed(bits) => Ok(*bits),
-        SizeSpec::Dynamic { .. } => Err(refuse(
-            element,
-            "the width comes from another parameter, so no offset after it is known at \
-             generation time",
-        )),
+        SizeSpec::Fixed(bits) => Ok(Width::Fixed(*bits)),
+        SizeSpec::Dynamic {
+            parameter,
+            adjustment,
+            use_calibrated,
+        } => {
+            let source = preceding
+                .iter()
+                .position(|field| field.parameter == *parameter)
+                .ok_or_else(|| {
+                    refuse(
+                        element,
+                        "the size names a parameter this container does not decode before it",
+                    )
+                })?;
+            let repr = preceding.get(source).map(|field| &field.repr);
+            // The source must be a plain integer. No calibrator is compiled, so for those the
+            // engineering and raw values are the same number and `useCalibratedValue` cannot
+            // change the answer — which is why it can be ignored here. For an enumeration or
+            // a boolean it would change the answer, so those are refused rather than guessed.
+            if !matches!(repr, Some(Repr::Unsigned | Repr::Signed(_))) {
+                return Err(refuse(
+                    element,
+                    "the size names a parameter that is not a plain integer",
+                ));
+            }
+            let _ = use_calibrated;
+            Ok(Width::Dynamic {
+                source,
+                adjustment: *adjustment,
+            })
+        }
         SizeSpec::DiscreteLookup(_) => Err(refuse(
             element,
             "the width comes from a DiscreteLookupList, which is not compiled",
@@ -484,8 +610,9 @@ fn fixed_width(
 /// The width and numeric interpretation a data encoding implies.
 fn encoding_repr(
     encoding: &DataEncoding,
+    preceding: &[Field],
     refuse: &impl Fn(&str, &'static str) -> CodegenError,
-) -> Result<(u32, Repr), CodegenError> {
+) -> Result<(Width, Repr), CodegenError> {
     Ok(match encoding {
         DataEncoding::Integer(encoding) => {
             if encoding.byte_order != xtce_model::ByteOrder::MostSignificantFirst {
@@ -498,7 +625,7 @@ fn encoding_repr(
                 IntegerCoding::Unsigned => Repr::Unsigned,
                 other => Repr::Signed(other),
             };
-            (encoding.size_in_bits, repr)
+            (Width::Fixed(encoding.size_in_bits), repr)
         }
         DataEncoding::Float(encoding) => {
             if encoding.byte_order != xtce_model::ByteOrder::MostSignificantFirst {
@@ -524,7 +651,7 @@ fn encoding_repr(
                     ));
                 }
             };
-            (encoding.size_in_bits, repr)
+            (Width::Fixed(encoding.size_in_bits), repr)
         }
         DataEncoding::String(encoding) => {
             let charset = match encoding.charset {
@@ -547,11 +674,11 @@ fn encoding_repr(
                     size_in_bits: *size_in_bits,
                 },
             };
-            let width = fixed_width(&encoding.raw_size, "StringDataEncoding", refuse)?;
+            let width = size_width(&encoding.raw_size, "StringDataEncoding", preceding, refuse)?;
             (width, Repr::Text { charset, delimiter })
         }
         DataEncoding::Binary(encoding) => {
-            let width = fixed_width(&encoding.size, "BinaryDataEncoding", refuse)?;
+            let width = size_width(&encoding.size, "BinaryDataEncoding", preceding, refuse)?;
             (width, Repr::Binary)
         }
         DataEncoding::None => {
@@ -579,6 +706,17 @@ impl Builder<'_> {
                             reason: "the criterion tests a parameter this container's \
                                      ancestors do not decode",
                         })?;
+                    // The dispatcher tests criteria before decoding anything, so it can only
+                    // reach fields whose offset is a literal.
+                    let (bit_offset, bit_width) =
+                        field
+                            .static_span()
+                            .ok_or_else(|| CodegenError::Unsupported {
+                                element: "Comparison".to_owned(),
+                                container: name.clone(),
+                                reason: "the criterion tests a parameter that sits after a \
+                                     data-dependent width, so its offset is not known",
+                            })?;
                     if !field.repr.is_integral() {
                         return Err(CodegenError::Unsupported {
                             element: "Comparison".to_owned(),
@@ -605,8 +743,8 @@ impl Builder<'_> {
                             })?;
                     guards.push(Guard {
                         xtce_name: field.xtce_name.clone(),
-                        bit_offset: field.bit_offset,
-                        bit_width: field.bit_width,
+                        bit_offset,
+                        bit_width,
                         repr: field.repr.clone(),
                         operator: comparison.operator,
                         value,

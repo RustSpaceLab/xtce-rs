@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Written for this project, not a mission file: every numeric shape the generator emits,
+  each one both byte-aligned and deliberately off a byte boundary.
+
+  The bundled mission definitions do not reach these. Between them they contain exactly one
+  32-bit float and no 16-bit float at all, and every float they do have sits on a byte
+  boundary — so the emitter's half-float path, and its handling of a float whose bytes span
+  an extra byte, had no differential coverage. `xtce-codegen-e2e` decodes this definition
+  both ways over generated packets.
+
+  The leading 4-bit pad is what makes the first group unaligned: every field after it is a
+  whole number of bytes wide, so each starts at 4 bits past a byte. U64_UNALIGNED is the
+  interesting one — 64 bits at 4 bits past a boundary spans nine bytes, which is the case a
+  single 64-bit load silently truncates.
+-->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="NumericEdges">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U1">
+        <IntegerDataEncoding sizeInBits="1" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U4">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U57">
+        <IntegerDataEncoding sizeInBits="57" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U64">
+        <IntegerDataEncoding sizeInBits="64" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="S16_TWOS">
+        <IntegerDataEncoding sizeInBits="16" encoding="twosComplement"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="S63_TWOS">
+        <IntegerDataEncoding sizeInBits="63" encoding="twosComplement"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="S16_SIGNMAG">
+        <IntegerDataEncoding sizeInBits="16" encoding="signMagnitude"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="S16_ONES">
+        <IntegerDataEncoding sizeInBits="16" encoding="onesComplement"/>
+      </IntegerParameterType>
+      <FloatParameterType name="F16">
+        <FloatDataEncoding sizeInBits="16" encoding="IEEE754"/>
+      </FloatParameterType>
+      <FloatParameterType name="F32">
+        <FloatDataEncoding sizeInBits="32" encoding="IEEE754"/>
+      </FloatParameterType>
+      <FloatParameterType name="F64">
+        <FloatDataEncoding sizeInBits="64" encoding="IEEE754"/>
+      </FloatParameterType>
+    </ParameterTypeSet>
+
+    <ParameterSet>
+      <Parameter name="PAD_4" parameterTypeRef="U4"/>
+      <Parameter name="F16_UNALIGNED" parameterTypeRef="F16"/>
+      <Parameter name="F32_UNALIGNED" parameterTypeRef="F32"/>
+      <Parameter name="F64_UNALIGNED" parameterTypeRef="F64"/>
+      <Parameter name="S16_TWOS_UNALIGNED" parameterTypeRef="S16_TWOS"/>
+      <Parameter name="S16_SIGNMAG_UNALIGNED" parameterTypeRef="S16_SIGNMAG"/>
+      <Parameter name="S16_ONES_UNALIGNED" parameterTypeRef="S16_ONES"/>
+      <Parameter name="U64_UNALIGNED" parameterTypeRef="U64"/>
+      <Parameter name="U57_UNALIGNED" parameterTypeRef="U57"/>
+      <Parameter name="S63_TWOS_UNALIGNED" parameterTypeRef="S63_TWOS"/>
+      <Parameter name="PAD_4B" parameterTypeRef="U4"/>
+
+      <Parameter name="F16_ALIGNED" parameterTypeRef="F16"/>
+      <Parameter name="F32_ALIGNED" parameterTypeRef="F32"/>
+      <Parameter name="F64_ALIGNED" parameterTypeRef="F64"/>
+      <Parameter name="S16_TWOS_ALIGNED" parameterTypeRef="S16_TWOS"/>
+      <Parameter name="S16_SIGNMAG_ALIGNED" parameterTypeRef="S16_SIGNMAG"/>
+      <Parameter name="S16_ONES_ALIGNED" parameterTypeRef="S16_ONES"/>
+      <Parameter name="U64_ALIGNED" parameterTypeRef="U64"/>
+      <Parameter name="S63_TWOS_ALIGNED" parameterTypeRef="S63_TWOS"/>
+      <Parameter name="PAD_1" parameterTypeRef="U1"/>
+    </ParameterSet>
+
+    <ContainerSet>
+      <SequenceContainer name="NumericEdges">
+        <EntryList>
+          <!-- Unaligned group: 4 bits of pad puts every field 4 bits past a byte. -->
+          <ParameterRefEntry parameterRef="PAD_4"/>
+          <ParameterRefEntry parameterRef="F16_UNALIGNED"/>
+          <ParameterRefEntry parameterRef="F32_UNALIGNED"/>
+          <ParameterRefEntry parameterRef="F64_UNALIGNED"/>
+          <ParameterRefEntry parameterRef="S16_TWOS_UNALIGNED"/>
+          <ParameterRefEntry parameterRef="S16_SIGNMAG_UNALIGNED"/>
+          <ParameterRefEntry parameterRef="S16_ONES_UNALIGNED"/>
+          <ParameterRefEntry parameterRef="U64_UNALIGNED"/>
+          <ParameterRefEntry parameterRef="U57_UNALIGNED"/>
+          <ParameterRefEntry parameterRef="S63_TWOS_UNALIGNED"/>
+          <!-- The group ends at bit 348, so 4 more bits land the cursor back on a byte. -->
+          <ParameterRefEntry parameterRef="PAD_4B"/>
+
+          <ParameterRefEntry parameterRef="F16_ALIGNED"/>
+          <ParameterRefEntry parameterRef="F32_ALIGNED"/>
+          <ParameterRefEntry parameterRef="F64_ALIGNED"/>
+          <ParameterRefEntry parameterRef="S16_TWOS_ALIGNED"/>
+          <ParameterRefEntry parameterRef="S16_SIGNMAG_ALIGNED"/>
+          <ParameterRefEntry parameterRef="S16_ONES_ALIGNED"/>
+          <ParameterRefEntry parameterRef="U64_ALIGNED"/>
+          <ParameterRefEntry parameterRef="S63_TWOS_ALIGNED"/>
+          <ParameterRefEntry parameterRef="PAD_1"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

@@ -6,11 +6,24 @@
 use std::path::{Path, PathBuf};
 
 /// `(module name, definition, root container)`.
-const CASES: &[(&str, &str, Option<&str>)] = &[(
-    "ctim",
-    "ctim/ctim_xtce_v1.xml",
-    Some("CCSDSTelemetryPacket"),
-)];
+const CASES: &[(&str, &str, Option<&str>)] = &[
+    (
+        "ctim",
+        "ctim/ctim_xtce_v1.xml",
+        Some("CCSDSTelemetryPacket"),
+    ),
+    // Both of these have a binary field whose width comes from PKT_LEN, and two more fields
+    // after it — so their offsets are only known while decoding. They are the reason the
+    // generator has a cursor at all.
+    ("idex", "idex/idex_combined_science_definition.xml", None),
+    ("suda", "suda/suda_combined_science_definition.xml", None),
+    // No packet stream ships for this one; generating and compiling it is the check.
+    ("udp", "udp_packet.xml", None),
+    // Every numeric shape the emitter can produce, aligned and unaligned. The mission
+    // definitions between them have one 32-bit float and no 16-bit float, all byte-aligned,
+    // so without this the half-float and nine-byte-span paths would go unchecked.
+    ("numeric_edges", "numeric_edges.xml", Some("NumericEdges")),
+];
 
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");

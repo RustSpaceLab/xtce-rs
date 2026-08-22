@@ -18,6 +18,26 @@ mod ctim {
     include!(concat!(env!("OUT_DIR"), "/ctim.rs"));
 }
 
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+mod idex {
+    include!(concat!(env!("OUT_DIR"), "/idex.rs"));
+}
+
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+mod suda {
+    include!(concat!(env!("OUT_DIR"), "/suda.rs"));
+}
+
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+mod udp {
+    include!(concat!(env!("OUT_DIR"), "/udp.rs"));
+}
+
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+mod numeric_edges {
+    include!(concat!(env!("OUT_DIR"), "/numeric_edges.rs"));
+}
+
 fn testdata(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../testdata/spp")
@@ -112,7 +132,7 @@ macro_rules! assert_same_packet {
 }
 
 macro_rules! compare_with_interpreter {
-    ($module:ident, $definition:expr, $stream:expr, $root:expr, $packets:expr) => {{
+    ($module:ident, $definition:expr, $stream:expr, $root:expr, $skip:expr, $packets:expr) => {{
         let db = XtceDb::from_path(testdata($definition)).expect("definition loads");
         let decoder = match $root {
             Some(name) => Decoder::with_root(&db, name),
@@ -124,7 +144,7 @@ macro_rules! compare_with_interpreter {
         let mut interpreted = decoder.new_packet(&stream);
         let mut compared = 0usize;
 
-        for (index, framed) in PacketIter::new(&stream, 0).enumerate() {
+        for (index, framed) in PacketIter::new(&stream, $skip).enumerate() {
             let bytes = framed.expect("the stream is well framed").bytes();
             assert_same_packet!(
                 $module,
@@ -153,7 +173,37 @@ fn ctim_generated_matches_interpreted_on_every_packet() {
         "ctim/ctim_xtce_v1.xml",
         "ctim/ccsds_2021_155_14_39_51",
         Some("CCSDSTelemetryPacket"),
+        0,
         1499
+    );
+}
+
+/// IDEX: a binary field whose width comes from `PKT_LEN`, with two fields after it.
+///
+/// This is the case that forced the cursor. Everything up to the blob is read at literal
+/// offsets; the blob and the two fields behind it are walked, because where they sit is a
+/// property of the packet.
+#[test]
+fn idex_generated_matches_interpreted_on_every_packet() {
+    compare_with_interpreter!(
+        idex,
+        "idex/idex_combined_science_definition.xml",
+        "idex/sciData_2023_052_14_45_05",
+        None::<&str>,
+        0,
+        78
+    );
+}
+
+#[test]
+fn suda_generated_matches_interpreted_on_every_packet() {
+    compare_with_interpreter!(
+        suda,
+        "suda/suda_combined_science_definition.xml",
+        "suda/sciData_2022_130_17_41_53.spl",
+        None::<&str>,
+        4,
+        13
     );
 }
 
@@ -239,4 +289,52 @@ fn ctim_strings_are_borrowed_from_the_packet() {
         1,
         "an 8-bit string is one character"
     );
+}
+
+/// Every numeric shape the emitter produces, aligned and unaligned, on generated packets.
+///
+/// The mission streams cannot reach these: between them they contain one 32-bit float and no
+/// 16-bit float, every one byte-aligned. So the half-float conversion, sign extension at 63
+/// bits, and the nine-byte span a 64-bit field occupies when it starts four bits into a byte
+/// were all emitted without ever being compared against the interpreter.
+///
+/// The packets are generated rather than fixed: bit patterns matter here — NaN payloads,
+/// subnormals, the sign bit of a 63-bit two's-complement field — and a handful of
+/// hand-written packets would test whichever ones happened to be written. A fixed seed keeps
+/// a failure reproducible.
+#[test]
+fn every_numeric_shape_matches_the_interpreter() {
+    const BYTES: usize = 80;
+
+    let db = XtceDb::from_path(testdata("numeric_edges.xml")).expect("definition loads");
+    let decoder = Decoder::with_root(&db, "NumericEdges").expect("root container");
+
+    // A packet of every byte equal, then xorshift64* patterns. All-zero and all-ones are
+    // worth naming: they are zero, negative zero, infinity and the largest NaN payload,
+    // depending on which field reads them.
+    let mut packets: Vec<Vec<u8>> = (0..=255u8).map(|byte| vec![byte; BYTES]).collect();
+    let mut state = 0x2545_F491_4F6C_DD1Du64;
+    for _ in 0..2048 {
+        let mut packet = vec![0u8; BYTES];
+        for chunk in packet.chunks_mut(8) {
+            state ^= state >> 12;
+            state ^= state << 25;
+            state ^= state >> 27;
+            let bytes = state.wrapping_mul(0x2545_F491_4F6C_DD1D).to_be_bytes();
+            chunk.copy_from_slice(&bytes[..chunk.len()]);
+        }
+        packets.push(packet);
+    }
+
+    for (index, packet) in packets.iter().enumerate() {
+        let mut interpreted = decoder.new_packet(packet);
+        assert_same_packet!(
+            numeric_edges,
+            db,
+            decoder,
+            interpreted,
+            packet.as_slice(),
+            format!("packet {index}")
+        );
+    }
 }

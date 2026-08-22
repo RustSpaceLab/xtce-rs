@@ -17,7 +17,9 @@
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 
-use crate::plan::{ContainerPlan, Field, Guard, Node, Plan, Repr, TextCharset, TextDelimiter};
+use crate::plan::{
+    ContainerPlan, Field, Guard, Node, Plan, Repr, TextCharset, TextDelimiter, Width,
+};
 use xtce_model::{CompareOp, IntegerCoding};
 
 /// Renders a plan as formatted Rust source.
@@ -114,6 +116,26 @@ fn preamble() -> TokenStream {
                 /// The parameter being decoded.
                 parameter: &'static str,
             },
+            /// A field's width, read from the packet, is not a usable length.
+            BadFieldSize {
+                /// The parameter being decoded.
+                parameter: &'static str,
+                /// The width that was computed, in bits.
+                bits: i64,
+            },
+            /// A text or binary field of data-dependent width did not land on a byte
+            /// boundary, so it cannot be handed out as a slice of the packet.
+            ///
+            /// The interpreter copies the bits into a new buffer instead; this decoder
+            /// refuses rather than allocate. See `SUPPORTED.md`.
+            Unaligned {
+                /// The parameter being decoded.
+                parameter: &'static str,
+                /// Bit offset the field started at.
+                at: usize,
+                /// Width of the field, in bits.
+                bits: usize,
+            },
         }
 
         impl core::fmt::Display for DecodeError {
@@ -137,6 +159,14 @@ fn preamble() -> TokenStream {
                     Self::BadStringLength { parameter } => {
                         write!(f, "{parameter}: leading size is larger than the buffer")
                     }
+                    Self::BadFieldSize { parameter, bits } => {
+                        write!(f, "{parameter}: computed width {bits} bits is not usable")
+                    }
+                    Self::Unaligned { parameter, at, bits } => write!(
+                        f,
+                        "{parameter}: {bits} bit(s) at bit {at} is not byte-aligned, so it \
+                         cannot be borrowed from the packet"
+                    ),
                 }
             }
         }
@@ -169,8 +199,6 @@ fn preamble() -> TokenStream {
 fn container(plan: &ContainerPlan) -> TokenStream {
     let type_ident = ident(&plan.type_ident);
     let xtce_name = &plan.xtce_name;
-    let bit_length = Literal::usize_unsuffixed(plan.bit_length);
-    let byte_length = Literal::usize_unsuffixed(plan.bit_length.div_ceil(8));
 
     // A container that hands out slices of the packet has to name the packet's lifetime; one
     // made only of scalars must not, or the parameter would be unused and the module would
@@ -188,18 +216,44 @@ fn container(plan: &ContainerPlan) -> TokenStream {
         quote!(&[u8])
     };
 
+    let (length_doc, length_consts) = if let Some(bits) = plan.bit_length {
+        let bit_length = Literal::usize_unsuffixed(bits);
+        let byte_length = Literal::usize_unsuffixed(bits.div_ceil(8));
+        (
+            format!("{bits} bit(s)"),
+            quote! {
+                /// Total width of this container's fields, in bits.
+                pub const BIT_LENGTH: usize = #bit_length;
+
+                /// Bytes a packet must have for this container to decode.
+                pub const BYTE_LENGTH: usize = #byte_length;
+            },
+        )
+    } else {
+        let prefix = Literal::usize_unsuffixed(plan.static_prefix_bits);
+        (
+            format!(
+                "{} fixed bit(s) then a data-dependent tail",
+                plan.static_prefix_bits
+            ),
+            quote! {
+                /// Width of the leading fields whose offsets are fixed, in bits.
+                ///
+                /// This container has no total length: one of its fields takes its width
+                /// from the packet.
+                pub const STATIC_PREFIX_BITS: usize = #prefix;
+            },
+        )
+    };
+
     let doc = format!(
-        " `{xtce_name}`: {} field(s) in {} bit(s).",
-        plan.fields.len(),
-        plan.bit_length
+        " `{xtce_name}`: {} field(s) in {length_doc}.",
+        plan.fields.len()
     );
 
     let fields = plan.fields.iter().flat_map(struct_fields);
-    let assignments = plan
-        .fields
-        .iter()
-        .flat_map(|field| field_initialisers(field, &ident("packet")));
     let accessors = plan.fields.iter().filter_map(accessor);
+    let body = decode_body(plan);
 
     // An entry list may name the same parameter twice — CTIM's `APID_20_Packet` has two
     // `SPARE_8` entries. The struct keeps both, because both really are in the packet at
@@ -238,11 +292,7 @@ fn container(plan: &ContainerPlan) -> TokenStream {
             /// Name of this container in the XTCE definition.
             pub const NAME: &'static str = #xtce_name;
 
-            /// Total width of this container's fields, in bits.
-            pub const BIT_LENGTH: usize = #bit_length;
-
-            /// Bytes a packet must have for this container to decode.
-            pub const BYTE_LENGTH: usize = #byte_length;
+            #length_consts
 
             /// Parameter names, in decode order.
             pub const FIELDS: [&'static str; #field_count] = [#(#field_names),*];
@@ -251,33 +301,11 @@ fn container(plan: &ContainerPlan) -> TokenStream {
             ///
             /// # Errors
             ///
-            /// [`DecodeError::TooShort`] if the packet is smaller than [`Self::BYTE_LENGTH`],
-            /// or a text error if a string field does not hold valid text.
+            /// [`DecodeError::TooShort`] if the packet does not hold the whole container, or
+            /// a text error if a string field does not hold valid text.
             #[inline]
             pub fn decode(data: #data_ref) -> Result<Self, DecodeError> {
-                // Narrowing to a fixed-size array once is what removes the bounds check from
-                // every field read below, with no `unsafe`.
-                // The length is spelled out rather than written `Self::BYTE_LENGTH`: an
-                // associated constant of a type with a lifetime parameter cannot appear in
-                // an array type.
-                let packet: &[u8; #byte_length] = match data.get(..#byte_length) {
-                    Some(prefix) => match prefix.try_into() {
-                        Ok(array) => array,
-                        Err(_) => {
-                            return Err(DecodeError::TooShort {
-                                needed: #byte_length,
-                                got: data.len(),
-                            });
-                        }
-                    },
-                    None => {
-                        return Err(DecodeError::TooShort {
-                            needed: #byte_length,
-                            got: data.len(),
-                        });
-                    }
-                };
-                Ok(Self { #(#assignments)* })
+                #body
             }
 
             /// Calls `visit(name, raw, engineering)` for every field, in decode order.
@@ -325,11 +353,15 @@ fn reported_fields(fields: &[Field]) -> Vec<usize> {
 fn struct_fields(field: &Field) -> Vec<TokenStream> {
     let name = ident(&field.ident);
     let ty = rust_type(&field.repr);
+    let placement = match (field.bit_offset, field.width.fixed()) {
+        (Some(offset), Some(width)) => format!("{width} bit(s) at bit {offset}"),
+        (Some(offset), None) => format!("a data-dependent width, from bit {offset}"),
+        (None, Some(width)) => format!("{width} bit(s), after a data-dependent width"),
+        (None, None) => "a data-dependent width and offset".to_owned(),
+    };
     let doc = format!(
-        " `{}` — {} bit(s) at bit {}.{}",
+        " `{}` — {placement}.{}",
         field.xtce_name,
-        field.bit_width,
-        field.bit_offset,
         match &field.repr {
             Repr::Bool => " Stored raw; see the accessor for the boolean value.",
             Repr::Enumerated(_) => " Stored raw; see the accessor for the label.",
@@ -370,11 +402,236 @@ fn field_initialisers(field: &Field, packet: &Ident) -> Vec<TokenStream> {
     out
 }
 
-/// The `&packet[a..b]` slice for a byte-aligned field.
+/// The `&packet[a..b]` slice for a byte-aligned field at a literal offset.
 fn byte_slice(field: &Field, packet: &Ident) -> TokenStream {
-    let start = Literal::usize_unsuffixed(field.bit_offset / 8);
-    let end = Literal::usize_unsuffixed((field.bit_offset + field.bit_width as usize) / 8);
+    let Some((offset, width)) = field.static_span() else {
+        return quote! {
+            compile_error!("xtce-codegen: a literal slice of a field with no fixed span")
+        };
+    };
+    let start = Literal::usize_unsuffixed(offset / 8);
+    let end = Literal::usize_unsuffixed((offset + width as usize) / 8);
     quote! { &#packet[#start..#end] }
+}
+
+/// The body of a container's `decode`.
+///
+/// Two shapes. When every width is fixed, the packet is narrowed to an array once and each
+/// field is a literal offset into it — no cursor exists at run time. When one field takes its
+/// width from the packet, everything before it still reads that way, and only the tail is
+/// walked with a cursor. The split is the honest one: the offsets after a data-dependent
+/// width are a property of the data, not of this generator.
+fn decode_body(plan: &ContainerPlan) -> TokenStream {
+    let packet = ident("packet");
+    let prefix_bits = if plan.is_dynamic() {
+        plan.static_prefix_bits
+    } else {
+        plan.bit_length.unwrap_or(0)
+    };
+    let prefix_bytes = Literal::usize_unsuffixed(prefix_bits.div_ceil(8));
+
+    // Narrowing to a fixed-size array once is what removes the bounds check from every
+    // literal-offset read below, with no `unsafe`. The length is spelled out rather than
+    // written `Self::BYTE_LENGTH`: an associated constant of a type with a lifetime
+    // parameter cannot appear in an array type.
+    let narrow = quote! {
+        let #packet: &[u8; #prefix_bytes] = match data.get(..#prefix_bytes) {
+            Some(prefix) => match prefix.try_into() {
+                Ok(array) => array,
+                Err(_) => {
+                    return Err(DecodeError::TooShort {
+                        needed: #prefix_bytes,
+                        got: data.len(),
+                    });
+                }
+            },
+            None => {
+                return Err(DecodeError::TooShort {
+                    needed: #prefix_bytes,
+                    got: data.len(),
+                });
+            }
+        };
+    };
+
+    if !plan.is_dynamic() {
+        let assignments = plan
+            .fields
+            .iter()
+            .flat_map(|field| field_initialisers(field, &packet));
+        return quote! {
+            #narrow
+            Ok(Self { #(#assignments)* })
+        };
+    }
+
+    // The cursor takes over at the first field the packet has any say over — which is the
+    // field with the data-dependent *width*, not the first one with an unknown offset. Its
+    // own offset is still known; everything after it is not. It is declared exactly once,
+    // immediately before that field.
+    let last = plan.fields.len().saturating_sub(1);
+    let first_dynamic = plan
+        .fields
+        .iter()
+        .position(|field| field.static_span().is_none());
+
+    let mut statements = Vec::new();
+    let mut names = Vec::new();
+
+    for (index, field) in plan.fields.iter().enumerate() {
+        if Some(index) == first_dynamic {
+            let start = Literal::usize_unsuffixed(plan.static_prefix_bits);
+            // `mut` only where something moves it: if the dynamic field is the last one,
+            // nothing reads the cursor again and the generated code would warn.
+            let cursor = if index == last {
+                quote! { let at: usize = #start; }
+            } else {
+                quote! { let mut at: usize = #start; }
+            };
+            statements.push(cursor);
+        }
+
+        let name = ident(&field.ident);
+        let raw_name = field.raw_ident.as_deref().map(ident);
+        names.push(quote! { #name });
+
+        if field.static_span().is_some() {
+            let value = read_field(field, &packet);
+            statements.push(quote! { let #name = #value; });
+            if let Some(raw_name) = &raw_name {
+                let slice = byte_slice(field, &packet);
+                statements.push(quote! { let #raw_name = #slice; });
+            }
+        } else {
+            let source = match field.width {
+                Width::Dynamic { source, .. } => {
+                    plan.fields.get(source).map(|source| ident(&source.ident))
+                }
+                Width::Fixed(_) => None,
+            };
+            statements.extend(runtime_field(
+                field,
+                &name,
+                raw_name.as_ref(),
+                source.as_ref(),
+                index != last,
+            ));
+        }
+
+        if let Some(raw_name) = raw_name {
+            names.push(quote! { #raw_name });
+        }
+    }
+
+    quote! {
+        #narrow
+        #(#statements)*
+        Ok(Self { #(#names),* })
+    }
+}
+
+/// Statements for one field whose offset is only known while decoding.
+///
+/// The cursor `at` is in bits and is advanced by each field in turn — the same walk the
+/// interpreter does, except that the widths, conversions and names are all fixed here rather
+/// than looked up per packet.
+fn runtime_field(
+    field: &Field,
+    name: &Ident,
+    raw_name: Option<&Ident>,
+    source: Option<&Ident>,
+    advance: bool,
+) -> Vec<TokenStream> {
+    let mut out = Vec::new();
+    let xtce_name = &field.xtce_name;
+
+    // The width: a literal, or a value computed from a field already decoded.
+    let width = match field.width {
+        Width::Fixed(bits) => {
+            let bits = Literal::usize_unsuffixed(bits as usize);
+            quote! { #bits }
+        }
+        Width::Dynamic { adjustment, .. } => {
+            let bits_ident = ident(&format!("{name}_bits"));
+            let Some(source) = source else {
+                return vec![quote! {
+                    compile_error!("xtce-codegen: dynamic width with no resolved source");
+                }];
+            };
+            // Matching the interpreter exactly: it multiplies and adds in `f64` and then
+            // truncates toward zero. Doing the arithmetic any other way would give a
+            // different length for a value the two implementations must agree on.
+            let compute = if let Some(adjustment) = adjustment {
+                let slope = Literal::f64_unsuffixed(adjustment.slope);
+                let intercept = Literal::f64_unsuffixed(adjustment.intercept);
+                quote! { ((#slope * (#source as f64)) + #intercept) as i64 }
+            } else {
+                quote! { i64::try_from(#source).unwrap_or(i64::MAX) }
+            };
+            out.push(quote! {
+                let #bits_ident: usize = {
+                    let bits = #compute;
+                    match usize::try_from(bits) {
+                        Ok(bits) => bits,
+                        Err(_) => {
+                            return Err(DecodeError::BadFieldSize {
+                                parameter: #xtce_name,
+                                bits,
+                            });
+                        }
+                    }
+                };
+            });
+            quote! { #bits_ident }
+        }
+    };
+
+    match &field.repr {
+        Repr::Binary => out.push(quote! {
+            let #name = take_bytes(data, at, #width, #xtce_name)?;
+        }),
+        Repr::Text { charset, delimiter } => {
+            let raw_name = raw_name
+                .cloned()
+                .unwrap_or_else(|| ident(&format!("{name}_raw")));
+            out.push(quote! {
+                let #raw_name = take_bytes(data, at, #width, #xtce_name)?;
+            });
+            let ascii = matches!(charset, TextCharset::UsAscii);
+            out.push(match delimiter {
+                TextDelimiter::WholeBuffer => {
+                    quote! { let #name = text_whole(#raw_name, #ascii, #xtce_name)?; }
+                }
+                TextDelimiter::TerminationChar(bytes) => {
+                    let terminator = bytes.iter().map(|byte| Literal::u8_unsuffixed(*byte));
+                    quote! {
+                        let #name =
+                            text_terminated(#raw_name, &[#(#terminator),*], #ascii, #xtce_name)?;
+                    }
+                }
+                TextDelimiter::LeadingSize { size_in_bits } => {
+                    let size = Literal::u32_unsuffixed(*size_in_bits);
+                    quote! { let #name = text_leading(#raw_name, #size, #ascii, #xtce_name)?; }
+                }
+            });
+        }
+        repr => {
+            let bits = Literal::u32_unsuffixed(field.width.fixed().unwrap_or(0));
+            let value = numeric_from_u64(repr, &Expr::atom(quote! { __raw }), field.width);
+            out.push(quote! {
+                let #name = {
+                    let __raw = read_at(data, at, #bits, #xtce_name)?;
+                    #value
+                };
+            });
+        }
+    }
+
+    // Nothing reads the cursor past the last field, and assigning to it there would warn.
+    if advance {
+        out.push(quote! { at = at.saturating_add(#width); });
+    }
+    out
 }
 
 /// An accessor for reprs whose stored form is the raw integer.
@@ -503,22 +760,47 @@ fn read_field(field: &Field, packet: &Ident) -> TokenStream {
         _ => {}
     }
 
-    let raw = read_bits(field.bit_offset, field.bit_width, packet);
-    let embedded = raw.embedded();
-    match &field.repr {
-        Repr::Signed(coding) => signed(&raw, field.bit_width, *coding),
-        Repr::Float16 => quote! { half_to_f64(#embedded as u16) },
-        Repr::Float32 => quote! { f64::from(f32::from_bits(#embedded as u32)) },
-        Repr::Float64 => {
-            let tokens = raw.into_tokens();
-            quote! { f64::from_bits(#tokens) }
+    let Some((offset, width)) = field.static_span() else {
+        return quote! {
+            compile_error!("xtce-codegen: a literal read of a field with no fixed span")
+        };
+    };
+    let raw = read_bits(offset, width, packet);
+    numeric_from_u64(&field.repr, &raw, field.width)
+}
+
+/// Turns a `u64` of raw bits into the field's value.
+///
+/// Shared by the literal-offset path and the cursor path, so a signed field or a float is
+/// converted identically whichever side of a data-dependent width it falls on.
+fn numeric_from_u64(repr: &Repr, raw: &Expr, width: Width) -> TokenStream {
+    let bits = width.fixed().unwrap_or(64);
+    match repr {
+        Repr::Signed(coding) => signed(raw, bits, *coding),
+        // These three sit in argument position, where parentheses would only trip
+        // `unused_parens`.
+        Repr::Float16 => {
+            let value = raw.widened(16).into_tokens();
+            quote! { half_to_f64(#value) }
         }
-        _ => raw.into_tokens(),
+        Repr::Float32 => {
+            let value = raw.widened(32).into_tokens();
+            quote! { f64::from(f32::from_bits(#value)) }
+        }
+        Repr::Float64 => {
+            let value = raw.widened(64).into_tokens();
+            quote! { f64::from_bits(#value) }
+        }
+        _ => raw.widened(64).into_tokens(),
     }
 }
 
 fn signed(raw: &Expr, width: u32, coding: IntegerCoding) -> TokenStream {
-    let value = raw.embedded();
+    let widened = raw.widened(64);
+    // Two forms, because the same value is spliced in front of an operator in some arms and
+    // stands alone as the value of a `let` in others.
+    let value = widened.embedded();
+    let alone = widened.bare();
     match coding {
         IntegerCoding::Unsigned => quote! { #value as i64 },
         IntegerCoding::TwosComplement => {
@@ -531,7 +813,7 @@ fn signed(raw: &Expr, width: u32, coding: IntegerCoding) -> TokenStream {
             let magnitude = Literal::u64_unsuffixed((1u64 << (width - 1)) - 1);
             quote! {
                 {
-                    let raw = #value;
+                    let raw = #alone;
                     let magnitude = (raw & #magnitude) as i64;
                     if raw & #sign == 0 { magnitude } else { -magnitude }
                 }
@@ -542,7 +824,7 @@ fn signed(raw: &Expr, width: u32, coding: IntegerCoding) -> TokenStream {
             let mask = Literal::u64_unsuffixed(mask_for(width));
             quote! {
                 {
-                    let raw = #value;
+                    let raw = #alone;
                     if raw & #sign == 0 {
                         raw as i64
                     } else {
@@ -581,23 +863,54 @@ const fn mask_for(width: u32) -> u64 {
 /// silently produce `a & (b as u32)`. Tracking atomicity means the parentheses go in exactly
 /// where they are needed — adding them everywhere would trip `unused_parens`, which a file
 /// meant for `include!` cannot switch off.
+#[derive(Clone)]
 struct Expr {
     tokens: TokenStream,
     atomic: bool,
+    /// Width of the expression's own type, so a cast is only emitted when it changes
+    /// something. Without this every float read came out as `... as u64 as u32`.
+    natural_bits: u32,
 }
 
 impl Expr {
+    /// An expression that needs no parentheses anywhere, already a `u64`.
     fn atom(tokens: TokenStream) -> Self {
+        Self::of_width(tokens, 64)
+    }
+
+    /// The same, of a narrower or wider integer type.
+    fn of_width(tokens: TokenStream, natural_bits: u32) -> Self {
         Self {
             tokens,
             atomic: true,
+            natural_bits,
         }
     }
 
-    fn compound(tokens: TokenStream) -> Self {
+    /// The expression as a `bits`-wide unsigned integer, casting only if it is not already
+    /// one. Returns an `Expr` rather than tokens so that a value needing no cast keeps its
+    /// atomicity: dropping it here once turned a masked load spliced before a shift into a
+    /// silent misparse.
+    fn widened(&self, bits: u32) -> Self {
+        if self.natural_bits == bits {
+            return self.clone();
+        }
+        let target = match bits {
+            8 => quote!(u8),
+            16 => quote!(u16),
+            32 => quote!(u32),
+            128 => quote!(u128),
+            _ => quote!(u64),
+        };
+        let value = self.embedded();
+        // Not atomic. `x as u64 << 48` does not parse: the type after `as` swallows the `<<`
+        // as the start of generic arguments, and rustc reports it as an error rather than
+        // quietly picking one reading — but only for the shift. Anything spliced in front of
+        // an operator needs the parentheses.
         Self {
-            tokens,
+            tokens: quote! { #value as #target },
             atomic: false,
+            natural_bits: bits,
         }
     }
 
@@ -614,6 +927,14 @@ impl Expr {
 
     fn into_tokens(self) -> TokenStream {
         self.tokens
+    }
+
+    /// The expression as written, with no added parentheses.
+    ///
+    /// Correct wherever the expression stands alone — the value of a `let`, an argument —
+    /// and wrong wherever a tighter-binding operator follows it.
+    fn bare(&self) -> TokenStream {
+        self.tokens.clone()
     }
 }
 
@@ -635,9 +956,11 @@ fn read_bits(offset: usize, width: u32, packet: &Ident) -> Expr {
     };
     let pad = slots - span;
 
+    // The load keeps its own width; a cast is added only where a caller needs a wider one.
+    let natural_bits = (slots * 8) as u32;
     let load = if slots == 1 {
         let index = Literal::usize_unsuffixed(first);
-        quote! { #packet[#index] as u64 }
+        quote! { #packet[#index] }
     } else {
         let bytes = (0..pad)
             .map(|_| quote!(0))
@@ -651,12 +974,7 @@ fn read_bits(offset: usize, width: u32, packet: &Ident) -> Expr {
             8 => quote!(u64),
             _ => quote!(u128),
         };
-        let load = quote! { #ty::from_be_bytes([#(#bytes),*]) };
-        if slots == 8 {
-            load
-        } else {
-            quote! { #load as u64 }
-        }
+        quote! { #ty::from_be_bytes([#(#bytes),*]) }
     };
 
     // The span's bytes sit in the low `span * 8` bits of the loaded value, so the field's
@@ -664,17 +982,36 @@ fn read_bits(offset: usize, width: u32, packet: &Ident) -> Expr {
     let shift = (span as u32) * 8 - bit_in_byte - width;
     let whole = shift == 0 && width == (span as u32) * 8;
 
-    // Every load is either a call or a cast, and `as` binds tighter than `<<`, `>>` and `&`,
-    // so an unmasked load never needs parentheses.
+    // Every load is either an index or a call, so an unmasked one never needs parentheses.
     if whole {
-        return Expr::atom(load);
+        return Expr::of_width(load, natural_bits);
     }
+    // The shift and mask happen in the load's own width, never narrower.
+    //
+    // A narrower load is widened to `u64` first, because the mask is a `u64` value. A *wider*
+    // one — the `u128` a nine-byte span needs — stays `u128` until after the shift: narrowing
+    // it first would discard the top of the field, which is precisely the case `u128` is here
+    // for. The caller widens or narrows the result, and knows which because `natural_bits`
+    // says what it is.
+    let (base, natural_bits) = if natural_bits < 64 {
+        (quote! { #load as u64 }, 64)
+    } else {
+        (load, natural_bits)
+    };
     let mask = Literal::u64_unsuffixed(mask);
     if shift == 0 {
-        return Expr::compound(quote! { (#load) & #mask });
+        return Expr {
+            tokens: quote! { (#base) & #mask },
+            atomic: false,
+            natural_bits,
+        };
     }
     let shift = Literal::u32_unsuffixed(shift);
-    Expr::compound(quote! { (#load >> #shift) & #mask })
+    Expr {
+        tokens: quote! { (#base >> #shift) & #mask },
+        atomic: false,
+        natural_bits,
+    }
 }
 
 fn packet_enum(plan: &Plan) -> TokenStream {
@@ -993,6 +1330,12 @@ fn helpers(plan: &Plan) -> TokenStream {
         )
     });
 
+    let needs_cursor = plan.containers.iter().any(ContainerPlan::is_dynamic);
+    let cursor = if needs_cursor {
+        cursor_helpers()
+    } else {
+        quote!()
+    };
     let half = if needs_half { half_helper() } else { quote!() };
     let text = if needs_text { text_helper() } else { quote!() };
     let terminated = if needs_terminator {
@@ -1007,10 +1350,77 @@ fn helpers(plan: &Plan) -> TokenStream {
     };
 
     quote! {
+        #cursor
         #half
         #text
         #terminated
         #leading
+    }
+}
+
+/// Readers for the part of a container that follows a data-dependent width.
+///
+/// Only emitted when a container needs them. Their offsets are run-time values, which is
+/// unavoidable: what follows a field whose width the packet decides is at a position the
+/// packet decides. Everything before it is still read at literal offsets.
+fn cursor_helpers() -> TokenStream {
+    quote! {
+        /// Reads `width` bits at a run-time bit offset.
+        ///
+        /// A 64-bit field at a non-zero bit offset spans nine bytes, so the accumulator is a
+        /// `u128`; loading eight bytes and shifting would silently truncate it.
+        #[inline]
+        fn read_at(
+            data: &[u8],
+            at: usize,
+            width: u32,
+            parameter: &'static str,
+        ) -> Result<u64, DecodeError> {
+            if width == 0 {
+                return Ok(0);
+            }
+            let end = at.saturating_add(width as usize);
+            if end > data.len().saturating_mul(8) {
+                return Err(DecodeError::TooShort {
+                    needed: end.div_ceil(8),
+                    got: data.len(),
+                });
+            }
+
+            let byte = at / 8;
+            let bit_in_byte = (at % 8) as u32;
+            let mut window = [0u8; 16];
+            let tail = data.get(byte..).unwrap_or_default();
+            let take = tail.len().min(16);
+            if let (Some(slot), Some(source)) = (window.get_mut(..take), tail.get(..take)) {
+                slot.copy_from_slice(source);
+            }
+            let window = u128::from_be_bytes(window);
+
+            let shift = 128 - bit_in_byte - width;
+            let mask = if width >= 64 { u64::MAX } else { (1u64 << width) - 1 };
+            let _ = parameter;
+            Ok(((window >> shift) as u64) & mask)
+        }
+
+        /// Borrows `bits` bits at a run-time bit offset, as bytes.
+        #[inline]
+        fn take_bytes<'a>(
+            data: &'a [u8],
+            at: usize,
+            bits: usize,
+            parameter: &'static str,
+        ) -> Result<&'a [u8], DecodeError> {
+            if at % 8 != 0 || bits % 8 != 0 {
+                return Err(DecodeError::Unaligned { parameter, at, bits });
+            }
+            let start = at / 8;
+            let end = start.saturating_add(bits / 8);
+            data.get(start..end).ok_or(DecodeError::TooShort {
+                needed: end,
+                got: data.len(),
+            })
+        }
     }
 }
 

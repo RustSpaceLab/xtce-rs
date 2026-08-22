@@ -101,8 +101,11 @@ unaffected by them.
 ## Code generation
 
 `xtce-codegen` compiles a definition into a static Rust decoder. It handles a *narrower*
-subset than the interpreter, because a layout can only be compiled when it is fixed at load
-time — every field at a known offset and width, with nothing depending on packet content.
+subset than the interpreter: a field is compiled when what to do with its bits is decided at
+generation time. Most fields also sit at a fixed offset, and those are read with a literal
+index, a literal shift and a literal mask. A text or binary field may take its width from an
+earlier field instead; from there the decoder walks a cursor, exactly as the interpreter
+does, but with the widths, conversions and names still fixed.
 
 A construct outside that subset is **refused by name**, never handed back to the interpreter.
 A silent fallback would hide from the caller that half their database is still interpreted,
@@ -121,15 +124,27 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | `BinaryDataEncoding`, fixed size, byte-aligned | Yes | borrows the packet |
 | Text or binary not on a byte boundary | Refused | borrowing is impossible, and copying would put an allocation on the hot path |
 | Text in a charset needing transcoding | Refused | Latin-1, Windows-1252, UTF-16, UTF-32 cannot borrow |
-| `StringDataEncoding`/`BinaryDataEncoding` of variable width | Refused | no offset after it is known at generation time |
+| Text or binary whose width comes from another field | Yes | `DynamicValue` with a `LinearAdjustment`; the fields after it are walked with a cursor |
+| A *numeric* field of variable width | Refused | a number's width picks its Rust type, which cannot vary per packet |
+| A dynamic width landing off a byte boundary | Refused at run time | `DecodeError::Unaligned`, since only the packet says where it lands |
 | `LocationInContainerInBits`, `RepeatEntry` | Refused | |
 | `BooleanExpression` criteria | Refused | |
 | MIL-STD-1750A floats | Refused | |
 
-Of the ten bundled definitions, `jpss1_geolocation_xtce_v1.xml` compiles completely. The
-other nine are refused with the element named — CTIM on its strings, IDEX and SUDA on their
-dynamically sized binary fields, `contrived_inheritance_structure.xml` on its
-`BooleanExpression`. All nine decode fine through the interpreter.
+Ten of the eleven bundled definitions compile completely, including CTIM — 9493 parameters
+and 38 concrete containers — and IDEX and SUDA, whose science packets carry a binary blob
+whose length comes from `PKT_LEN`. Each is checked against the interpreter on its real packet
+stream by `xtce-codegen-e2e`, and the interpreter is checked against `space_packet_parser`,
+so a generated decoder is held to the reference at one remove.
+
+`numeric_edges.xml` is the exception to "real samples only": it exists because the mission
+files between them contain one 32-bit float, no 16-bit float, and no numeric field spanning
+nine bytes, so several emitted paths had no differential coverage at all. It declares every
+numeric shape the emitter can produce, aligned and four bits off a byte boundary, and is
+compared over 2304 generated packets.
+
+The eleventh, `contrived_inheritance_structure.xml`, is refused by name on its
+`BooleanExpression`, and decodes fine through the interpreter.
 
 ## Python bindings
 

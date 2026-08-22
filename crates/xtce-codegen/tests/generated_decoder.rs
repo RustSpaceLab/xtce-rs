@@ -195,13 +195,10 @@ fn a_packet_of_another_type_is_refused() {
 /// Out-of-scope constructs must be refused by name, never silently interpreted.
 #[test]
 fn unsupported_constructs_are_named_not_ignored() {
-    // CTIM is deliberately absent: its fixed-size strings are compiled now, and
-    // `xtce-codegen-e2e` checks the result against the interpreter on the real stream.
-    let cases = [
-        ("idex/idex_combined_science_definition.xml", None),
-        ("suda/suda_combined_science_definition.xml", None),
-        ("jpss/contrived_inheritance_structure.xml", None),
-    ];
+    // Ten of the eleven bundled definitions compile now; `xtce-codegen-e2e` checks each
+    // against the interpreter. This one still does not, and the point of the test is that it
+    // says why rather than quietly producing a partial decoder.
+    let cases = [("jpss/contrived_inheritance_structure.xml", None)];
 
     for (file, root) in cases {
         let db = XtceDb::from_path(testdata(file)).unwrap_or_else(|e| panic!("{file}: {e}"));
@@ -245,16 +242,114 @@ fn planned_offsets_match_the_interpreters_offsets() {
 
     assert_eq!(planned.fields.len(), decoded.len());
     for (field, value) in planned.fields.iter().zip(decoded.values()) {
+        // JPSS is entirely fixed-width, so every field's span is known at generation time.
+        let (offset, width) = field
+            .static_span()
+            .unwrap_or_else(|| panic!("{}: expected a fixed span", field.xtce_name));
         assert_eq!(
-            field.bit_offset, value.bit_offset,
+            offset, value.bit_offset,
             "{}: planned offset differs from the interpreter's",
             field.xtce_name
         );
         assert_eq!(
-            field.bit_width as usize, value.bit_width,
+            width as usize, value.bit_width,
             "{}: planned width differs from the interpreter's",
             field.xtce_name
         );
     }
-    assert_eq!(planned.bit_length, decoded.bits_consumed());
+    assert_eq!(planned.bit_length, Some(decoded.bits_consumed()));
+}
+
+/// Constructs that must stay refused, each with the reason it cannot be compiled.
+///
+/// Written inline because no bundled definition contains them, and a refusal path with no
+/// test is a refusal that can silently turn into a wrong answer.
+#[test]
+fn constructs_outside_the_compilable_subset_are_refused() {
+    fn definition(types: &str, parameters: &str, entries: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="T">
+  <TelemetryMetaData>
+    <ParameterTypeSet>{types}</ParameterTypeSet>
+    <ParameterSet>{parameters}</ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="Packet"><EntryList>{entries}</EntryList></SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>"#
+        )
+    }
+
+    let flag = r#"<IntegerParameterType name="F"><IntegerDataEncoding sizeInBits="4" encoding="unsigned"/></IntegerParameterType>"#;
+
+    let cases: [(&str, String, &str); 4] = [
+        (
+            // Three bits of padding put the string off a byte boundary, so it cannot be a
+            // slice of the packet and copying it would mean allocating.
+            "unaligned string",
+            definition(
+                &format!(
+                    r#"{flag}<StringParameterType name="S"><StringDataEncoding encoding="UTF-8"><SizeInBits><Fixed><FixedValue>16</FixedValue></Fixed></SizeInBits></StringDataEncoding></StringParameterType>"#
+                ),
+                r#"<Parameter name="PAD" parameterTypeRef="F"/><Parameter name="TEXT" parameterTypeRef="S"/>"#,
+                r#"<ParameterRefEntry parameterRef="PAD"/><ParameterRefEntry parameterRef="TEXT"/>"#,
+            ),
+            "sizeInBits",
+        ),
+        (
+            // UTF-16 cannot borrow: decoding it means building new bytes.
+            "charset needing transcoding",
+            definition(
+                r#"<StringParameterType name="S"><StringDataEncoding encoding="UTF-16BE"><SizeInBits><Fixed><FixedValue>16</FixedValue></Fixed></SizeInBits></StringDataEncoding></StringParameterType>"#,
+                r#"<Parameter name="TEXT" parameterTypeRef="S"/>"#,
+                r#"<ParameterRefEntry parameterRef="TEXT"/>"#,
+            ),
+            "StringDataEncoding",
+        ),
+        (
+            // A calibrator would change the value, and the emitted arithmetic has not been
+            // proved identical to the interpreter's.
+            "calibrated field",
+            definition(
+                r#"<IntegerParameterType name="C"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"><DefaultCalibrator><PolynomialCalibrator><Term coefficient="2.0" exponent="1"/></PolynomialCalibrator></DefaultCalibrator></IntegerDataEncoding></IntegerParameterType>"#,
+                r#"<Parameter name="A" parameterTypeRef="C"/>"#,
+                r#"<ParameterRefEntry parameterRef="A"/>"#,
+            ),
+            "Calibrator",
+        ),
+        (
+            // The control: two plain integers, one after the other. Without it the three
+            // refusals above would also pass if `generate` refused every inline definition.
+            "fixed-width integers",
+            definition(
+                &format!(
+                    r#"{flag}<IntegerParameterType name="V"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>"#
+                ),
+                r#"<Parameter name="LEN" parameterTypeRef="F"/><Parameter name="N" parameterTypeRef="V"/>"#,
+                r#"<ParameterRefEntry parameterRef="LEN"/><ParameterRefEntry parameterRef="N"/>"#,
+            ),
+            // Empty means "must compile".
+            "",
+        ),
+    ];
+
+    for (what, xml, expected_element) in cases {
+        let db = XtceDb::from_xml(&xml).unwrap_or_else(|error| panic!("{what}: {error}"));
+        let result = xtce_codegen::generate(&db, &xtce_codegen::Options::default());
+
+        if expected_element.is_empty() {
+            assert!(result.is_ok(), "{what}: should compile, got {result:?}");
+            continue;
+        }
+        match result {
+            Err(xtce_codegen::CodegenError::Unsupported { element, .. }) => {
+                assert_eq!(
+                    element, expected_element,
+                    "{what}: refused the wrong element"
+                );
+            }
+            other => panic!("{what}: expected a refusal naming {expected_element}, got {other:?}"),
+        }
+    }
 }

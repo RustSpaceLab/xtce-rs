@@ -47,6 +47,26 @@ pub enum DecodeError {
         /// The parameter being decoded.
         parameter: &'static str,
     },
+    /// A field's width, read from the packet, is not a usable length.
+    BadFieldSize {
+        /// The parameter being decoded.
+        parameter: &'static str,
+        /// The width that was computed, in bits.
+        bits: i64,
+    },
+    /// A text or binary field of data-dependent width did not land on a byte
+    /// boundary, so it cannot be handed out as a slice of the packet.
+    ///
+    /// The interpreter copies the bits into a new buffer instead; this decoder
+    /// refuses rather than allocate. See `SUPPORTED.md`.
+    Unaligned {
+        /// The parameter being decoded.
+        parameter: &'static str,
+        /// Bit offset the field started at.
+        at: usize,
+        /// Width of the field, in bits.
+        bits: usize,
+    },
 }
 impl core::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -68,6 +88,16 @@ impl core::fmt::Display for DecodeError {
             }
             Self::BadStringLength { parameter } => {
                 write!(f, "{parameter}: leading size is larger than the buffer")
+            }
+            Self::BadFieldSize { parameter, bits } => {
+                write!(f, "{parameter}: computed width {bits} bits is not usable")
+            }
+            Self::Unaligned { parameter, at, bits } => {
+                write!(
+                    f,
+                    "{parameter}: {bits} bit(s) at bit {at} is not byte-aligned, so it \
+                         cannot be borrowed from the packet"
+                )
             }
         }
     }
@@ -192,8 +222,8 @@ impl JpssAttEphem {
     ///
     /// # Errors
     ///
-    /// [`DecodeError::TooShort`] if the packet is smaller than [`Self::BYTE_LENGTH`],
-    /// or a text error if a string field does not hold valid text.
+    /// [`DecodeError::TooShort`] if the packet does not hold the whole container, or
+    /// a text error if a string field does not hold valid text.
     #[inline]
     pub fn decode(data: &[u8]) -> Result<Self, DecodeError> {
         let packet: &[u8; 71] = match data.get(..71) {
@@ -238,38 +268,32 @@ impl JpssAttEphem {
             adaet1us: u16::from_be_bytes([packet[21], packet[22]]) as u64,
             adgpsposx: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[23], packet[24], packet[25], packet[26]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[23], packet[24], packet[25], packet[26]]),
                 ),
             ),
             adgpsposy: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[27], packet[28], packet[29], packet[30]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[27], packet[28], packet[29], packet[30]]),
                 ),
             ),
             adgpsposz: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[31], packet[32], packet[33], packet[34]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[31], packet[32], packet[33], packet[34]]),
                 ),
             ),
             adgpsvelx: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[35], packet[36], packet[37], packet[38]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[35], packet[36], packet[37], packet[38]]),
                 ),
             ),
             adgpsvely: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[39], packet[40], packet[41], packet[42]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[39], packet[40], packet[41], packet[42]]),
                 ),
             ),
             adgpsvelz: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[43], packet[44], packet[45], packet[46]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[43], packet[44], packet[45], packet[46]]),
                 ),
             ),
             adaet2day: u16::from_be_bytes([packet[47], packet[48]]) as u64,
@@ -282,26 +306,22 @@ impl JpssAttEphem {
             adaet2us: u16::from_be_bytes([packet[53], packet[54]]) as u64,
             adcfaq1: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[55], packet[56], packet[57], packet[58]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[55], packet[56], packet[57], packet[58]]),
                 ),
             ),
             adcfaq2: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[59], packet[60], packet[61], packet[62]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[59], packet[60], packet[61], packet[62]]),
                 ),
             ),
             adcfaq3: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[63], packet[64], packet[65], packet[66]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[63], packet[64], packet[65], packet[66]]),
                 ),
             ),
             adcfaq4: f64::from(
                 f32::from_bits(
-                    u32::from_be_bytes([packet[67], packet[68], packet[69], packet[70]])
-                        as u64 as u32,
+                    u32::from_be_bytes([packet[67], packet[68], packet[69], packet[70]]),
                 ),
             ),
         })

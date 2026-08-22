@@ -244,3 +244,86 @@ blocking jobs are unchanged.
 ### All milestones complete
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
+
+## 2026-08-22 — strings, binaries and variable width in the code generator
+
+The generator compiled numbers. Anything else — a string, a binary blob, a field whose width
+comes from the packet — was refused by name, which meant CTIM, IDEX and SUDA were refused
+whole. Only JPSS compiled, and JPSS is one container of twenty-seven fixed fields.
+
+Ten of the eleven bundled definitions compile now. CTIM is 9493 parameters and 38 concrete
+containers; IDEX and SUDA carry a binary blob whose length is `8 × PKT_LEN − 328` bits, with
+two more fields behind it.
+
+### Strings and binaries borrow the packet
+
+A decoded string is a `&str` into the caller's buffer: no allocation, no copy. That decides
+the whole shape of the feature. Only byte-aligned fields are compiled, because an unaligned
+one would have to be shifted into a new buffer, and only UTF-8 and US-ASCII, because Latin-1
+or UTF-16 would have to be transcoded into one. Both are refused by name instead, and the
+interpreter handles them.
+
+A text field becomes *two* struct fields. XTCE gives a string two values — the buffer as
+allocated and the string found inside it — and reproducing the reference exactly needs both.
+`TerminationChar` and `LeadingSize` delimiters are compiled.
+
+There is a test that the decoded string's pointer lies inside the caller's buffer. Comparing
+values alone would still pass if this regressed to an owned copy, which is the one thing the
+feature exists to avoid.
+
+### A cursor, but only past the first dynamic field
+
+IDEX's science packets are the case that forced it. Everything up to the blob is read at
+literal offsets; from the blob on, a `usize` cursor is walked — the same walk the interpreter
+does, except the widths, conversions and names are still fixed at generation time.
+
+A numeric field of variable width stays refused: a number's width picks its Rust type, and
+that cannot be a property of the packet. For text and binary it only picks how many bytes to
+borrow, which can.
+
+### The differential suite, and what it did not cover
+
+`xtce-codegen-e2e` generates decoders in `build.rs` and compares them against the interpreter
+on the real streams. That is the shape a mission uses, and it is how a 94 000-line decoder
+gets tested without committing 94 000 lines.
+
+Two gaps turned up, and both were real bugs rather than missing tests.
+
+No packet in the CTIM stream reaches a container with a string field — `APID_6`, `APID_10`
+and `APID_28` never occur in it — so compiled string decoding had zero coverage. Synthetic
+packets close that.
+
+The second is worse. Between them the mission definitions contain **one** 32-bit float, no
+16-bit float, and no numeric field spanning nine bytes. So `numeric_edges.xml` was written:
+every numeric shape the emitter produces, each one byte-aligned and again four bits off a
+boundary, compared over 2304 generated packets. It failed twice on first run.
+
+*A cast is not atomic.* `x as u64 << 48` does not parse — the type after `as` swallows the
+`<<` as the start of generic arguments. Sign extension is a shift, so every two's-complement
+field of 8, 16, 24 or 32 bits sitting on a byte boundary emitted exactly that. The mission
+definitions contain one two's-complement field in total, CTIM's `ana_proc_temp`, and it
+starts at bit 251 — off a boundary, where the mask had already put the parentheses in.
+
+*The nine-byte span was truncated before it was shifted.* A 64-bit field starting four bits
+into a byte occupies nine bytes, which is why the emitter loads it through `u128`. It then
+cast to `u64` and *then* shifted — throwing away the four bits at the top of the field. The
+module documentation claimed this case was "handled by construction". It was not, and no
+mission file had ever reached it.
+
+Both predate this session's work. Neither is the kind of thing a reader catches; only a
+definition built to reach them does.
+
+### Smaller things
+
+Every load now uses the narrowest integer that spans the field, and casts only where the
+consumer needs a different width. Before, every float read came out as
+`u32::from_be_bytes([..]) as u64 as u32`. The CTIM decoder is 3.9 MB and 94 011 lines; with
+eight-byte padding on every load it was 5.4 MB.
+
+The interpreter collapses a parameter that appears twice in one entry list — CTIM's
+`APID_20_Packet` has two `SPARE_8` entries — because it stores values in a dictionary where
+the second assignment overwrites the first and the key keeps its position. The generated
+struct keeps both fields, since both really are in the packet at different offsets, but the
+reported values now collapse the same way.
+
+`cargo xtask diff` still reports all six cases matching the reference.
