@@ -2,9 +2,8 @@
 /.venv
 *.profraw
 
-# JetBrains workspace state — the shared parts are checked in deliberately.
-/.idea/workspace.xml
-/.idea/shelf
+# JetBrains project files: local to whoever opened the project.
+/.idea/
 
 # maturin build output for the Python bindings
 /crates/xtce-py/target
