@@ -14,8 +14,9 @@
 //! fallback would make a generated-versus-interpreted benchmark meaningless, and would hide
 //! from the caller that half their database is not actually compiled.
 //!
-//! In practice that rules out variable-length strings and binary fields, calibrators,
-//! `LocationInContainerInBits`, `RepeatEntry`, and `BooleanExpression` restriction criteria.
+//! In practice that rules out `LocationInContainerInBits`, `RepeatEntry`, `BooleanExpression`
+//! restriction criteria, and calibrators selected by context rather than declared as the
+//! default.
 //! The interpreted decoder in `xtce-decode` handles all of them and is the fallback the
 //! caller chooses explicitly.
 //!
@@ -45,7 +46,7 @@ pub mod plan;
 
 use xtce_model::XtceDb;
 
-pub use plan::{ContainerPlan, Field, Guard, Node, Plan, Repr};
+pub use plan::{Calibration, ContainerPlan, Field, Guard, Node, Plan, Repr};
 
 /// What to generate.
 #[derive(Clone, Debug, Default)]

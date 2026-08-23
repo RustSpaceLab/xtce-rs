@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Written for this project, not a mission file: no definition in reach has a calibrator at
+  all. Grepping the five bundled mission files for one returns nothing, so every line of the
+  calibration path — interpreted and generated alike — would otherwise go unexercised.
+
+  The point of the file is the *arithmetic*, not the plumbing. Floating-point addition is
+  neither associative nor commutative, so a calibrator is where a generator most easily
+  produces an answer that is right to fourteen digits and wrong in the last bit. Each type
+  below exists to make one such difference visible.
+
+  POLY_MIXED_T and POLY_MIXED_F64_T carry byte-for-byte identical terms over different
+  encodings — one 32-bit unsigned integer, one binary64. That is deliberate. The reference
+  raises an integral raw value to its power exactly, in arbitrary-precision integers, and
+  converts once; a float raw goes through repeated squaring, which rounds at every step. For
+  roughly a quarter of 32-bit values the two answers differ in the last bit, so a generator
+  that picks the path by convenience rather than by the field's encoding is caught here and
+  nowhere else.
+
+  POLY_BIG_T is the other half of that: its fourth power overflows an i128 above about 3.6
+  thousand million, where the exact route has to give up and fall back to floating point.
+  Random 32-bit values land on both sides of that line. It is a separate parameter rather
+  than another term on POLY_MIXED_T because a fourth-power term is so much larger than a
+  cubed one that it swallows the difference the cubed one is there to expose — which is how
+  the first draft of this file managed to test nothing.
+
+  POLY_NEG_T has a negative exponent, which for a raw of zero is an infinity that then has to
+  propagate through the sum identically in both implementations. Its terms are also listed
+  out of exponent order, as is POLY_MIXED_T's — document order is the summation order, and
+  sorting them would change the answer.
+
+  The four splines cover both orders this project compiles, with and without extrapolation.
+  The bounded pair sits on a four-bit field whose range is wider than the points, so a random
+  packet lands outside them often, and both implementations have to refuse it. The
+  unbounded pair sits on a byte, so extrapolation off each end is reached too, as is a query
+  landing exactly on the last point — the one place this project knowingly differs from the
+  Python reference, which raises there.
+
+  ENUM_CAL and BOOL_CAL carry calibrators that must be *ignored*. XTCE 4.3.2.4.3.6 looks an
+  enumeration and a boolean up from the raw value, and the reference returns before it
+  consults a calibrator. Ignoring them is therefore the faithful behaviour, and a generator
+  that helpfully applied them would be wrong.
+-->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="Calibrators">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <!-- The same three terms, over an integer encoding and over a float one. -->
+      <IntegerParameterType name="POLY_MIXED_T">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="1.0" exponent="3"/>
+              <Term coefficient="-0.5" exponent="1"/>
+              <Term coefficient="12.25" exponent="0"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </IntegerParameterType>
+
+      <FloatParameterType name="POLY_MIXED_F64_T">
+        <FloatDataEncoding sizeInBits="64" encoding="IEEE754">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="1.0" exponent="3"/>
+              <Term coefficient="-0.5" exponent="1"/>
+              <Term coefficient="12.25" exponent="0"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </FloatDataEncoding>
+      </FloatParameterType>
+
+      <!-- Its only job is the fourth power: above about 3.6 thousand million the exact
+           route overflows an i128 and has to fall back to floating point, so a random
+           32-bit value lands in the exact branch about five times in six and in the
+           fallback the rest of the time. -->
+      <IntegerParameterType name="POLY_BIG_T">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="1.0" exponent="4"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </IntegerParameterType>
+
+      <IntegerParameterType name="POLY_NEG_T">
+        <IntegerDataEncoding sizeInBits="16" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="2.0" exponent="1"/>
+              <Term coefficient="100.0" exponent="-1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </IntegerParameterType>
+
+      <!-- Twelve bits, and the container puts it off a byte boundary. -->
+      <IntegerParameterType name="POLY_SMALL_T">
+        <IntegerDataEncoding sizeInBits="12" encoding="unsigned">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.125" exponent="2"/>
+              <Term coefficient="-7.5" exponent="0"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </IntegerParameterType>
+
+      <IntegerParameterType name="SPL0_WIDE_T">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned">
+          <DefaultCalibrator>
+            <SplineCalibrator order="0" extrapolate="true">
+              <SplinePoint raw="10" calibrated="-40.0"/>
+              <SplinePoint raw="50" calibrated="0.0"/>
+              <SplinePoint raw="120" calibrated="25.5"/>
+              <SplinePoint raw="200" calibrated="85.25"/>
+            </SplineCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </IntegerParameterType>
+
+      <IntegerParameterType name="SPL1_WIDE_T">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned">
+          <DefaultCalibrator>
+            <SplineCalibrator order="1" extrapolate="true">
+              <SplinePoint raw="10" calibrated="-40.0"/>
+              <SplinePoint raw="50" calibrated="0.0"/>
+              <SplinePoint raw="120" calibrated="25.5"/>
+              <SplinePoint raw="200" calibrated="85.25"/>
+            </SplineCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </IntegerParameterType>
+
+      <!-- Four bits, points covering 2 to 13: raws 0, 1, 14 and 15 have no answer. -->
+      <IntegerParameterType name="SPL1_BOUNDED_T">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned">
+          <DefaultCalibrator>
+            <SplineCalibrator order="1" extrapolate="false">
+              <SplinePoint raw="2" calibrated="1.5"/>
+              <SplinePoint raw="7" calibrated="4.0"/>
+              <SplinePoint raw="13" calibrated="9.75"/>
+            </SplineCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </IntegerParameterType>
+
+      <IntegerParameterType name="SPL0_BOUNDED_T">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned">
+          <DefaultCalibrator>
+            <SplineCalibrator order="0" extrapolate="false">
+              <SplinePoint raw="2" calibrated="1.5"/>
+              <SplinePoint raw="7" calibrated="4.0"/>
+              <SplinePoint raw="13" calibrated="9.75"/>
+            </SplineCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </IntegerParameterType>
+
+      <!-- The calibrator here must never run: the label comes from the raw value. -->
+      <EnumeratedParameterType name="ENUM_CAL_T">
+        <IntegerDataEncoding sizeInBits="2" encoding="unsigned">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="1000.0" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+        <EnumerationList>
+          <Enumeration value="0" label="IDLE"/>
+          <Enumeration value="1" label="ARMED"/>
+          <Enumeration value="2" label="FIRING"/>
+          <Enumeration value="3" label="SAFED"/>
+        </EnumerationList>
+      </EnumeratedParameterType>
+
+      <!-- As must this one. -->
+      <BooleanParameterType name="BOOL_CAL_T" zeroStringValue="OFF" oneStringValue="ON">
+        <IntegerDataEncoding sizeInBits="1" encoding="unsigned">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="7.0" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </BooleanParameterType>
+
+      <IntegerParameterType name="U1">
+        <IntegerDataEncoding sizeInBits="1" encoding="unsigned"/>
+      </IntegerParameterType>
+    </ParameterTypeSet>
+
+    <ParameterSet>
+      <Parameter name="POLY_U32" parameterTypeRef="POLY_MIXED_T"/>
+      <Parameter name="POLY_F64" parameterTypeRef="POLY_MIXED_F64_T"/>
+      <Parameter name="POLY_BIG" parameterTypeRef="POLY_BIG_T"/>
+      <Parameter name="POLY_S16" parameterTypeRef="POLY_NEG_T"/>
+      <Parameter name="SPL0_U8" parameterTypeRef="SPL0_WIDE_T"/>
+      <Parameter name="SPL1_U8" parameterTypeRef="SPL1_WIDE_T"/>
+      <Parameter name="SPL1_U4" parameterTypeRef="SPL1_BOUNDED_T"/>
+      <Parameter name="SPL0_U4" parameterTypeRef="SPL0_BOUNDED_T"/>
+      <Parameter name="ENUM_CAL" parameterTypeRef="ENUM_CAL_T"/>
+      <Parameter name="BOOL_CAL" parameterTypeRef="BOOL_CAL_T"/>
+      <Parameter name="POLY_U12" parameterTypeRef="POLY_SMALL_T"/>
+      <Parameter name="PAD_1" parameterTypeRef="U1"/>
+    </ParameterSet>
+
+    <ContainerSet>
+      <SequenceContainer name="Calibrated">
+        <EntryList>
+          <ParameterRefEntry parameterRef="POLY_U32"/>
+          <ParameterRefEntry parameterRef="POLY_F64"/>
+          <ParameterRefEntry parameterRef="POLY_BIG"/>
+          <ParameterRefEntry parameterRef="POLY_S16"/>
+          <ParameterRefEntry parameterRef="SPL0_U8"/>
+          <ParameterRefEntry parameterRef="SPL1_U8"/>
+          <ParameterRefEntry parameterRef="SPL1_U4"/>
+          <ParameterRefEntry parameterRef="SPL0_U4"/>
+          <ParameterRefEntry parameterRef="ENUM_CAL"/>
+          <ParameterRefEntry parameterRef="BOOL_CAL"/>
+          <!-- Starts at bit 139, so the twelve bits below span two byte boundaries. -->
+          <ParameterRefEntry parameterRef="POLY_U12"/>
+          <ParameterRefEntry parameterRef="PAD_1"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

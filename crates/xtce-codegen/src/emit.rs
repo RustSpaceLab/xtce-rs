@@ -18,7 +18,7 @@ use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 
 use crate::plan::{
-    ContainerPlan, Field, Guard, Node, Plan, Repr, TextCharset, TextDelimiter, Width,
+    Calibration, ContainerPlan, Field, Guard, Node, Plan, Repr, TextCharset, TextDelimiter, Width,
 };
 use xtce_model::{CompareOp, IntegerCoding};
 
@@ -136,6 +136,12 @@ fn preamble() -> TokenStream {
                 /// Width of the field, in bits.
                 bits: usize,
             },
+            /// A spline calibrator was asked for a value outside its points, and the
+            /// definition does not allow extrapolation.
+            Calibration {
+                /// The parameter being calibrated.
+                parameter: &'static str,
+            },
         }
 
         impl core::fmt::Display for DecodeError {
@@ -166,6 +172,11 @@ fn preamble() -> TokenStream {
                         f,
                         "{parameter}: {bits} bit(s) at bit {at} is not byte-aligned, so it \
                          cannot be borrowed from the packet"
+                    ),
+                    Self::Calibration { parameter } => write!(
+                        f,
+                        "{parameter}: query point falls outside the spline points and \
+                         extrapolate is false"
                     ),
                 }
             }
@@ -385,6 +396,18 @@ fn struct_fields(field: &Field) -> Vec<TokenStream> {
             pub #raw_name: &'a [u8],
         });
     }
+    if let Some(eng_ident) = &field.eng_ident {
+        let eng_name = ident(eng_ident);
+        let eng_doc = format!(
+            " `{}` — the engineering value, after its calibrator. The field above is the \
+             raw one the packet carried.",
+            field.xtce_name
+        );
+        out.push(quote! {
+            #[doc = #eng_doc]
+            pub #eng_name: f64,
+        });
+    }
     out
 }
 
@@ -398,6 +421,16 @@ fn field_initialisers(field: &Field, packet: &Ident) -> Vec<TokenStream> {
         let raw_name = ident(raw_ident);
         let slice = byte_slice(field, packet);
         out.push(quote! { #raw_name: #slice, });
+    }
+    if let Some(eng_ident) = &field.eng_ident {
+        let eng_name = ident(eng_ident);
+        // The raw value is read a second time rather than referred to: these are struct
+        // initialisers, so the first one is not a binding anything else can name.
+        let raw = read_field(field, packet);
+        let calibrated = calibrate(field, &quote!(__raw));
+        out.push(quote! {
+            #eng_name: { let __raw = #raw; #calibrated },
+        });
     }
     out
 }
@@ -493,6 +526,7 @@ fn decode_body(plan: &ContainerPlan) -> TokenStream {
 
         let name = ident(&field.ident);
         let raw_name = field.raw_ident.as_deref().map(ident);
+        let eng_name = field.eng_ident.as_deref().map(ident);
         names.push(quote! { #name });
 
         if field.static_span().is_some() {
@@ -520,6 +554,13 @@ fn decode_body(plan: &ContainerPlan) -> TokenStream {
 
         if let Some(raw_name) = raw_name {
             names.push(quote! { #raw_name });
+        }
+        // Calibration reads the binding above, so it goes after both branches rather than
+        // being duplicated into each.
+        if let Some(eng_name) = eng_name {
+            let calibrated = calibrate(field, &quote!(#name));
+            statements.push(quote! { let #eng_name: f64 = #calibrated; });
+            names.push(quote! { #eng_name });
         }
     }
 
@@ -679,9 +720,103 @@ fn accessor(field: &Field) -> Option<TokenStream> {
     }
 }
 
+/// The expression that turns a field's raw value into its engineering value.
+///
+/// Every line of this has to produce the same bits as `xtce_decode::calibrate`, because the
+/// two are compared field by field on every packet of the differential suite. Floating-point
+/// addition is neither associative nor commutative, so "the same arithmetic in a different
+/// order" is a different answer, and a calibrator is where that is easiest to get wrong.
+///
+/// Two things carry that:
+///
+/// * **Terms are summed in document order**, not by Horner's method and not sorted.
+/// * **The integer and float paths are separate.** For an integral raw the power is computed
+///   in `i128` and converted once, exactly as the reference does with its arbitrary-precision
+///   integers; for a float raw it is `powi`, which rounds at every multiply. The same number
+///   through the two paths gives different bits, so the path is chosen by the field's
+///   encoding and never by convenience.
+fn calibrate(field: &Field, raw: &TokenStream) -> TokenStream {
+    let Some(calibration) = &field.calibration else {
+        return quote!(0.0f64);
+    };
+    let integral = matches!(field.repr, Repr::Unsigned | Repr::Signed(_));
+    let xtce_name = &field.xtce_name;
+
+    match calibration {
+        Calibration::Polynomial(terms) => {
+            let accumulate = terms.iter().map(|term| {
+                let coefficient = Literal::f64_unsuffixed(term.coefficient);
+                let exponent = Literal::i32_unsuffixed(term.exponent);
+                if integral {
+                    quote! { sum += #coefficient * integer_power(base, #exponent); }
+                } else {
+                    quote! { sum += #coefficient * base.powi(#exponent); }
+                }
+            });
+            let base = if integral {
+                quote! { let base = i128::from(#raw); }
+            } else {
+                quote! { let base = #raw; }
+            };
+            quote! {
+                {
+                    #base
+                    let mut sum = 0.0f64;
+                    #(#accumulate)*
+                    sum
+                }
+            }
+        }
+        Calibration::Spline(spline) => {
+            let points = spline.points.iter().map(|point| {
+                let raw = Literal::f64_unsuffixed(point.raw);
+                let calibrated = Literal::f64_unsuffixed(point.calibrated);
+                quote! { (#raw, #calibrated) }
+            });
+            let order = Literal::u8_unsuffixed(spline.order);
+            let extrapolate = spline.extrapolate;
+            // `as_f64` on the reference's input: an integral raw goes through `i128` first,
+            // which for the widths compiled here is the same value either way, but is
+            // written the same way so the two are read as the same conversion.
+            let query = if integral {
+                quote! { i128::from(#raw) as f64 }
+            } else {
+                quote! { #raw }
+            };
+            quote! {
+                {
+                    const POINTS: &[(f64, f64)] = &[#(#points),*];
+                    match spline_value(POINTS, #order, #extrapolate, #query) {
+                        Some(value) => value,
+                        None => {
+                            return Err(DecodeError::Calibration { parameter: #xtce_name });
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// The `(raw, engineering)` pair a field contributes to `for_each_value`.
 fn visit_values(field: &Field) -> (TokenStream, TokenStream) {
     let stored = ident(&field.ident);
+
+    // A calibrated parameter's engineering value is the calibrator's output, whatever the
+    // raw encoding was. Only a numeric field ever carries one — an enumeration and a boolean
+    // are looked up from the raw value and never reach a calibrator.
+    if let Some(eng_ident) = &field.eng_ident {
+        let eng = ident(eng_ident);
+        let raw = match &field.repr {
+            Repr::Signed(_) => quote! { Value::Signed(self.#stored) },
+            Repr::Float16 | Repr::Float32 | Repr::Float64 => {
+                quote! { Value::Float(self.#stored) }
+            }
+            _ => quote! { Value::Unsigned(self.#stored) },
+        };
+        return (raw, quote! { Value::Float(self.#eng) });
+    }
+
     match &field.repr {
         Repr::Unsigned => (
             quote! { Value::Unsigned(self.#stored) },
@@ -1330,6 +1465,15 @@ fn helpers(plan: &Plan) -> TokenStream {
         )
     });
 
+    let calibrations = || {
+        plan.containers
+            .iter()
+            .flat_map(|c| &c.fields)
+            .filter_map(|f| f.calibration.as_ref())
+    };
+    let needs_power = calibrations().any(|c| matches!(c, Calibration::Polynomial(_)));
+    let needs_spline = calibrations().any(|c| matches!(c, Calibration::Spline(_)));
+
     let needs_cursor = plan.containers.iter().any(ContainerPlan::is_dynamic);
     let cursor = if needs_cursor {
         cursor_helpers()
@@ -1349,12 +1493,134 @@ fn helpers(plan: &Plan) -> TokenStream {
         quote!()
     };
 
+    // Only where a polynomial over an integral encoding actually appears: the helper is only
+    // reachable from that path, and an unused function in generated code is noise a reviewer
+    // has to rule out.
+    let power = if needs_power {
+        integer_power_helper()
+    } else {
+        quote!()
+    };
+    let spline = if needs_spline {
+        spline_helpers()
+    } else {
+        quote!()
+    };
+
     quote! {
         #cursor
         #half
         #text
         #terminated
         #leading
+        #power
+        #spline
+    }
+}
+
+/// `base^exponent` as the reference computes it for an integral raw value.
+///
+/// Exactly, in `i128`, converted once — not by repeated `f64` multiplication, which rounds at
+/// every step. The reference uses arbitrary-precision integers, so for anything that fits in
+/// an `i128` this is the same number; when it does not fit there is no exact route left and
+/// both fall back to floating point.
+fn integer_power_helper() -> TokenStream {
+    quote! {
+        fn integer_power(base: i128, exponent: i32) -> f64 {
+            if exponent < 0 {
+                return (base as f64).powi(exponent);
+            }
+            match u32::try_from(exponent)
+                .ok()
+                .and_then(|exponent| base.checked_pow(exponent))
+            {
+                Some(exact) => exact as f64,
+                None => (base as f64).powi(exponent),
+            }
+        }
+    }
+}
+
+/// Spline interpolation, line for line as `xtce_decode::calibrate::interpolate` does it.
+///
+/// The order and the extrapolation flag are passed in rather than specialised away, so that
+/// the two implementations can be read side by side; both are constants at every call site,
+/// so nothing survives optimisation.
+///
+/// Orders above one and an empty point list are refused when the code is generated, which is
+/// why the only failure left here is a query outside the points.
+fn spline_helpers() -> TokenStream {
+    quote! {
+        fn spline_line(x: f64, x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
+            if (x1 - x0) == 0.0 {
+                return y0;
+            }
+            let slope = (y1 - y0) / (x1 - x0);
+            slope * (x - x0) + y0
+        }
+
+        fn spline_value(
+            points: &[(f64, f64)],
+            order: u8,
+            extrapolate: bool,
+            query: f64,
+        ) -> Option<f64> {
+            let first = *points.first()?;
+            let last = *points.last()?;
+
+            if query < first.0 {
+                if !extrapolate {
+                    return None;
+                }
+                return Some(match order {
+                    0 => first.1,
+                    _ => match points.get(1) {
+                        Some(second) => {
+                            spline_line(query, first.0, second.0, first.1, second.1)
+                        }
+                        None => first.1,
+                    },
+                });
+            }
+
+            if query > last.0 {
+                if !extrapolate {
+                    return None;
+                }
+                return Some(match order {
+                    0 => last.1,
+                    _ => match points.len().checked_sub(2).and_then(|at| points.get(at)) {
+                        Some(previous) => {
+                            spline_line(query, previous.0, last.0, previous.1, last.1)
+                        }
+                        None => last.1,
+                    },
+                });
+            }
+
+            // The index of the first point strictly above the query. A NaN query makes both
+            // comparisons above false and every predicate here false too, so it lands at
+            // zero — which is what the floor is for.
+            let hi = points.partition_point(|point| point.0 <= query).max(1);
+
+            Some(match order {
+                0 => points.get(hi - 1).map_or(first.1, |point| point.1),
+                _ => {
+                    if points.len() < 2 {
+                        return Some(first.1);
+                    }
+                    // A query equal to the last raw value has no point above it;
+                    // interpolating over the final segment lands exactly on it.
+                    let upper = hi.min(points.len() - 1);
+                    match (points.get(upper - 1), points.get(upper)) {
+                        (Some(lower), Some(higher)) => {
+                            spline_line(query, lower.0, higher.0, lower.1, higher.1)
+                        }
+                        _ => first.1,
+                    }
+                }
+            })
+        }
     }
 }
 

@@ -67,6 +67,12 @@ pub enum DecodeError {
         /// Width of the field, in bits.
         bits: usize,
     },
+    /// A spline calibrator was asked for a value outside its points, and the
+    /// definition does not allow extrapolation.
+    Calibration {
+        /// The parameter being calibrated.
+        parameter: &'static str,
+    },
 }
 impl core::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -97,6 +103,13 @@ impl core::fmt::Display for DecodeError {
                     f,
                     "{parameter}: {bits} bit(s) at bit {at} is not byte-aligned, so it \
                          cannot be borrowed from the packet"
+                )
+            }
+            Self::Calibration { parameter } => {
+                write!(
+                    f,
+                    "{parameter}: query point falls outside the spline points and \
+                         extrapolate is false"
                 )
             }
         }

@@ -10,8 +10,8 @@ use std::collections::HashMap;
 
 use xtce_model::{
     Calibrator, Charset, CompareOp, ContainerId, DataEncoding, EntryKind, FloatCoding,
-    IntegerCoding, LinearAdjustment, MatchCriteria, ParamId, SizeSpec, StringDelimiter, TypeKind,
-    XtceDb,
+    IntegerCoding, LinearAdjustment, MatchCriteria, ParamId, PolynomialTerm, SizeSpec, Spline,
+    StringDelimiter, TypeKind, XtceDb,
 };
 
 use crate::CodegenError;
@@ -115,6 +115,19 @@ impl Width {
     }
 }
 
+/// A calibrator this generator compiles.
+///
+/// The model's [`Calibrator`] also has an `Unsupported` variant and admits splines this
+/// generator will not emit — order above one, or no points at all. Those are refused while
+/// planning, so what reaches the emitter is only ever something it can write down.
+#[derive(Clone, Debug)]
+pub enum Calibration {
+    /// Terms in document order, which is the order they must be summed in.
+    Polynomial(Vec<PolynomialTerm>),
+    /// Order 0 or 1, with at least one point.
+    Spline(Spline),
+}
+
 /// One decoded field in a flattened container.
 #[derive(Clone, Debug)]
 pub struct Field {
@@ -129,6 +142,17 @@ pub struct Field {
     /// XTCE gives a string two values — the buffer as allocated, and the string found inside
     /// it — and both are needed to reproduce the reference exactly, so both are stored.
     pub raw_ident: Option<String>,
+    /// For a calibrated field, the name of the companion field holding the engineering value.
+    ///
+    /// Same reason as `raw_ident`: a calibrated parameter also has two values, and the
+    /// reference reports both.
+    pub eng_ident: Option<String>,
+    /// The calibrator applied to this field's raw value, when one is.
+    ///
+    /// Only ever set for a numeric field. An enumeration, a boolean and a string are all
+    /// derived from the *raw* value — the interpreter returns before it reaches calibration —
+    /// so a calibrator on one of those changes nothing, and carrying it here would.
+    pub calibration: Option<Calibration>,
     /// Bit offset from the start of the packet, when it is known at generation time.
     ///
     /// `None` once an earlier field in the same container has a data-dependent width.
@@ -416,24 +440,9 @@ impl<'db> Builder<'db> {
             reason,
         };
 
-        if ty.encoding.default_calibrator().is_some()
-            || !ty.encoding.context_calibrators().is_empty()
-        {
-            // Calibration is arithmetic this generator could emit, but the interpreted path
-            // sums polynomial terms in document order with exact integer powers, and any
-            // difference in the last bit would be a silent divergence. Out of scope until
-            // the emitted arithmetic is proved identical.
-            return Err(refuse("Calibrator", "calibration is not compiled yet"));
-        }
-        if let Some(Calibrator::Unsupported { .. }) = ty.encoding.default_calibrator() {
-            return Err(refuse(
-                "Calibrator",
-                "calibrator kind is outside the subset",
-            ));
-        }
-
         let (width, numeric) = encoding_repr(&ty.encoding, preceding, &refuse)?;
         let repr = self.kind_repr(ty, numeric, &refuse)?;
+        let calibration = Self::calibration_for(ty, &repr, &refuse)?;
 
         if repr.borrows() {
             // Text and binary are handed out as slices of the packet, which is only possible
@@ -478,11 +487,75 @@ impl<'db> Builder<'db> {
             parameter,
             ident: field_ident(&xtce_name),
             raw_ident: None,
+            eng_ident: None,
+            calibration,
             xtce_name,
             bit_offset,
             width,
             repr,
         })
+    }
+
+    /// The calibrator that will actually run, or what stops this field being compiled.
+    ///
+    /// The interpreter reaches calibration only for a numeric parameter: a string returns its
+    /// decoded text, and an enumeration and a boolean are both looked up from the *raw* value
+    /// and return before the calibrator is consulted. So a calibrator on one of those is not
+    /// refused here — it is ignored, because ignoring it is what the reference does.
+    fn calibration_for(
+        ty: &xtce_model::ParameterType,
+        repr: &Repr,
+        refuse: &impl Fn(&str, &'static str) -> CodegenError,
+    ) -> Result<Option<Calibration>, CodegenError> {
+        let numeric = matches!(
+            repr,
+            Repr::Unsigned | Repr::Signed(_) | Repr::Float16 | Repr::Float32 | Repr::Float64
+        );
+        if !numeric {
+            return Ok(None);
+        }
+
+        if !ty.encoding.context_calibrators().is_empty() {
+            // A context calibrator is chosen by criteria over other parameters, which may
+            // themselves be calibrated and may name a parameter this container decodes after
+            // the one being calibrated. That is a dependency graph, not an expression, and
+            // nothing in reach uses one — so it is refused by name rather than guessed at.
+            return Err(refuse(
+                "ContextCalibrator",
+                "a calibrator selected by criteria over other parameters is not compiled; \
+                 only a DefaultCalibrator is",
+            ));
+        }
+
+        let Some(calibrator) = ty.encoding.default_calibrator() else {
+            return Ok(None);
+        };
+
+        match calibrator {
+            Calibrator::Polynomial(terms) => Ok(Some(Calibration::Polynomial(terms.clone()))),
+            Calibrator::Spline(spline) => {
+                // Both of these are properties of the definition, so they are settled now
+                // rather than left to fail once per packet. Only a query outside the point range
+                // is a run-time condition.
+                if spline.order > 1 {
+                    return Err(refuse(
+                        "SplineCalibrator",
+                        "only spline orders 0 and 1 are compiled, as in the interpreter",
+                    ));
+                }
+                if spline.points.is_empty() {
+                    return Err(refuse(
+                        "SplineCalibrator",
+                        "a spline with no points has no value to interpolate",
+                    ));
+                }
+                Ok(Some(Calibration::Spline(spline.clone())))
+            }
+            Calibrator::Unsupported { .. } => Err(refuse(
+                "Calibrator",
+                "calibrator kind is outside the subset",
+            )),
+        }
     }
 
     /// The parameter type can override how the encoded number is presented.
@@ -811,6 +884,10 @@ fn assign_unique_idents(fields: &mut [Field]) {
         if field.repr.borrows() && matches!(field.repr, Repr::Text { .. }) {
             let wanted = format!("{}_raw", field.ident);
             field.raw_ident = Some(claim(&wanted, &mut used));
+        }
+        if field.calibration.is_some() {
+            let wanted = format!("{}_eng", field.ident);
+            field.eng_ident = Some(claim(&wanted, &mut used));
         }
     }
 }

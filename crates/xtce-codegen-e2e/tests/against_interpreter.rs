@@ -38,6 +38,11 @@ mod numeric_edges {
     include!(concat!(env!("OUT_DIR"), "/numeric_edges.rs"));
 }
 
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+mod calibrators {
+    include!(concat!(env!("OUT_DIR"), "/calibrators.rs"));
+}
+
 fn testdata(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../testdata/spp")
@@ -337,4 +342,170 @@ fn every_numeric_shape_matches_the_interpreter() {
             format!("packet {index}")
         );
     }
+}
+
+/// Calibration, against the interpreter, over generated packets.
+///
+/// Separate from the macro above because a calibrator is the one thing in the compiled subset
+/// that can *refuse* a well-formed packet: a spline whose definition forbids extrapolation
+/// has no answer outside its points. Agreement therefore has to include agreeing to fail, and
+/// on the same packets — which the macro, written when nothing could fail, does not express.
+///
+/// `calibrators.xml` is deliberately built so both outcomes are common: two of its splines
+/// sit on a four-bit field whose range is wider than their points.
+#[test]
+fn calibration_matches_the_interpreter_bit_for_bit() {
+    const BYTES: usize = 23;
+
+    let db = XtceDb::from_path(testdata("calibrators.xml")).expect("definition loads");
+    let decoder = Decoder::with_root(&db, "Calibrated").expect("root container");
+    let (same_raw, same_eng) = comparators!(calibrators);
+
+    let mut packets: Vec<Vec<u8>> = (0..=255u8).map(|byte| vec![byte; BYTES]).collect();
+    let mut state = 0x51ED_2701_A3C9_0FB7u64;
+    for _ in 0..4096 {
+        let mut packet = vec![0u8; BYTES];
+        for chunk in packet.chunks_mut(8) {
+            state ^= state >> 12;
+            state ^= state << 25;
+            state ^= state >> 27;
+            let bytes = state.wrapping_mul(0x2545_F491_4F6C_DD1D).to_be_bytes();
+            chunk.copy_from_slice(&bytes[..chunk.len()]);
+        }
+        packets.push(packet);
+    }
+
+    let mut compared = 0usize;
+    let mut refused = 0usize;
+
+    for (index, packet) in packets.iter().enumerate() {
+        let mut interpreted = decoder.new_packet(packet);
+        let by_interpreter = decoder.decode_into(&mut interpreted, packet);
+        let by_generator = calibrators::decode(packet);
+
+        match (by_interpreter, by_generator) {
+            (Err(_), Err(_)) => {
+                refused += 1;
+                continue;
+            }
+            (Ok(()), Ok(compiled)) => {
+                let mut fields = Vec::new();
+                compiled.for_each_value(|name, raw, eng| fields.push((name, raw, eng)));
+                assert_eq!(
+                    fields.len(),
+                    interpreted.len(),
+                    "packet {index}: field counts differ"
+                );
+
+                for ((name, raw, eng), value) in fields.iter().zip(interpreted.values()) {
+                    let expected = db
+                        .parameter(value.parameter)
+                        .map(|parameter| db.name(parameter.name))
+                        .expect("parameter resolves");
+                    assert_eq!(*name, expected, "packet {index}: field order differs");
+                    assert!(
+                        same_raw(raw, &value.raw),
+                        "packet {index}: {name}: raw differs — generated {raw:?}, \
+                         interpreted {:?}",
+                        value.raw
+                    );
+                    // By bit pattern. A calibrated value that is right to fourteen digits and
+                    // wrong in the last bit is exactly the failure this file exists to catch.
+                    assert!(
+                        same_eng(eng, &value.eng),
+                        "packet {index}: {name}: engineering differs — generated {eng:?}, \
+                         interpreted {:?}",
+                        value.eng
+                    );
+                }
+                compared += 1;
+            }
+            (interpreted_result, generated_result) => panic!(
+                "packet {index}: the two implementations disagree about whether it decodes \
+                 at all — interpreter {:?}, generated {:?}",
+                interpreted_result.err(),
+                generated_result.err()
+            ),
+        }
+    }
+
+    assert!(compared > 2_000, "only {compared} packet(s) were compared");
+    assert!(
+        refused > 100,
+        "only {refused} packet(s) exercised a spline refusing to extrapolate"
+    );
+}
+
+/// The integral and floating-point power paths are not interchangeable.
+///
+/// `calibrators.xml` gives `POLY_U32` and `POLY_F64` byte-for-byte identical terms over
+/// different encodings. Fed the same number, they must still disagree in the last bit: the
+/// reference cubes an integral raw exactly and rounds once, and cubes a float raw by repeated
+/// squaring, which rounds twice.
+///
+/// Without this, an emitter that sent both through one path would pass everything above —
+/// the two fields are compared against the interpreter separately, and a test that never
+/// feeds them the same number never notices they agree when they should not.
+#[test]
+fn the_integer_power_path_is_not_the_float_one() {
+    // 2^27 + 1. Its cube needs 82 bits, so rounding it once is not the same as rounding the
+    // square and then the product.
+    const VALUE: u32 = (1 << 27) + 1;
+
+    let mut packet = vec![0u8; 23];
+    packet[0..4].copy_from_slice(&VALUE.to_be_bytes());
+    packet[4..12].copy_from_slice(&f64::from(VALUE).to_bits().to_be_bytes());
+    // Both four-bit splines refuse to extrapolate, so they need a query inside their points.
+    packet[20] = 0x55;
+
+    let calibrators::Packet::Calibrated(decoded) =
+        calibrators::decode(&packet).expect("the packet decodes");
+
+    assert_eq!(decoded.poly_u32, u64::from(VALUE));
+    assert_eq!(decoded.poly_f64, f64::from(VALUE));
+    assert_ne!(
+        decoded.poly_u32_eng.to_bits(),
+        decoded.poly_f64_eng.to_bits(),
+        "the same value through the integral and floating-point paths came out identical, \
+         so the emitter is using one path for both"
+    );
+    // Not wildly different, though: this is a last-bit disagreement, not a wrong answer.
+    let difference = (decoded.poly_u32_eng - decoded.poly_f64_eng).abs();
+    assert!(
+        difference / decoded.poly_u32_eng.abs() < 1e-15,
+        "the two paths differ by more than rounding: {difference}"
+    );
+}
+
+/// A calibrator on an enumeration or a boolean is ignored, because the reference ignores it.
+///
+/// XTCE looks both up from the *raw* value, and the interpreter returns before it consults a
+/// calibrator. `ENUM_CAL` and `BOOL_CAL` carry one anyway; a generator that helpfully applied
+/// it would turn `ARMED` into 1000.
+#[test]
+fn a_calibrator_on_an_enumeration_or_boolean_is_ignored() {
+    let mut packet = vec![0u8; 23];
+    packet[20] = 0x55;
+    // ENUM_CAL is bits 168..170 and BOOL_CAL is bit 170, so both live in byte 21.
+    packet[21] = 0b0110_0000; // ENUM_CAL = 1, BOOL_CAL = 1
+
+    let calibrators::Packet::Calibrated(decoded) =
+        calibrators::decode(&packet).expect("the packet decodes");
+
+    assert_eq!(decoded.enum_cal, 1);
+    assert_eq!(decoded.enum_cal_label(), Some("ARMED"));
+    assert!(decoded.bool_cal_value());
+
+    // The proof that nothing was applied: neither carries an engineering field at all. If the
+    // generator had compiled their calibrators, `enum_cal_eng` would exist and this would not
+    // compile.
+    let mut engineering = Vec::new();
+    decoded.for_each_value(|name, _, eng| engineering.push((name, format!("{eng:?}"))));
+    let labelled: Vec<&(&str, String)> = engineering
+        .iter()
+        .filter(|(name, _)| *name == "ENUM_CAL" || *name == "BOOL_CAL")
+        .collect();
+    assert_eq!(labelled.len(), 2);
+    assert!(labelled[0].1.contains("ARMED"), "{:?}", labelled[0]);
+    assert!(labelled[1].1.contains("true"), "{:?}", labelled[1]);
 }

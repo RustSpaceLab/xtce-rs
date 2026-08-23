@@ -245,6 +245,62 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — calibrators in the code generator
+
+`xtce-codegen` compiles `DefaultCalibrator` now, both kinds: `PolynomialCalibrator` and
+`SplineCalibrator` of order 0 or 1. Eleven of the twelve bundled definitions compile.
+
+**What the difficulty actually was.** Not the arithmetic — a polynomial is four lines. It is
+that the arithmetic has to be *the same* arithmetic. Floating-point addition is neither
+associative nor commutative, so summing the terms by Horner's method, or sorted by exponent,
+or in any order but the one the document lists them in, gives an answer that is right to
+fourteen digits and wrong in the last bit. `xtce-decode` accumulates in document order
+because the Python reference does; the emitter now does too, and the comparison is on
+`to_bits()`.
+
+The sharper edge is the power. The reference raises an *integral* raw value to its power in
+arbitrary-precision integers and converts to `f64` once; a *float* raw goes through repeated
+squaring, which rounds at every step. Those are different numbers. `integer_power` in the
+emitted code mirrors the first, falling back to `powi` when the exact route overflows an
+`i128`, and the path is chosen by the field's encoding — never by convenience.
+
+**A calibrator on an enumeration or a boolean is ignored, on purpose.** XTCE looks both up
+from the raw value and the interpreter returns before it consults a calibrator, so applying
+one would be a divergence dressed up as helpfulness. The plan attaches a calibrator only to a
+numeric field.
+
+**Refused by name:** `ContextCalibrator`, splines above first order, splines with no points.
+The first is a dependency graph — its criteria range over other parameters, which may
+themselves be calibrated — and nothing in reach uses one, so there would be nothing to check
+a guess against. The other two are properties of the definition, so they are settled while
+planning rather than failing once per packet. Only a query outside a non-extrapolating
+spline's points is a run-time error, and it has its own `DecodeError::Calibration`.
+
+**`testdata/spp/calibrators.xml` had to be written**, because no bundled mission definition
+has a calibrator at all — grepping all five returns nothing. Its centre is a pair of
+parameters carrying byte-for-byte identical polynomial terms over different encodings, one
+32-bit unsigned integer and one binary64. Fed the same number they must *disagree* in the
+last bit, and a generator that used one power routine for both would otherwise pass every
+test in this repository. A third parameter's fourth power overflows an `i128` above about
+3.6 thousand million, so random values exercise both branches of the fallback.
+
+The first draft of that file put the cubed term and a fifth-power term on the same parameter.
+It tested nothing: the fifth-power term is so much larger that it swallowed the last-bit
+difference the cubed one was there to expose. Splitting them into two parameters is what made
+the test discriminate — verified by mutating the emitter to widen integers and call `powi`,
+which the differential test then catches at packet 35 and the direct test catches outright.
+
+**Coverage:** 4352 generated packets per run, of which a few hundred are ones both
+implementations must refuse — two of the file's splines sit on a four-bit field wider than
+their points, so agreement has to include agreeing to fail, on the same packets. That is a
+case the existing comparison macro could not express, so the calibration test does its own
+loop.
+
+Still true, and worth repeating: nothing differentially tests `xtce-decode`'s calibration
+against Python, because there is no mission definition with a calibrator to run through both.
+The generated path is now pinned to the interpreted one bit for bit; the interpreted one is
+pinned to hand-computed values and an exhaustive unit test, not to the reference.
+
 ## 2026-08-22 — strings, binaries and variable width in the code generator
 
 The generator compiled numbers. Anything else — a string, a binary blob, a field whose width

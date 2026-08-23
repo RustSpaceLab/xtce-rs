@@ -119,7 +119,12 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | `BaseContainer` + `Comparison` / `ComparisonList` | Yes | inheritance chain flattened into one struct |
 | `ContainerRefEntry` | Yes | expanded inline |
 | `leastSignificantByteFirst` | Refused | |
-| Calibrators | Refused | the interpreter sums polynomial terms in document order with exact integer powers; until the emitted arithmetic is proved identical, compiling it risks a silent last-bit divergence |
+| `DefaultCalibrator` / `PolynomialCalibrator` | Yes | terms summed in document order; an integral raw value is raised to its power exactly in `i128` and converted once, a float raw by `powi` — the same two paths the interpreter takes |
+| `DefaultCalibrator` / `SplineCalibrator` | Yes | orders 0 and 1; out of range without extrapolation is `DecodeError::Calibration` |
+| A calibrator on an enumeration or a boolean | Ignored | XTCE looks both up from the *raw* value; the reference returns before it reaches a calibrator, so applying one would be wrong |
+| `ContextCalibrator` | Refused | selected by criteria over other parameters, which may themselves be calibrated — a dependency graph rather than an expression, and nothing in reach uses one |
+| A spline above first order, or with no points | Refused | settled while planning, not once per packet |
+| `MathOperationCalibrator`, `CustomAlgorithm` | Refused | |
 | `StringDataEncoding`, fixed size, byte-aligned | Yes | UTF-8 and US-ASCII; `TerminationChar` and `LeadingSize` delimiters; the string borrows the packet |
 | `BinaryDataEncoding`, fixed size, byte-aligned | Yes | borrows the packet |
 | Text or binary not on a byte boundary | Refused | borrowing is impossible, and copying would put an allocation on the hot path |
@@ -131,19 +136,31 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | `BooleanExpression` criteria | Refused | |
 | MIL-STD-1750A floats | Refused | |
 
-Ten of the eleven bundled definitions compile completely, including CTIM — 9493 parameters
+Eleven of the twelve bundled definitions compile completely, including CTIM — 9493 parameters
 and 38 concrete containers — and IDEX and SUDA, whose science packets carry a binary blob
 whose length comes from `PKT_LEN`. Each is checked against the interpreter on its real packet
 stream by `xtce-codegen-e2e`, and the interpreter is checked against `space_packet_parser`,
 so a generated decoder is held to the reference at one remove.
 
-`numeric_edges.xml` is the exception to "real samples only": it exists because the mission
-files between them contain one 32-bit float, no 16-bit float, and no numeric field spanning
-nine bytes, so several emitted paths had no differential coverage at all. It declares every
-numeric shape the emitter can produce, aligned and four bits off a byte boundary, and is
-compared over 2304 generated packets.
+Two definitions are the exception to "real samples only", both for the same reason: a path
+the emitter can produce that no mission file reaches.
 
-The eleventh, `contrived_inheritance_structure.xml`, is refused by name on its
+`numeric_edges.xml` exists because the mission files between them contain one 32-bit float,
+no 16-bit float, and no numeric field spanning nine bytes. It declares every numeric shape
+the emitter can produce, aligned and four bits off a byte boundary, and is compared over
+2304 generated packets.
+
+`calibrators.xml` exists because **no bundled mission definition has a calibrator at all** —
+so before it, neither the interpreted nor the generated calibration path had ever been
+compared against anything. It is built around the one difference that is easy to get wrong
+and hard to see: two parameters carry identical polynomial terms over different encodings,
+one integer and one binary64, and for about a quarter of 32-bit values the two must come out
+differing in the last bit. A generator that used one power routine for both would pass every
+other test in this repository. It is compared over 4352 generated packets, of which a few
+hundred are ones both implementations must *refuse* — a spline that may not extrapolate,
+asked for a point outside itself.
+
+The twelfth, `contrived_inheritance_structure.xml`, is refused by name on its
 `BooleanExpression`, and decodes fine through the interpreter.
 
 ## Python bindings

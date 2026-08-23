@@ -195,7 +195,7 @@ fn a_packet_of_another_type_is_refused() {
 /// Out-of-scope constructs must be refused by name, never silently interpreted.
 #[test]
 fn unsupported_constructs_are_named_not_ignored() {
-    // Ten of the eleven bundled definitions compile now; `xtce-codegen-e2e` checks each
+    // Eleven of the twelve bundled definitions compile now; `xtce-codegen-e2e` checks each
     // against the interpreter. This one still does not, and the point of the test is that it
     // says why rather than quietly producing a partial decoder.
     let cases = [("jpss/contrived_inheritance_structure.xml", None)];
@@ -283,7 +283,7 @@ fn constructs_outside_the_compilable_subset_are_refused() {
 
     let flag = r#"<IntegerParameterType name="F"><IntegerDataEncoding sizeInBits="4" encoding="unsigned"/></IntegerParameterType>"#;
 
-    let cases: [(&str, String, &str); 4] = [
+    let cases: [(&str, String, &str); 6] = [
         (
             // Three bits of padding put the string off a byte boundary, so it cannot be a
             // slice of the packet and copying it would mean allocating.
@@ -308,15 +308,37 @@ fn constructs_outside_the_compilable_subset_are_refused() {
             "StringDataEncoding",
         ),
         (
-            // A calibrator would change the value, and the emitted arithmetic has not been
-            // proved identical to the interpreter's.
-            "calibrated field",
+            // A context calibrator is chosen by criteria over other parameters, which may
+            // themselves be calibrated. That is a dependency graph, not an expression.
+            "context calibrator",
+            definition(
+                r#"<IntegerParameterType name="C"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"><ContextCalibratorList><ContextCalibrator><ContextMatch><Comparison parameterRef="A" value="1"/></ContextMatch><Calibrator><PolynomialCalibrator><Term coefficient="2.0" exponent="1"/></PolynomialCalibrator></Calibrator></ContextCalibrator></ContextCalibratorList></IntegerDataEncoding></IntegerParameterType>"#,
+                r#"<Parameter name="A" parameterTypeRef="C"/>"#,
+                r#"<ParameterRefEntry parameterRef="A"/>"#,
+            ),
+            "ContextCalibrator",
+        ),
+        (
+            // The interpreter supports orders 0 and 1 only, so anything above that would be
+            // a second implementation of a thing there is no reference for.
+            "spline above first order",
+            definition(
+                r#"<IntegerParameterType name="C"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"><DefaultCalibrator><SplineCalibrator order="2"><SplinePoint raw="0" calibrated="0"/><SplinePoint raw="1" calibrated="1"/></SplineCalibrator></DefaultCalibrator></IntegerDataEncoding></IntegerParameterType>"#,
+                r#"<Parameter name="A" parameterTypeRef="C"/>"#,
+                r#"<ParameterRefEntry parameterRef="A"/>"#,
+            ),
+            "SplineCalibrator",
+        ),
+        (
+            // A second control, and the one that would have failed before calibration
+            // landed: a default polynomial calibrator now compiles.
+            "polynomial calibrator",
             definition(
                 r#"<IntegerParameterType name="C"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"><DefaultCalibrator><PolynomialCalibrator><Term coefficient="2.0" exponent="1"/></PolynomialCalibrator></DefaultCalibrator></IntegerDataEncoding></IntegerParameterType>"#,
                 r#"<Parameter name="A" parameterTypeRef="C"/>"#,
                 r#"<ParameterRefEntry parameterRef="A"/>"#,
             ),
-            "Calibrator",
+            "",
         ),
         (
             // The control: two plain integers, one after the other. Without it the three

@@ -23,6 +23,10 @@ const CASES: &[(&str, &str, Option<&str>)] = &[
     // definitions between them have one 32-bit float and no 16-bit float, all byte-aligned,
     // so without this the half-float and nine-byte-span paths would go unchecked.
     ("numeric_edges", "numeric_edges.xml", Some("NumericEdges")),
+    // No bundled mission definition has a calibrator at all, so without this the whole
+    // calibration path — polynomial summation order, exact integer powers, spline
+    // interpolation — would be generated and never compared against anything.
+    ("calibrators", "calibrators.xml", Some("Calibrated")),
 ];
 
 fn main() {
