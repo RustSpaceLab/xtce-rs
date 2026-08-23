@@ -750,7 +750,7 @@ fn calibrate(field: &Field, raw: &TokenStream) -> TokenStream {
                 if integral {
                     quote! { sum += #coefficient * integer_power(base, #exponent); }
                 } else {
-                    quote! { sum += #coefficient * base.powi(#exponent); }
+                    quote! { sum += #coefficient * powi(base, #exponent); }
                 }
             });
             let base = if integral {
@@ -1472,6 +1472,9 @@ fn helpers(plan: &Plan) -> TokenStream {
             .filter_map(|f| f.calibration.as_ref())
     };
     let needs_power = calibrations().any(|c| matches!(c, Calibration::Polynomial(_)));
+    // Every polynomial needs it: the integral path falls back to it on overflow, and the
+    // float path is nothing else.
+    let needs_powi = needs_power;
     let needs_spline = calibrations().any(|c| matches!(c, Calibration::Spline(_)));
 
     let needs_cursor = plan.containers.iter().any(ContainerPlan::is_dynamic);
@@ -1501,6 +1504,7 @@ fn helpers(plan: &Plan) -> TokenStream {
     } else {
         quote!()
     };
+    let powi = if needs_powi { powi_helper() } else { quote!() };
     let spline = if needs_spline {
         spline_helpers()
     } else {
@@ -1513,6 +1517,7 @@ fn helpers(plan: &Plan) -> TokenStream {
         #text
         #terminated
         #leading
+        #powi
         #power
         #spline
     }
@@ -1528,15 +1533,45 @@ fn integer_power_helper() -> TokenStream {
     quote! {
         fn integer_power(base: i128, exponent: i32) -> f64 {
             if exponent < 0 {
-                return (base as f64).powi(exponent);
+                return powi(base as f64, exponent);
             }
             match u32::try_from(exponent)
                 .ok()
                 .and_then(|exponent| base.checked_pow(exponent))
             {
                 Some(exact) => exact as f64,
-                None => (base as f64).powi(exponent),
+                None => powi(base as f64, exponent),
             }
+        }
+    }
+}
+
+/// `f64::powi`, written out.
+///
+/// Not a nicety: `powi` lives in `std`, and this file names nothing outside `core` so that it
+/// can be included in a bare-metal build. The sequence below is the one `powi` performs —
+/// square and multiply, lowest bit first — so it is bit-identical, which matters because the
+/// interpreter this is compared against calls the real thing.
+fn powi_helper() -> TokenStream {
+    quote! {
+        fn powi(x: f64, exponent: i32) -> f64 {
+            // `unsigned_abs`, not negation: `-i32::MIN` overflows.
+            let mut remaining = exponent.unsigned_abs();
+            let mut result = 1.0f64;
+            let mut base = x;
+            let mut started = false;
+            while remaining > 0 {
+                if remaining & 1 == 1 {
+                    result = if started { result * base } else { base };
+                    started = true;
+                }
+                remaining >>= 1;
+                if remaining > 0 {
+                    base = base * base;
+                }
+            }
+            let value = if started { result } else { 1.0 };
+            if exponent < 0 { 1.0 / value } else { value }
         }
     }
 }

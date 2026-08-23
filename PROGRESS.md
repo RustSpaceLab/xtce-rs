@@ -290,6 +290,13 @@ difference the cubed one was there to expose. Splitting them into two parameters
 the test discriminate — verified by mutating the emitter to widen integers and call `powi`,
 which the differential test then catches at packet 35 and the direct test catches outright.
 
+**`powi` is in `std`.** The emitted file names nothing outside `core`, deliberately, so that
+it can be included in a bare-metal build — and the first version of the calibration emitter
+quietly broke that by calling `f64::powi`. Every test passed; the code would not have built
+for a Cortex-M. It is written out now, as the same square-and-multiply sequence `powi`
+performs, checked bit-identical over four million comparisons and pinned by the differential
+test, which compares against an interpreter that calls the real thing.
+
 **Coverage:** 4352 generated packets per run, of which a few hundred are ones both
 implementations must refuse — two of the file's splines sit on a four-bit field wider than
 their points, so agreement has to include agreeing to fail, on the same packets. That is a

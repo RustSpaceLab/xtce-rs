@@ -124,6 +124,7 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | A calibrator on an enumeration or a boolean | Ignored | XTCE looks both up from the *raw* value; the reference returns before it reaches a calibrator, so applying one would be wrong |
 | `ContextCalibrator` | Refused | selected by criteria over other parameters, which may themselves be calibrated — a dependency graph rather than an expression, and nothing in reach uses one |
 | A spline above first order, or with no points | Refused | settled while planning, not once per packet |
+| `powi` | Written out | it lives in `std`, and generated code names nothing outside `core`; the emitted sequence is bit-identical |
 | `MathOperationCalibrator`, `CustomAlgorithm` | Refused | |
 | `StringDataEncoding`, fixed size, byte-aligned | Yes | UTF-8 and US-ASCII; `TerminationChar` and `LeadingSize` delimiters; the string borrows the packet |
 | `BinaryDataEncoding`, fixed size, byte-aligned | Yes | borrows the packet |
