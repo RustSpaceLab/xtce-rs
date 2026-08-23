@@ -455,3 +455,102 @@ fn a_command_container_points_back_at_its_command() {
         .expect("the telemetry container");
     assert_eq!(db.container(report).expect("resolves").command, None);
 }
+
+/// An argument type may share a name with a telemetry parameter type, and they stay apart.
+///
+/// The schema keys these in two overlapping ways. One key covers `TelemetryMetaData`'s and
+/// `CommandMetaData`'s `<ParameterTypeSet>`s; another covers `CommandMetaData`'s
+/// `<ArgumentTypeSet>` and its `<ParameterTypeSet>`. An argument type and a *telemetry*
+/// parameter type are in no key together — so `U8` may be both, meaning two different things,
+/// and a loader that shared one index would reject a file the schema allows.
+#[test]
+fn an_argument_type_may_share_a_name_with_a_parameter_type() {
+    let db = load(
+        r#"    <ArgumentTypeSet>
+      <IntegerArgumentType name="U8"><IntegerDataEncoding sizeInBits="16" encoding="unsigned"/></IntegerArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <MetaCommand name="Cmd">
+        <ArgumentList><Argument name="A" argumentTypeRef="U8"/></ArgumentList>
+        <CommandContainer name="Packing">
+          <EntryList><ArgumentRefEntry argumentRef="A"/></EntryList>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>"#,
+    );
+
+    // The wrapper's telemetry half declares `U8` as eight bits; the command half as sixteen.
+    let argument = db.meta_commands()[0].arguments[0];
+    assert_eq!(
+        db.type_of(argument)
+            .and_then(xtce_model::ParameterType::fixed_size_in_bits),
+        Some(16),
+        "the argument took the argument type, not the telemetry one of the same name"
+    );
+
+    let telemetry = db.find_parameter("MODE").expect("the telemetry parameter");
+    assert_eq!(
+        db.type_of(telemetry)
+            .and_then(xtce_model::ParameterType::fixed_size_in_bits),
+        Some(8),
+        "and the telemetry parameter kept its own"
+    );
+}
+
+/// Two argument types of the same name are still a duplicate, as the schema requires.
+#[test]
+fn two_argument_types_of_the_same_name_are_refused() {
+    let error = refusal(
+        r#"    <ArgumentTypeSet>
+      <IntegerArgumentType name="A_T"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerArgumentType>
+      <IntegerArgumentType name="A_T"><IntegerDataEncoding sizeInBits="16" encoding="unsigned"/></IntegerArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <MetaCommand name="Cmd">
+        <ArgumentList><Argument name="A" argumentTypeRef="A_T"/></ArgumentList>
+        <CommandContainer name="Packing">
+          <EntryList><ArgumentRefEntry argumentRef="A"/></EntryList>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>"#,
+    );
+    assert!(
+        error.contains("duplicate") && error.contains("A_T"),
+        "unexpected error: {error}"
+    );
+}
+
+/// A command's own `<ParameterTypeSet>` is in both namespaces, so either reference finds it.
+#[test]
+fn a_command_parameter_type_is_reachable_from_both_kinds_of_reference() {
+    let db = load(
+        r#"    <ParameterTypeSet>
+      <IntegerParameterType name="SHARED"><IntegerDataEncoding sizeInBits="24" encoding="unsigned"/></IntegerParameterType>
+    </ParameterTypeSet>
+    <ParameterSet><Parameter name="SEQ" parameterTypeRef="SHARED"/></ParameterSet>
+    <MetaCommandSet>
+      <MetaCommand name="Cmd">
+        <ArgumentList><Argument name="A" argumentTypeRef="SHARED"/></ArgumentList>
+        <CommandContainer name="Packing">
+          <EntryList>
+            <ParameterRefEntry parameterRef="SEQ"/>
+            <ArgumentRefEntry argumentRef="A"/>
+          </EntryList>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>"#,
+    );
+
+    let argument = db.meta_commands()[0].arguments[0];
+    assert_eq!(
+        db.type_of(argument)
+            .and_then(xtce_model::ParameterType::fixed_size_in_bits),
+        Some(24)
+    );
+    let parameter = db.find_parameter("SEQ").expect("the command's parameter");
+    assert_eq!(
+        db.type_of(parameter)
+            .and_then(xtce_model::ParameterType::fixed_size_in_bits),
+        Some(24)
+    );
+}

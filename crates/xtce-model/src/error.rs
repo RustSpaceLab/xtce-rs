@@ -117,6 +117,12 @@ pub enum RefKind {
     Parameter,
     /// `parameterTypeRef`.
     ParameterType,
+    /// `argumentTypeRef`.
+    ///
+    /// A namespace of its own, because the schema's uniqueness keys make it one: an argument
+    /// type must not clash with a *command*'s parameter types, and may clash with the
+    /// telemetry ones.
+    ArgumentType,
     /// `containerRef`, `baseContainer`.
     Container,
     /// `metaCommandRef`.
@@ -128,6 +134,7 @@ impl fmt::Display for RefKind {
         f.write_str(match self {
             Self::Parameter => "parameter",
             Self::ParameterType => "parameter type",
+            Self::ArgumentType => "argument type",
             Self::Container => "container",
             Self::MetaCommand => "telecommand",
         })

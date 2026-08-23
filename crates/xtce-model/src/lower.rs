@@ -90,6 +90,14 @@ pub(crate) struct Lowering<'d> {
 
     type_by_qualified: FxHashMap<NameId, TypeId>,
     type_by_leaf: FxHashMap<NameId, TypeId>,
+    /// Argument types, and the command half's parameter types, which share one namespace.
+    ///
+    /// The schema keys these separately from the telemetry parameter types — an
+    /// `<IntegerArgumentType name="U8">` and an `<IntegerParameterType name="U8">` in the
+    /// telemetry half are two different definitions and a valid file may have both. Sharing
+    /// one index would reject it.
+    argument_type_by_qualified: FxHashMap<NameId, TypeId>,
+    argument_type_by_leaf: FxHashMap<NameId, TypeId>,
     param_by_qualified: FxHashMap<NameId, ParamId>,
     param_by_leaf: FxHashMap<NameId, ParamId>,
     container_by_qualified: FxHashMap<NameId, ContainerId>,
@@ -121,6 +129,8 @@ impl<'d> Lowering<'d> {
             fixed_values: Vec::new(),
             type_by_qualified: FxHashMap::default(),
             type_by_leaf: FxHashMap::default(),
+            argument_type_by_qualified: FxHashMap::default(),
+            argument_type_by_leaf: FxHashMap::default(),
             param_by_qualified: FxHashMap::default(),
             param_by_leaf: FxHashMap::default(),
             container_by_qualified: FxHashMap::default(),
@@ -264,11 +274,20 @@ impl<'d> Lowering<'d> {
         element: Element<'d>,
         space_system: SpaceSystemId,
     ) -> Result<(), XtceError> {
-        for set in [Tag::ParameterTypeSet, Tag::ArgumentTypeSet] {
-            if let Some(set) = element.child(set) {
-                for child in set.children() {
-                    self.register(child, space_system, Definition::Type)?;
-                }
+        // The schema keys these three sets in two overlapping ways: a command's parameter
+        // types must not clash with the telemetry ones, *and* must not clash with the
+        // argument types — but an argument type and a telemetry parameter type may share a
+        // name, and a valid file does. So a command's parameter types are registered in both
+        // namespaces and the argument types in only one.
+        if let Some(set) = element.child(Tag::ParameterTypeSet) {
+            for child in set.children() {
+                self.register(child, space_system, Definition::Type)?;
+                self.also_index_as_argument_type(child, space_system)?;
+            }
+        }
+        if let Some(set) = element.child(Tag::ArgumentTypeSet) {
+            for child in set.children() {
+                self.register(child, space_system, Definition::ArgumentType)?;
             }
         }
         if let Some(set) = element.child(Tag::ParameterSet) {
@@ -288,6 +307,43 @@ impl<'d> Lowering<'d> {
             for child in set.children_with(Tag::MetaCommand) {
                 self.register_meta_command(child, space_system)?;
             }
+        }
+        Ok(())
+    }
+
+    /// Indexes an already-registered type under the argument-type namespace as well.
+    ///
+    /// Only for a `<CommandMetaData><ParameterTypeSet>` entry, which both an
+    /// `argumentTypeRef` and a `parameterTypeRef` may name.
+    fn also_index_as_argument_type(
+        &mut self,
+        element: Element<'d>,
+        space_system: SpaceSystemId,
+    ) -> Result<(), XtceError> {
+        let Some(name) = element.attr(AttrKey::Name) else {
+            return Ok(());
+        };
+        let ss_path = self
+            .ss_paths
+            .get(space_system.index())
+            .map_or(String::new(), Clone::clone);
+        let qualified = format!("{ss_path}/{name}");
+        let Some(qualified_id) = self.interner.get(&qualified) else {
+            return Ok(());
+        };
+        let Some(&id) = self.type_by_qualified.get(&qualified_id) else {
+            return Ok(());
+        };
+        insert_unique(
+            &mut self.argument_type_by_qualified,
+            qualified_id,
+            id,
+            RefKind::ArgumentType,
+            &qualified,
+            &element,
+        )?;
+        if let Some(leaf_id) = self.interner.get(name) {
+            self.argument_type_by_leaf.entry(leaf_id).or_insert(id);
         }
         Ok(())
     }
@@ -448,18 +504,33 @@ impl<'d> Lowering<'d> {
         };
 
         match kind {
-            Definition::Type => {
+            Definition::Type | Definition::ArgumentType => {
                 let id = TypeId::new(u32::try_from(self.pending_types.len()).unwrap_or(u32::MAX));
                 self.pending_types.push(pending);
+                // Both namespaces live in one arena; only the indexes differ.
+                let argument = matches!(kind, Definition::ArgumentType);
+                let (by_qualified, by_leaf, ref_kind) = if argument {
+                    (
+                        &mut self.argument_type_by_qualified,
+                        &mut self.argument_type_by_leaf,
+                        RefKind::ArgumentType,
+                    )
+                } else {
+                    (
+                        &mut self.type_by_qualified,
+                        &mut self.type_by_leaf,
+                        RefKind::ParameterType,
+                    )
+                };
                 insert_unique(
-                    &mut self.type_by_qualified,
+                    by_qualified,
                     qualified_id,
                     id,
-                    RefKind::ParameterType,
+                    ref_kind,
                     qualified,
                     &element,
                 )?;
-                self.type_by_leaf.entry(leaf_id).or_insert(id);
+                by_leaf.entry(leaf_id).or_insert(id);
             }
             Definition::Parameter => {
                 let id = ParamId::new(u32::try_from(self.pending_params.len()).unwrap_or(u32::MAX));
@@ -1099,6 +1170,7 @@ impl<'d> Lowering<'d> {
             // `<Parameter parameterTypeRef=..>` and `<Argument argumentTypeRef=..>` are the
             // same thing named twice; an argument arrives here because arguments are lowered
             // as parameters.
+            let argument = element.tag() == Tag::Argument;
             let type_ref = element
                 .attr(AttrKey::ParameterTypeRef)
                 .or_else(|| element.attr(AttrKey::ArgumentTypeRef))
@@ -1106,10 +1178,15 @@ impl<'d> Lowering<'d> {
                     what: "parameterTypeRef attribute",
                     path: element.path(),
                 })?;
+            let kind = if argument {
+                RefKind::ArgumentType
+            } else {
+                RefKind::ParameterType
+            };
             let type_id = self
-                .resolve(type_ref, item.space_system, RefKind::ParameterType)
+                .resolve(type_ref, item.space_system, kind)
                 .ok_or_else(|| XtceError::UnresolvedReference {
-                    kind: RefKind::ParameterType,
+                    kind,
                     reference: type_ref.to_owned(),
                     path: element.path(),
                 })?;
@@ -1927,6 +2004,7 @@ impl<'d> Lowering<'d> {
         match kind {
             RefKind::Parameter => self.param_by_leaf.get(&leaf_id).map(|id| id.raw()),
             RefKind::ParameterType => self.type_by_leaf.get(&leaf_id).map(|id| id.raw()),
+            RefKind::ArgumentType => self.argument_type_by_leaf.get(&leaf_id).map(|id| id.raw()),
             RefKind::Container => self.container_by_leaf.get(&leaf_id).map(|id| id.raw()),
             RefKind::MetaCommand => self.command_by_leaf.get(&leaf_id).map(|id| id.raw()),
         }
@@ -1937,6 +2015,7 @@ impl<'d> Lowering<'d> {
         match kind {
             RefKind::Parameter => self.param_by_qualified.get(&id).map(|id| id.raw()),
             RefKind::ParameterType => self.type_by_qualified.get(&id).map(|id| id.raw()),
+            RefKind::ArgumentType => self.argument_type_by_qualified.get(&id).map(|id| id.raw()),
             RefKind::Container => self.container_by_qualified.get(&id).map(|id| id.raw()),
             RefKind::MetaCommand => self.command_by_qualified.get(&id).map(|id| id.raw()),
         }
@@ -1954,6 +2033,9 @@ impl<'d> Lowering<'d> {
 #[derive(Clone, Copy)]
 enum Definition {
     Type,
+    /// A type from an `<ArgumentTypeSet>`, or a command's `<ParameterTypeSet>`: the two share
+    /// a namespace with each other and not with the telemetry types.
+    ArgumentType,
     Parameter,
     Container,
 }

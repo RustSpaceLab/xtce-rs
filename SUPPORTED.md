@@ -43,6 +43,7 @@ case for commands.
 | `ParameterRefEntry` in a command container | Decodable | a command may name parameters as well as arguments |
 | `FixedValueEntry` | Decodable | the bits are stepped over and reported as nobody's value; see the divergence table |
 | `*ArgumentType` (integer, float, string, binary, boolean, enumerated, time, array, aggregate) | Decodable | the same types under a different name; `ValidRangeSet` is ignored, as ranges are everywhere here |
+| An argument type named like a telemetry parameter type | Decodable | a namespace of its own: the schema keys `ArgumentTypeSet` with the *command's* `ParameterTypeSet` and not with the telemetry one, so both may exist and mean different things |
 | `CommandContainerSet` | Decodable | shared containers, registered like telemetry ones |
 | `BlockMetaCommand` | Rejected | a sequence of commands, not a packet layout |
 | `VerifierSet`, `TransmissionConstraintList`, `Interlock`, `ParameterToSetList` | Rejected | operational behaviour, not packet layout |

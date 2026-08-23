@@ -8,6 +8,11 @@ nothing in reach uses.
 
 ## Where a next session should start
 
+0. **A real `<CommandMetaData>`.** Everything the command support claims is checked against a
+   purpose-built file and the schema, because no bundled definition has a command half and the
+   reference has no command support to compare against. The first real one this meets will
+   find something.
+
 1. **Localising a digest mismatch needs the goldens regenerated.** `cargo xtask diff` now
    tells you what to run when the digest differs but the detail window is clean — the window
    is 64 packets and a SHA-256 does not localise, so widening it and regenerating is the
@@ -45,8 +50,14 @@ nothing in reach uses.
 
 ## Things deliberately left undone
 
-* **`CommandMetaData`.** Out of scope by design, dropped during parsing, counted in
-  `skipped_sections()`.
+* **The rest of `CommandMetaData`.** The section is read as of 2026-08-23 — telecommands are
+  decoded and compiled — but only the packet layout: `MetaCommand`, `ArgumentList`,
+  `CommandContainer`, `ArgumentAssignment` and `FixedValueEntry`. `BlockMetaCommand`,
+  `VerifierSet`, `TransmissionConstraintList`, `Interlock` and `ParameterToSetList` describe
+  operational behaviour rather than bits, and are out of scope by design.
+* **An `ArgumentAssignment` on an enumerated argument.** `argumentValue` is a calibrated value,
+  so it compares labels, which the dispatcher does not — refused by name. It is the pattern
+  real command sets use most, and worth revisiting with a real database in hand.
 * **Publishing to crates.io.** `CONTRIBUTING.md` rule 7 forbids it without being asked. The names
   `xtce`, `xtce-model` and `xtce-decode` were free on crates.io as of writing.
 

@@ -38,9 +38,11 @@
   * SetGain's arguments are a byte and a float, so the two commands differ in length as well
     as in content.
 
-  The telemetry half is here for the collision it makes: MODE is both a telemetry parameter
-  and an argument of `SetMode`. They are different things, and a generator that let one shadow
-  the other would decode the wrong field.
+  The telemetry half is here for the collisions it makes. MODE is both a telemetry parameter
+  and an argument of `SetMode`; `TM_U8` is both a telemetry parameter type and an argument
+  type, with different widths. XTCE keys those namespaces apart — a file may have both, and
+  they mean different things — so a loader that shared one index would either reject this file
+  or decode the wrong width.
 -->
 <SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="Commands">
   <TelemetryMetaData>
@@ -74,11 +76,16 @@
     </ParameterSet>
 
     <ArgumentTypeSet>
+      <!--
+        Deliberately the same name as the telemetry parameter type above, and a different
+        width. The schema keys argument types apart from telemetry parameter types, so a valid
+        file may have both, and a loader sharing one index would reject this one.
+      -->
+      <IntegerArgumentType name="TM_U8">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned"/>
+      </IntegerArgumentType>
       <IntegerArgumentType name="U8_A">
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
-      </IntegerArgumentType>
-      <IntegerArgumentType name="U4_A">
-        <IntegerDataEncoding sizeInBits="4" encoding="unsigned"/>
       </IntegerArgumentType>
       <IntegerArgumentType name="S16_A">
         <IntegerDataEncoding sizeInBits="16" encoding="twosComplement"/>
@@ -109,8 +116,11 @@
           </ArgumentAssignmentList>
         </BaseMetaCommand>
         <ArgumentList>
-          <!-- Shares a name with the telemetry parameter, deliberately. -->
-          <Argument name="MODE" argumentTypeRef="U4_A"/>
+          <!--
+            Shares a name with the telemetry parameter, deliberately — and its type shares a
+            name with the telemetry parameter type, also deliberately.
+          -->
+          <Argument name="MODE" argumentTypeRef="TM_U8"/>
         </ArgumentList>
         <CommandContainer name="SetModeContainer">
           <EntryList>
