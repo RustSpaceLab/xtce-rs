@@ -835,3 +835,56 @@ fn an_unresolvable_reference_names_itself() {
         Ok(_) => panic!("a dangling reference must not load"),
     }
 }
+
+/// MIL-STD-1750A is a 32-bit format, and any other width is refused rather than truncated.
+///
+/// The reference raises when a definition says otherwise, and raises at *load*, so a file
+/// like this one does not open in Python at all. Here it opens — loading always succeeds, and
+/// only decoding reports what it cannot do — but the parameter reports rather than decoding
+/// the low 32 bits of a 48-bit field, which is a number nothing else would ever produce.
+#[test]
+fn a_mil_std_1750a_float_that_is_not_32_bits_is_refused() {
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="T">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <FloatParameterType name="WIDE_T">
+        <FloatDataEncoding sizeInBits="48" encoding="MILSTD_1750A"/>
+      </FloatParameterType>
+      <FloatParameterType name="OK_T">
+        <FloatDataEncoding sizeInBits="32" encoding="MILSTD_1750A"/>
+      </FloatParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="OK" parameterTypeRef="OK_T"/>
+      <Parameter name="WIDE" parameterTypeRef="WIDE_T"/>
+    </ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="Only">
+        <EntryList>
+          <ParameterRefEntry parameterRef="OK"/>
+          <ParameterRefEntry parameterRef="WIDE"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>"#;
+
+    let db = XtceDb::from_xml(xml).expect("the definition loads");
+    let decoder = Decoder::new(&db).expect("root container");
+    // 0x40000001 is 1.0 in MIL-STD-1750A, then six bytes for the 48-bit field.
+    let packet = [0x40, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0];
+    let mut decoded = decoder.new_packet(&packet);
+    let error = decoder
+        .decode_into(&mut decoded, &packet)
+        .expect_err("the 48-bit field cannot be decoded");
+    let message = error.to_string();
+    assert!(
+        message.contains("48 bits"),
+        "the refusal should say how wide: {message}"
+    );
+    assert!(
+        message.contains("MIL-STD-1750A"),
+        "and what it is: {message}"
+    );
+}

@@ -487,6 +487,18 @@ impl<'db> Decoder<'db> {
                             context: format!("{name}: IEEE-754 at {width} bits"),
                         })?
                     }
+                    // MIL-STD-1750A is a 32-bit format and nothing else. The reference
+                    // refuses to *load* a definition that says otherwise; this refuses to
+                    // decode one, which keeps the property that loading always succeeds and
+                    // only decoding reports. Truncating to 32 bits, which is what the
+                    // arithmetic below would otherwise do, would produce a number the
+                    // reference never would.
+                    FloatCoding::MilStd1750A if width != 32 => {
+                        return Err(DecodeError::Unsupported {
+                            element: "FloatDataEncoding".to_owned(),
+                            context: format!("{name}: MIL-STD-1750A at {width} bits, not 32"),
+                        });
+                    }
                     FloatCoding::MilStd1750A => mil_std_1750a(bits),
                 };
                 Ok(RawValue::Float(value))

@@ -30,7 +30,7 @@ make the differential tests impossible to run at all.
 | Element | Level | Note |
 |---|---|---|
 | `IntegerParameterType` | Decodable | `unsigned`, `twosComplement` (incl. the `twosCompliment` typo and informal `signed`), `signMagnitude`, `onesComplement`; 1–64 bits |
-| `FloatParameterType` | Decodable | IEEE-754 at 16, 32, 64 bits; MIL-STD-1750A at 32 bits |
+| `FloatParameterType` | Decodable | IEEE-754 at 16, 32, 64 bits; MIL-STD-1750A at 32 bits and no other width, which is what the format is |
 | `EnumeratedParameterType` | Decodable | full `EnumerationList` including `maxValue` ranges |
 | `BooleanParameterType` | Decodable | value is `bool` from the raw value; `zeroStringValue` / `oneStringValue` available via `XtceDb::boolean_label` |
 | `StringParameterType` | Decodable | fixed and variable raw size; `TerminationChar` and `LeadingSize` delimiters |

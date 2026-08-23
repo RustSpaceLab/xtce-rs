@@ -245,6 +245,27 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — a MIL-STD-1750A float of the wrong width
+
+`mil_std_1750a` takes `bits as u32`. For a field declared 32 bits wide, which is what the
+format is, that is exactly right. For any other width it silently truncates, and the value it
+returns is one nothing else would produce.
+
+The reference does not have this problem because it refuses the definition outright:
+`FloatDataEncoding` raises when `encoding == "MILSTD_1750A"` and `size_in_bits != 32`, at
+load. Here the file loads and the parameter decodes — to the low 32 bits of whatever it was.
+
+Refused at decode now, with the width named. Not at load, deliberately: this project's
+invariant is that loading always succeeds and only decoding reports what it cannot do, which
+is what `TypeKind::Unsupported` is built on, and matching Python's *timing* here would break
+it for nothing. The consequence is worth stating plainly — a definition with a 48-bit
+MIL-STD-1750A field does not open in Python at all and does open here, and then refuses that
+one parameter.
+
+Pre-existing, not introduced by any of this week's work. Found while reading the reference's
+implementation before compiling the format, which is the second time reading it has turned up
+something; the first was the sub-byte little-endian sign extension.
+
 ## 2026-08-23 — aggregates, and the expansion generalised
 
 `AggregateParameterType` decodes. Sixteen of sixteen bundled definitions compile, and there
