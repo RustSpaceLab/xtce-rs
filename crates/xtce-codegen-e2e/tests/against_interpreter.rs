@@ -944,7 +944,9 @@ fn context_calibrators_match_the_interpreter() {
     let mut compared = 0usize;
     let mut refused = 0usize;
     // Which branch of SENSOR's chain each packet took, so a stream that stopped reaching them
-    // is a failure rather than a quietly weaker test.
+    // is a failure rather than a quietly weaker test. MODE is an enumeration, and mode 3 is
+    // also the label SPLINE_CTX's context compares against — so this counts the label
+    // comparison too, by the raw value behind it.
     let mut modes = [0usize; 5];
 
     for (index, framed) in PacketIter::new(&stream, 0).enumerate() {

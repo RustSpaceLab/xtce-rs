@@ -8,8 +8,8 @@
  {
   "case": "context_calibrators",
   "packet_count": 512,
-  "load_seconds": 0.005157,
-  "parse_seconds": 0.19101
+  "load_seconds": 0.003902,
+  "parse_seconds": 0.039636
  },
  {
   "case": "ctim",

@@ -56,7 +56,7 @@ the real mission files never reach, and so would never be compared against anyth
 | `arrays.xml` | **no mission file has an `<ArrayParameterType>`**, and neither does the reference: it raises `NotImplementedError` and calls the feature roadmap |
 | `aggregates.xml` | the same for `<AggregateParameterType>`, plus the two nested in each other, which is where the naming can go wrong |
 | `mil_1750a.xml` + `mil_1750a_stream.bin` | **no mission file uses MIL-STD-1750A** — but the reference implements it, so this one is a golden case like the six real ones |
-| `context_calibrators.xml` + `context_calibrators_stream.bin` | **no mission file has a `<ContextCalibratorList>`** — the reference implements one, so this is a golden case too, and the only stream whose bytes are shaped so that the criteria actually fire |
+| `context_calibrators.xml` + `context_calibrators_stream.bin` | **no mission file has a `<ContextCalibratorList>`** — the reference implements one, so this is a golden case too, and the only stream whose bytes are shaped so that the criteria actually fire. One of its contexts is selected by an enumeration's *label*, which makes it the only place a criterion comparing a string is checked against Python rather than against the interpreter alone |
 | `commands.xml` | **no mission file has a `<CommandMetaData>` section**, and the reference has no command support of any kind — not even a `NotImplementedError`: the string does not appear in its source, and a definition carrying one loads with the command half silently ignored |
 
 `byte_order_stream.bin`, `mil_1750a_stream.bin` and `context_calibrators_stream.bin` are the

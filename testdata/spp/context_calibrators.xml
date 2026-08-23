@@ -23,7 +23,10 @@
   * LOOKAHEAD's context names LATER, which is decoded *after* it. Also not present yet, so it
     compares LOOKAHEAD's own raw value — not LATER's. That is surprising, it is what both
     implementations do, and it is here so that it stays that way rather than drifting.
-  * SPLINE_CTX's context selects a spline rather than a polynomial.
+  * SPLINE_CTX's context selects a spline rather than a polynomial, and selects it by MODE's
+    *label* rather than by its number — the only place in this repository where a criterion
+    compares a string and the answer is checked against Python rather than against the
+    interpreter alone.
   * PLAIN is the control: an uncalibrated field, so a generator that calibrated everything is
     caught.
 
@@ -56,6 +59,22 @@
       <IntegerParameterType name="U8">
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
       </IntegerParameterType>
+
+      <!--
+        MODE is an enumeration so that one context can be selected by a *label* rather than by
+        a number. The stream draws it from 0 to 4 and every one of those has a label, so no
+        packet carries a value the enumeration cannot name.
+      -->
+      <EnumeratedParameterType name="MODE_T">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+        <EnumerationList>
+          <Enumeration value="0" label="IDLE"/>
+          <Enumeration value="1" label="WARMUP"/>
+          <Enumeration value="2" label="RUNNING"/>
+          <Enumeration value="3" label="CALIBRATE"/>
+          <Enumeration value="4" label="SAFE"/>
+        </EnumerationList>
+      </EnumeratedParameterType>
 
       <!-- Two contexts on a preceding field, and a default behind them. -->
       <IntegerParameterType name="SENSOR_T">
@@ -145,7 +164,15 @@
           <ContextCalibratorList>
             <ContextCalibrator>
               <ContextMatch>
-                <Comparison parameterRef="MODE" value="3" useCalibratedValue="false"/>
+                <!--
+                  A label, with `useCalibratedValue` left at its default of true: what is
+                  compared is the engineering value, and an enumeration's engineering value is
+                  a string. The reference compares it as one; this side resolves the labels
+                  satisfying the comparison to raw values when the code is generated. Both
+                  answers are in the golden, so the resolution is pinned to Python and not
+                  only to the interpreter.
+                -->
+                <Comparison parameterRef="MODE" value="CALIBRATE"/>
               </ContextMatch>
               <Calibrator>
                 <SplineCalibrator order="1" extrapolate="true">
@@ -174,7 +201,7 @@
       <Parameter name="SEQ_CTR" parameterTypeRef="U14"/>
       <Parameter name="PKT_LEN" parameterTypeRef="U16"/>
 
-      <Parameter name="MODE" parameterTypeRef="U8"/>
+      <Parameter name="MODE" parameterTypeRef="MODE_T"/>
       <Parameter name="SENSOR" parameterTypeRef="SENSOR_T"/>
       <Parameter name="SELF" parameterTypeRef="SELF_T"/>
       <Parameter name="LOOKAHEAD" parameterTypeRef="LOOKAHEAD_T"/>

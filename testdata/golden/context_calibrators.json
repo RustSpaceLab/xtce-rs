@@ -17,7 +17,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -83,7 +83,7 @@
    ],
    "MODE": [
     3,
-    3
+    "CALIBRATE"
    ],
    "PKT_APID": [
     300,
@@ -149,7 +149,7 @@
    ],
    "MODE": [
     2,
-    2
+    "RUNNING"
    ],
    "PKT_APID": [
     300,
@@ -218,7 +218,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -284,7 +284,7 @@
    ],
    "MODE": [
     2,
-    2
+    "RUNNING"
    ],
    "PKT_APID": [
     300,
@@ -350,7 +350,7 @@
    ],
    "MODE": [
     2,
-    2
+    "RUNNING"
    ],
    "PKT_APID": [
     300,
@@ -419,7 +419,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -485,7 +485,7 @@
    ],
    "MODE": [
     3,
-    3
+    "CALIBRATE"
    ],
    "PKT_APID": [
     300,
@@ -551,7 +551,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -620,7 +620,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -686,7 +686,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -752,7 +752,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -821,7 +821,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -887,7 +887,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -953,7 +953,7 @@
    ],
    "MODE": [
     3,
-    3
+    "CALIBRATE"
    ],
    "PKT_APID": [
     300,
@@ -1022,7 +1022,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -1088,7 +1088,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -1154,7 +1154,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -1223,7 +1223,7 @@
    ],
    "MODE": [
     3,
-    3
+    "CALIBRATE"
    ],
    "PKT_APID": [
     300,
@@ -1289,7 +1289,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -1355,7 +1355,7 @@
    ],
    "MODE": [
     2,
-    2
+    "RUNNING"
    ],
    "PKT_APID": [
     300,
@@ -1424,7 +1424,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -1490,7 +1490,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -1556,7 +1556,7 @@
    ],
    "MODE": [
     3,
-    3
+    "CALIBRATE"
    ],
    "PKT_APID": [
     300,
@@ -1625,7 +1625,7 @@
    ],
    "MODE": [
     3,
-    3
+    "CALIBRATE"
    ],
    "PKT_APID": [
     300,
@@ -1691,7 +1691,7 @@
    ],
    "MODE": [
     2,
-    2
+    "RUNNING"
    ],
    "PKT_APID": [
     300,
@@ -1757,7 +1757,7 @@
    ],
    "MODE": [
     3,
-    3
+    "CALIBRATE"
    ],
    "PKT_APID": [
     300,
@@ -1826,7 +1826,7 @@
    ],
    "MODE": [
     3,
-    3
+    "CALIBRATE"
    ],
    "PKT_APID": [
     300,
@@ -1892,7 +1892,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -1958,7 +1958,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -2027,7 +2027,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -2093,7 +2093,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -2159,7 +2159,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -2228,7 +2228,7 @@
    ],
    "MODE": [
     2,
-    2
+    "RUNNING"
    ],
    "PKT_APID": [
     300,
@@ -2294,7 +2294,7 @@
    ],
    "MODE": [
     2,
-    2
+    "RUNNING"
    ],
    "PKT_APID": [
     300,
@@ -2360,7 +2360,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -2429,7 +2429,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -2495,7 +2495,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -2561,7 +2561,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -2630,7 +2630,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -2696,7 +2696,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -2762,7 +2762,7 @@
    ],
    "MODE": [
     2,
-    2
+    "RUNNING"
    ],
    "PKT_APID": [
     300,
@@ -2831,7 +2831,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -2897,7 +2897,7 @@
    ],
    "MODE": [
     0,
-    0
+    "IDLE"
    ],
    "PKT_APID": [
     300,
@@ -2963,7 +2963,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -3032,7 +3032,7 @@
    ],
    "MODE": [
     1,
-    1
+    "WARMUP"
    ],
    "PKT_APID": [
     300,
@@ -3098,7 +3098,7 @@
    ],
    "MODE": [
     4,
-    4
+    "SAFE"
    ],
    "PKT_APID": [
     300,
@@ -3164,7 +3164,7 @@
    ],
    "MODE": [
     3,
-    3
+    "CALIBRATE"
    ],
    "PKT_APID": [
     300,
@@ -3219,20 +3219,20 @@
   }
  ],
  "detail_count": 64,
- "digest_sha256": "d27ae453423e7d1d9e830124df5f6f4770d97b3dad57651abe736371302ba5ca",
+ "digest_sha256": "28512348c2bddb0cb01f24cae5268499b0255878928a6bcab78bc3a469546887",
  "packet_count": 512,
  "packets": "context_calibrators_stream.bin",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.005157,
-  "parse_seconds": 0.19101
+  "load_seconds": 0.003902,
+  "parse_seconds": 0.039636
  },
  "root_container": null,
  "skip_header_bytes": 0,
  "unrecognized_count": 128,
  "window_digests": [
-  "11ac20369a810dd0d06d9bee49c3fc59ba76f32513f06ebc8a5fe8ebdf4c0198",
-  "8d31d6fe337baca98dfbeb76eab62126aae41f6de06454aefef8e2bbe1f572b7"
+  "5c409097dee94f23025804a73b0b36c56a145f1d2017ad0ca0e231cfc5c65576",
+  "bc1125905963b77ed0f52d4ae63f35f5613b08afefa6a48bbcc29234dcedf15a"
  ],
  "window_size": 256,
  "xtce": "context_calibrators.xml"
