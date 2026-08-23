@@ -428,7 +428,7 @@ fn field_initialisers(field: &Field, packet: &Ident) -> Vec<TokenStream> {
         // The raw value is read a second time rather than referred to: these are struct
         // initialisers, so the first one is not a binding anything else can name.
         let raw = read_field(field, packet);
-        let calibrated = calibrate(field, &quote!(__raw));
+        let calibrated = calibrate(field, &quote!(__raw), packet);
         out.push(quote! {
             #eng_name: { let __raw = #raw; #calibrated },
         });
@@ -559,7 +559,7 @@ fn decode_body(plan: &ContainerPlan) -> TokenStream {
         // Calibration reads the binding above, so it goes after both branches rather than
         // being duplicated into each.
         if let Some(eng_name) = eng_name {
-            let calibrated = calibrate(field, &quote!(#name));
+            let calibrated = calibrate(field, &quote!(#name), &packet);
             statements.push(quote! { let #eng_name: f64 = #calibrated; });
             names.push(quote! { #eng_name });
         }
@@ -744,10 +744,33 @@ fn accessor(field: &Field) -> Option<TokenStream> {
 ///   integers; for a float raw it is `powi`, which rounds at every multiply. The same number
 ///   through the two paths gives different bits, so the path is chosen by the field's
 ///   encoding and never by convenience.
-fn calibrate(field: &Field, raw: &TokenStream) -> TokenStream {
+fn calibrate(field: &Field, raw: &TokenStream, packet: &Ident) -> TokenStream {
     let Some(calibration) = &field.calibration else {
         return quote!(0.0f64);
     };
+
+    // A `<ContextCalibratorList>` is tried in order and the first whose criteria all hold
+    // wins; the default is what applies when none does. The plan refuses a list without a
+    // default, so the chain always ends in one and the value always has a type.
+    if !field.contexts.is_empty() {
+        let default = apply_calibration(field, calibration, raw);
+        // Built from the back so the tail is spliced without braces: an `else` followed by
+        // another `if` is `else if`, and a chain of five contexts nested five blocks deep is
+        // not something anyone should have to read in an audit.
+        let mut chain = quote! { { #default } };
+        for context in field.contexts.iter().rev() {
+            let condition = criterion_condition(&context.criteria, packet);
+            let applied = apply_calibration(field, &context.calibration, raw);
+            chain = quote! { if #condition { #applied } else #chain };
+        }
+        return chain;
+    }
+
+    apply_calibration(field, calibration, raw)
+}
+
+/// One calibrator, applied to a raw value.
+fn apply_calibration(field: &Field, calibration: &Calibration, raw: &TokenStream) -> TokenStream {
     let integral = matches!(field.repr, Repr::Unsigned | Repr::Signed(_));
     let xtce_name = &field.xtce_name;
 
@@ -1402,7 +1425,7 @@ fn descend(plan: &Plan, node: &Node) -> TokenStream {
         .enumerate()
         .map(|(index, (guards, _))| {
             let index = Literal::usize_unsuffixed(index);
-            let condition = criterion_condition(guards);
+            let condition = criterion_condition(guards, &ident("head"));
             quote! {
                 if #condition {
                     matched += 1;
@@ -1438,25 +1461,25 @@ fn descend(plan: &Plan, node: &Node) -> TokenStream {
 /// A conjunction of comparisons was all this ever had to be until `<BooleanExpression>`
 /// arrived; `<ORedConditions>` nests, so it is a tree now. Empty nodes keep the
 /// interpreter's answers: `all([])` is true and `any([])` is false.
-fn criterion_condition(criterion: &Criterion) -> TokenStream {
+fn criterion_condition(criterion: &Criterion, packet: &Ident) -> TokenStream {
     match criterion {
-        Criterion::Test(guard) => guard_test(guard),
+        Criterion::Test(guard) => guard_test(guard, packet),
         Criterion::All(children) if children.is_empty() => quote!(true),
         Criterion::Any(children) if children.is_empty() => quote!(false),
         Criterion::All(children) => {
-            let tests = children.iter().map(nested_condition);
+            let tests = children.iter().map(|child| nested_condition(child, packet));
             quote! { #(#tests)&&* }
         }
         Criterion::Any(children) => {
-            let tests = children.iter().map(nested_condition);
+            let tests = children.iter().map(|child| nested_condition(child, packet));
             quote! { #(#tests)||* }
         }
     }
 }
 
 /// The same, parenthesised where the precedence of `&&` over `||` would otherwise decide it.
-fn nested_condition(criterion: &Criterion) -> TokenStream {
-    let condition = criterion_condition(criterion);
+fn nested_condition(criterion: &Criterion, packet: &Ident) -> TokenStream {
+    let condition = criterion_condition(criterion, packet);
     match criterion {
         // A comparison is already tighter than either connective.
         Criterion::Test(_) => condition,
@@ -1465,13 +1488,12 @@ fn nested_condition(criterion: &Criterion) -> TokenStream {
     }
 }
 
-fn guard_test(guard: &Guard) -> TokenStream {
-    let head = ident("head");
-    let raw = read_bits(guard.bit_offset, guard.bit_width, &head);
+fn guard_test(guard: &Guard, head: &Ident) -> TokenStream {
+    let raw = read_bits(guard.bit_offset, guard.bit_width, head);
     // A criterion on a little-endian field tests the swapped value, because that is the
     // value the interpreter compares.
     let raw = if guard.swap_bytes {
-        swap_bytes_of(raw, guard.bit_offset, guard.bit_width, &head)
+        swap_bytes_of(raw, guard.bit_offset, guard.bit_width, head)
     } else {
         raw
     };
@@ -1598,11 +1620,18 @@ fn helpers(plan: &Plan) -> TokenStream {
         )
     });
 
+    // Every calibrator a field can reach, not only its default: a spline used solely by a
+    // context still needs its helper emitted, and the compiler is the only thing that would
+    // have said so.
     let calibrations = || {
         plan.containers
             .iter()
             .flat_map(|c| &c.fields)
-            .filter_map(|f| f.calibration.as_ref())
+            .flat_map(|f| {
+                f.calibration
+                    .iter()
+                    .chain(f.contexts.iter().map(|context| &context.calibration))
+            })
     };
     let needs_power = calibrations().any(|c| matches!(c, Calibration::Polynomial(_)));
     // Every polynomial needs it: the integral path falls back to it on overflow, and the

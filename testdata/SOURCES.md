@@ -44,7 +44,7 @@ text are retained, which `testdata/spp/LICENSE.txt` does.
 
 ### Written for this project
 
-Seven files here are not vendored. All exist for the same reason: an implementation path that
+Nine files here are not vendored. All exist for the same reason: an implementation path that
 the real mission files never reach, and so would never be compared against anything.
 
 | File | Why |
@@ -56,14 +56,15 @@ the real mission files never reach, and so would never be compared against anyth
 | `arrays.xml` | **no mission file has an `<ArrayParameterType>`**, and neither does the reference: it raises `NotImplementedError` and calls the feature roadmap |
 | `aggregates.xml` | the same for `<AggregateParameterType>`, plus the two nested in each other, which is where the naming can go wrong |
 | `mil_1750a.xml` + `mil_1750a_stream.bin` | **no mission file uses MIL-STD-1750A** — but the reference implements it, so this one is a golden case like the six real ones |
+| `context_calibrators.xml` + `context_calibrators_stream.bin` | **no mission file has a `<ContextCalibratorList>`** — the reference implements one, so this is a golden case too, and the only stream whose bytes are shaped so that the criteria actually fire |
 
-`byte_order_stream.bin` and `mil_1750a_stream.bin` are the only packet streams here that were
-not flown. It is written by
+`byte_order_stream.bin`, `mil_1750a_stream.bin` and `context_calibrators_stream.bin` are the
+only packet streams here that were not flown. It is written by
 `tools/gen_byte_order_stream.py` from a fixed seed, so regenerating it produces the same file
-and the golden taken over it stays meaningful. Both are golden cases like the six real ones, which makes little-endian and MIL-STD-1750A the
-only two features whose interpreted paths are checked against `space_packet_parser` directly.
-Little-endian found two divergences the first time it ran; MIL-STD-1750A matched. See
-`SUPPORTED.md`.
+and the golden taken over it stays meaningful. All three are golden cases like the six real ones, which makes little-endian, MIL-STD-1750A
+and context calibration the only features whose interpreted paths are checked against
+`space_packet_parser` directly. Little-endian found two divergences the first time it ran; the
+other two matched. See `SUPPORTED.md`.
 
 Neither is a substitute for a real sample; they are a supplement to one. `calibrators.xml` in
 particular is built around a difference that only shows up in the last bit: the reference

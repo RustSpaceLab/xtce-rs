@@ -47,10 +47,6 @@ nothing in reach uses.
 
 * **`CommandMetaData`.** Out of scope by design, dropped during parsing, counted in
   `skipped_sections()`.
-* **`ContextCalibrator` in `xtce-codegen`.** The interpreter evaluates one; the generator
-  refuses it by name. Its criteria range over other parameters, which may themselves be
-  calibrated and may sit later in the container, so compiling it means resolving a dependency
-  graph. No definition in reach uses one, so there is nothing to validate a guess against.
 * **Publishing to crates.io.** `CONTRIBUTING.md` rule 7 forbids it without being asked. The names
   `xtce`, `xtce-model` and `xtce-decode` were free on crates.io as of writing.
 

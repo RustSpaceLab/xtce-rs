@@ -130,7 +130,10 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | A criterion asking for the calibrated value of a calibrated parameter | Refused | the interpreter compares a float there, and the dispatcher runs before anything is decoded |
 | A criterion asking for the calibrated value of a boolean | Refused | its engineering value is 0 or 1, not its raw bits |
 | A calibrator on an enumeration or a boolean | Ignored | XTCE looks both up from the *raw* value; the reference returns before it reaches a calibrator, so applying one would be wrong |
-| `ContextCalibrator` | Refused | selected by criteria over other parameters, which may themselves be calibrated — a dependency graph rather than an expression, and nothing in reach uses one |
+| `ContextCalibrator` | Yes | tried in order, first match wins; a criterion naming a parameter not yet decoded resolves to the value being calibrated, as the reference does |
+| A `ContextCalibratorList` with no `DefaultCalibrator` | Refused | nothing applies when no context matches and the reference then reports the *raw* value, so the engineering value's type would depend on the packet |
+| `useCalibratedValue` on a criterion naming the field being calibrated | Refused | the value has not been calibrated — that is what is being decided — and the reference quietly compares the raw one instead |
+| A `ContextCalibrator` selected by a `BooleanExpression` | Refused | only a `Comparison` or `ComparisonList` is compiled there |
 | A spline above first order, or with no points | Refused | settled while planning, not once per packet |
 | `powi` | Written out | it lives in `std`, and generated code names nothing outside `core`; the emitted sequence is bit-identical |
 | `MathOperationCalibrator`, `CustomAlgorithm` | Refused | |
@@ -152,7 +155,7 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | MIL-STD-1750A floats, 32 bits | Yes | a 24-bit two's-complement mantissa and an 8-bit two's-complement exponent, neither biased; `mantissa * 2 ** (exponent - 23)` |
 | MIL-STD-1750A at any other width | Refused | the format has no other width, and the reference refuses to load one |
 
-Every one of the seventeen bundled definitions compiles, including CTIM — 9493 parameters
+Every one of the eighteen bundled definitions compiles, including CTIM — 9493 parameters
 and 38 concrete containers — and IDEX and SUDA, whose science packets carry a binary blob
 whose length comes from `PKT_LEN`. Each is checked against the interpreter on its real packet
 stream by `xtce-codegen-e2e`, and the interpreter is checked against `space_packet_parser`,
@@ -186,6 +189,15 @@ of equal-width members, a transposed or reordered expansion produces the same fi
 same bits. The differential test cannot see either, because both implementations read the same
 expansion — so the names are checked against the XTCE text separately, and both checks were
 confirmed by mutating the expansion until they failed.
+
+`context_calibrators.xml` is the eighth, and the third with a packet stream and a golden. It
+is also the only stream here whose bytes are *shaped* rather than arbitrary, and the reason is
+worth stating: a context is chosen by a comparison, and a comparison against a uniformly
+random field almost never holds. `MODE == 1` over a random byte is one packet in 256, so five
+hundred packets would take each branch twice and the default four hundred and ninety times.
+The fields the criteria test are drawn from small ranges so that every branch is taken tens of
+times, and the test asserts they still are. Everything not named in a criterion stays
+arbitrary.
 
 `mil_1750a.xml` is the seventh, and the second with a packet stream and a golden of its own —
 the reference implements MIL-STD-1750A, so unlike arrays and aggregates this one can be pinned

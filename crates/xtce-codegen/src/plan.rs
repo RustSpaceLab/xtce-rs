@@ -134,6 +134,18 @@ pub enum Calibration {
     Spline(Spline),
 }
 
+/// One `<ContextCalibrator>`: a calibrator and the criteria that select it.
+#[derive(Clone, Debug)]
+pub struct ContextCalibration {
+    /// All of these must hold. Their operands are resolved against the fields decoded
+    /// *before* this one; a criterion naming anything else compares the value being decoded,
+    /// which is what the reference does when a parameter "does not appear in the parsed data
+    /// so far".
+    pub criteria: Criterion,
+    /// The calibrator to apply when they do.
+    pub calibration: Calibration,
+}
+
 /// One decoded field in a flattened container.
 #[derive(Clone, Debug)]
 pub struct Field {
@@ -153,6 +165,13 @@ pub struct Field {
     /// Same reason as `raw_ident`: a calibrated parameter also has two values, and the
     /// reference reports both.
     pub eng_ident: Option<String>,
+    /// Calibrators tried in order before the default, each with the criteria that select it.
+    ///
+    /// Empty unless the definition has a `<ContextCalibratorList>`. When it does,
+    /// [`Field::calibration`] is the fallback and is always present: a context list with no
+    /// default would make the engineering value's *type* depend on the packet — a float when
+    /// something matched and the raw integer when nothing did — and that is refused.
+    pub contexts: Vec<ContextCalibration>,
     /// The calibrator applied to this field's raw value, when one is.
     ///
     /// Only ever set for a numeric field. An enumeration, a boolean and a string are all
@@ -570,12 +589,40 @@ impl<'db> Builder<'db> {
             ));
         }
 
+        // The criteria of a context calibrator are resolved against the fields decoded
+        // before this one — and, when they name anything else, against this one. So the
+        // current field has to be describable as a guard before it exists as a field.
+        let contexts = match (bit_offset, width.fixed()) {
+            (Some(offset), Some(bits)) => {
+                let current = Guard {
+                    xtce_name: xtce_name.clone(),
+                    bit_offset: offset,
+                    bit_width: bits,
+                    repr: repr.clone(),
+                    swap_bytes,
+                    operator: CompareOp::Equal,
+                    value: 0,
+                };
+                Self::contexts_for(ty, preceding, &current, calibration.as_ref(), &refuse)?
+            }
+            _ if ty.encoding.context_calibrators().is_empty() => Vec::new(),
+            // Past a data-dependent width there are no literal offsets to compare against.
+            _ => {
+                return Err(refuse(
+                    "ContextCalibrator",
+                    "a context calibrator on a field whose offset is not known when the code \
+                     is generated cannot have its criteria compiled",
+                ));
+            }
+        };
+
         Ok(Field {
             parameter,
             ident: field_ident(&xtce_name),
             raw_ident: None,
             eng_ident: None,
             calibration,
+            contexts,
             xtce_name,
             bit_offset,
             width,
@@ -612,18 +659,6 @@ impl<'db> Builder<'db> {
             return Ok(None);
         }
 
-        if !ty.encoding.context_calibrators().is_empty() {
-            // A context calibrator is chosen by criteria over other parameters, which may
-            // themselves be calibrated and may name a parameter this container decodes after
-            // the one being calibrated. That is a dependency graph, not an expression, and
-            // nothing in reach uses one — so it is refused by name rather than guessed at.
-            return Err(refuse(
-                "ContextCalibrator",
-                "a calibrator selected by criteria over other parameters is not compiled; \
-                 only a DefaultCalibrator is",
-            ));
-        }
-
         let Some(calibrator) = ty.encoding.default_calibrator() else {
             return Ok(None);
         };
@@ -653,6 +688,197 @@ impl<'db> Builder<'db> {
                 "calibrator kind is outside the subset",
             )),
         }
+    }
+
+    /// The `<ContextCalibratorList>`, with its criteria resolved to fields.
+    ///
+    /// A context criterion names a parameter, and the reference resolves it against what has
+    /// been decoded so far: "If the parameter to compare is not present in the parsed data
+    /// dict, we assume that we are comparing against the current raw value." So the
+    /// resolution rule is entirely positional — a preceding field of this container, or else
+    /// the field being calibrated — and needs no dependency graph, which is what stopped this
+    /// being compiled before.
+    fn contexts_for(
+        ty: &xtce_model::ParameterType,
+        preceding: &[Field],
+        current: &Guard,
+        default: Option<&Calibration>,
+        refuse: &impl Fn(&str, &'static str) -> CodegenError,
+    ) -> Result<Vec<ContextCalibration>, CodegenError> {
+        let list = ty.encoding.context_calibrators();
+        if list.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Without a default, nothing applies when no context matches, and the reference then
+        // reports the *raw* value — an integer where a match would have given a float. One
+        // struct field cannot be both, which is the same reason a number's width cannot come
+        // from the packet.
+        if default.is_none() {
+            return Err(refuse(
+                "ContextCalibratorList",
+                "a context list with no DefaultCalibrator makes the engineering value a \
+                 float when something matches and an integer when nothing does, and a \
+                 generated field has one type",
+            ));
+        }
+
+        let mut out = Vec::with_capacity(list.len());
+        for context in list {
+            let mut criteria = Vec::with_capacity(context.criteria.len());
+            for criterion in &context.criteria {
+                criteria.push(Self::context_criterion(
+                    criterion, preceding, current, refuse,
+                )?);
+            }
+            let calibration = match &context.calibrator {
+                Calibrator::Polynomial(terms) => Calibration::Polynomial(terms.clone()),
+                Calibrator::Spline(spline) => {
+                    if spline.order > 1 || spline.points.is_empty() {
+                        return Err(refuse(
+                            "SplineCalibrator",
+                            "only spline orders 0 and 1 with at least one point are compiled",
+                        ));
+                    }
+                    Calibration::Spline(spline.clone())
+                }
+                Calibrator::Unsupported { .. } => {
+                    return Err(refuse(
+                        "Calibrator",
+                        "calibrator kind is outside the subset",
+                    ));
+                }
+            };
+            out.push(ContextCalibration {
+                criteria: Criterion::All(criteria).simplified(),
+                calibration,
+            });
+        }
+        Ok(out)
+    }
+
+    /// One `<ContextMatch>` child, as a criterion over fields this container has decoded.
+    fn context_criterion(
+        criterion: &MatchCriteria,
+        preceding: &[Field],
+        current: &Guard,
+        refuse: &impl Fn(&str, &'static str) -> CodegenError,
+    ) -> Result<Criterion, CodegenError> {
+        match criterion {
+            MatchCriteria::Comparison(comparison) => Ok(Criterion::Test(Self::context_guard(
+                preceding,
+                current,
+                comparison.parameter,
+                comparison.use_calibrated,
+                comparison.operator,
+                &comparison.value,
+                refuse,
+            )?)),
+            MatchCriteria::Boolean(_) => Err(refuse(
+                "BooleanExpression",
+                "a context calibrator selected by a boolean expression is not compiled; only \
+                 a Comparison or a ComparisonList is",
+            )),
+            MatchCriteria::Unsupported { .. } => Err(refuse(
+                "ContextMatch",
+                "the criterion kind is outside the modelled subset",
+            )),
+        }
+    }
+
+    /// The one comparison a context criterion makes.
+    fn context_guard(
+        preceding: &[Field],
+        current: &Guard,
+        parameter: ParamId,
+        use_calibrated: bool,
+        operator: CompareOp,
+        value: &ComparisonValue,
+        refuse: &impl Fn(&str, &'static str) -> CodegenError,
+    ) -> Result<Guard, CodegenError> {
+        let literal = value
+            .as_int
+            .ok_or_else(|| refuse("Comparison", "the criterion's value is not an integer"))?;
+
+        // A preceding field of this container, by parameter — or, when there is none, the
+        // field being calibrated, because that is what "not present in the parsed data so
+        // far" resolves to.
+        let named = preceding
+            .iter()
+            .rev()
+            .find(|field| field.parameter == parameter);
+
+        let Some(field) = named else {
+            if use_calibrated {
+                // The current value has not been calibrated yet — that is what is being
+                // decided — so the reference compares its raw value whatever the attribute
+                // says. Rather than reproduce that silently, it is refused: a definition
+                // asking for a calibrated value that cannot exist is a definition to fix.
+                return Err(refuse(
+                    "Comparison",
+                    "a criterion on the value being calibrated can only see its raw value, \
+                     so useCalibratedValue cannot be honoured",
+                ));
+            }
+            if !current.repr.is_integral() {
+                return Err(refuse(
+                    "Comparison",
+                    "only integer-valued criteria are compiled",
+                ));
+            }
+            return Ok(Guard {
+                value: literal,
+                operator,
+                ..current.clone()
+            });
+        };
+
+        let (bit_offset, bit_width) = field.static_span().ok_or_else(|| {
+            refuse(
+                "Comparison",
+                "the criterion tests a parameter that sits after a data-dependent width, so \
+                 its offset is not known",
+            )
+        })?;
+        if !field.repr.is_integral() {
+            return Err(refuse(
+                "Comparison",
+                "only integer-valued criteria are compiled",
+            ));
+        }
+        if use_calibrated {
+            if matches!(field.repr, Repr::Enumerated(_)) {
+                return Err(refuse(
+                    "Comparison",
+                    "a criterion on a calibrated enumeration compares labels, which is not \
+                     compiled",
+                ));
+            }
+            if field.calibration.is_some() || !field.contexts.is_empty() {
+                return Err(refuse(
+                    "Comparison",
+                    "the criterion asks for the calibrated value of a calibrated parameter, \
+                     which is a float; comparing floats is not compiled",
+                ));
+            }
+            if matches!(field.repr, Repr::Bool) {
+                return Err(refuse(
+                    "Comparison",
+                    "a boolean's engineering value is 0 or 1, not its raw bits, and comparing \
+                     it is not compiled",
+                ));
+            }
+        }
+
+        Ok(Guard {
+            xtce_name: field.xtce_name.clone(),
+            bit_offset,
+            bit_width,
+            repr: field.repr.clone(),
+            swap_bytes: field.swap_bytes,
+            operator,
+            value: literal,
+        })
     }
 
     /// The parameter type can override how the encoded number is presented.
@@ -1099,11 +1325,13 @@ fn assign_unique_idents(fields: &mut [Field]) {
     for field in fields.iter_mut() {
         field.ident = claim(&field.ident, &mut used);
         if field.repr.borrows() && matches!(field.repr, Repr::Text { .. }) {
-            let wanted = format!("{}_raw", field.ident);
+            let wanted = format!("{}_raw", field.ident.trim_end_matches('_'));
             field.raw_ident = Some(claim(&wanted, &mut used));
         }
         if field.calibration.is_some() {
-            let wanted = format!("{}_eng", field.ident);
+            // `field_ident` escapes a keyword by appending an underscore, so a parameter
+            // called SELF is `self_` and the companion would be `self__eng`.
+            let wanted = format!("{}_eng", field.ident.trim_end_matches('_'));
             field.eng_ident = Some(claim(&wanted, &mut used));
         }
     }

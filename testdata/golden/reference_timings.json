@@ -6,6 +6,12 @@
   "parse_seconds": 0.064644
  },
  {
+  "case": "context_calibrators",
+  "packet_count": 512,
+  "load_seconds": 0.005983,
+  "parse_seconds": 0.036828
+ },
+ {
   "case": "ctim",
   "packet_count": 1499,
   "load_seconds": 0.119682,

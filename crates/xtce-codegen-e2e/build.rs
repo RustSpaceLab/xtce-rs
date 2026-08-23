@@ -41,6 +41,8 @@ const CASES: &[(&str, &str, Option<&str>)] = &[
     ("aggregates", "aggregates.xml", None),
     // MIL-STD-1750A, which no mission definition uses and the reference does implement.
     ("mil_1750a", "mil_1750a.xml", None),
+    // Context calibrators, which the reference also implements.
+    ("context_calibrators", "context_calibrators.xml", None),
 ];
 
 fn main() {

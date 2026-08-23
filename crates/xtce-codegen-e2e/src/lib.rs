@@ -90,6 +90,12 @@ pub mod arrays {
     include!(concat!(env!("OUT_DIR"), "/arrays.rs"));
 }
 
+/// Calibrators selected by criteria, including one that names the field being calibrated.
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+pub mod context_calibrators {
+    include!(concat!(env!("OUT_DIR"), "/context_calibrators.rs"));
+}
+
 /// MIL-STD-1750A, big-endian, little-endian, unaligned and calibrated.
 #[allow(dead_code, clippy::all, clippy::pedantic)]
 pub mod mil_1750a {

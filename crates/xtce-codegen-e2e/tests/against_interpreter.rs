@@ -20,8 +20,8 @@ use xtce_model::XtceDb;
 // `udp` is absent on purpose: it has no packet stream, so compiling it in the library above
 // is the whole of its check.
 use xtce_codegen_e2e::{
-    aggregates, arrays, boolean_criteria, byte_order, calibrators, ctim, idex, mil_1750a,
-    numeric_edges, suda,
+    aggregates, arrays, boolean_criteria, byte_order, calibrators, context_calibrators, ctim, idex,
+    mil_1750a, numeric_edges, suda,
 };
 
 fn testdata(relative: &str) -> PathBuf {
@@ -920,4 +920,88 @@ fn mil_std_1750a_matches_the_interpreter() {
     // 512 packets, one in four with an APID nothing describes.
     assert_eq!(compared, 384);
     assert_eq!(refused, 128);
+}
+
+/// Context calibrators, against the interpreter, over the whole stream.
+///
+/// The third feature here whose interpreted path is also pinned to Python, through
+/// `cargo xtask diff`. What was hard about compiling this turned out not to be hard at all:
+/// a criterion names a parameter, and the reference resolves it against what has been decoded
+/// so far, so the rule is positional rather than a dependency graph.
+///
+/// The positional rule has a surprising corner and the fixture pins it. `LOOKAHEAD`'s
+/// criterion names `LATER`, which is decoded *after* it, so it is "not present in the parsed
+/// data" and resolves to `LOOKAHEAD`'s own raw value — not `LATER`'s. Both implementations do
+/// that, and the golden says the reference does too.
+#[test]
+fn context_calibrators_match_the_interpreter() {
+    let db = XtceDb::from_path(testdata("context_calibrators.xml")).expect("definition loads");
+    let decoder = Decoder::new(&db).expect("root container");
+    let (same_raw, same_eng) = comparators!(context_calibrators);
+
+    let stream =
+        std::fs::read(testdata("context_calibrators_stream.bin")).expect("the stream is present");
+    let mut compared = 0usize;
+    let mut refused = 0usize;
+    // Which branch of SENSOR's chain each packet took, so a stream that stopped reaching them
+    // is a failure rather than a quietly weaker test.
+    let mut modes = [0usize; 5];
+
+    for (index, framed) in PacketIter::new(&stream, 0).enumerate() {
+        let packet = framed.expect("the stream is well framed");
+        let bytes = packet.bytes();
+
+        let mut interpreted = decoder.new_packet(bytes);
+        let by_interpreter = decoder.decode_into(&mut interpreted, bytes);
+        let by_generator = context_calibrators::decode(bytes);
+
+        match (by_interpreter, by_generator) {
+            (Err(_), Err(_)) => refused += 1,
+            (Ok(()), Ok(compiled)) => {
+                if let Some(mode) = bytes.get(6) {
+                    if let Some(count) = modes.get_mut(usize::from(*mode)) {
+                        *count += 1;
+                    }
+                }
+                let mut fields = Vec::new();
+                compiled.for_each_value(|name, raw, eng| fields.push((name, raw, eng)));
+                assert_eq!(
+                    fields.len(),
+                    interpreted.len(),
+                    "packet {index}: field counts"
+                );
+                for ((name, raw, eng), value) in fields.iter().zip(interpreted.values()) {
+                    assert!(
+                        same_raw(raw, &value.raw),
+                        "packet {index}: {name}: raw differs — generated {raw:?}, \
+                         interpreted {:?}",
+                        value.raw
+                    );
+                    assert!(
+                        same_eng(eng, &value.eng),
+                        "packet {index}: {name}: engineering differs — generated {eng:?}, \
+                         interpreted {:?}",
+                        value.eng
+                    );
+                }
+                compared += 1;
+            }
+            (interpreted_result, generated_result) => panic!(
+                "packet {index}: the two disagree about whether it decodes — interpreter \
+                 {:?}, generated {:?}",
+                interpreted_result.err(),
+                generated_result.err()
+            ),
+        }
+    }
+
+    assert_eq!(compared, 384);
+    assert_eq!(refused, 128);
+    for (mode, count) in modes.iter().enumerate() {
+        assert!(
+            *count > 20,
+            "MODE {mode} was reached only {count} time(s); the stream no longer exercises \
+             every branch of the context chain"
+        );
+    }
 }

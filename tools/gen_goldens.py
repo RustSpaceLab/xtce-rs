@@ -120,6 +120,14 @@ CASES: tuple[Case, ...] = (
         xtce="mil_1750a.xml",
         packets="mil_1750a_stream.bin",
     ),
+    # The third, and the only one whose bytes are shaped rather than arbitrary: a context is
+    # chosen by a comparison, and a comparison against a uniformly random field almost never
+    # holds. See the generator.
+    Case(
+        name="context_calibrators",
+        xtce="context_calibrators.xml",
+        packets="context_calibrators_stream.bin",
+    ),
     # A definition pointed at a stream it does not describe. Every packet reaches the
     # abstract root and finds no inheritor whose restriction criteria hold, so the reference
     # raises UnrecognizedPacketTypeError for all of them. Without this case the rejection

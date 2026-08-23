@@ -221,7 +221,7 @@ fn every_bundled_definition_compiles() {
         }
     }
     definitions.sort();
-    assert_eq!(definitions.len(), 17, "the bundled definitions changed");
+    assert_eq!(definitions.len(), 18, "the bundled definitions changed");
 
     for path in definitions {
         let name = path.display().to_string();
@@ -314,15 +314,17 @@ fn constructs_outside_the_compilable_subset_are_refused() {
             "StringDataEncoding",
         ),
         (
-            // A context calibrator is chosen by criteria over other parameters, which may
-            // themselves be calibrated. That is a dependency graph, not an expression.
-            "context calibrator",
+            // A context list decides between calibrators, and the default decides when none
+            // of them applies. Without one, nothing applies and the reference reports the
+            // *raw* value — an integer where a match would have given a float. One generated
+            // field cannot be both.
+            "context calibrator with no default",
             definition(
-                r#"<IntegerParameterType name="C"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"><ContextCalibratorList><ContextCalibrator><ContextMatch><Comparison parameterRef="A" value="1"/></ContextMatch><Calibrator><PolynomialCalibrator><Term coefficient="2.0" exponent="1"/></PolynomialCalibrator></Calibrator></ContextCalibrator></ContextCalibratorList></IntegerDataEncoding></IntegerParameterType>"#,
+                r#"<IntegerParameterType name="C"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"><ContextCalibratorList><ContextCalibrator><ContextMatch><Comparison parameterRef="A" value="1" useCalibratedValue="false"/></ContextMatch><Calibrator><PolynomialCalibrator><Term coefficient="2.0" exponent="1"/></PolynomialCalibrator></Calibrator></ContextCalibrator></ContextCalibratorList></IntegerDataEncoding></IntegerParameterType>"#,
                 r#"<Parameter name="A" parameterTypeRef="C"/>"#,
                 r#"<ParameterRefEntry parameterRef="A"/>"#,
             ),
-            "ContextCalibrator",
+            "ContextCalibratorList",
         ),
         (
             // The interpreter supports orders 0 and 1 only, so anything above that would be

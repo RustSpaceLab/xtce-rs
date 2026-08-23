@@ -245,6 +245,53 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — ContextCalibrator, and the dependency graph that was not one
+
+Calibrators selected by criteria compile. Eighteen of eighteen bundled definitions compile,
+and the code-generation table has no unexplained refusals left.
+
+**What had been stopping it was wrong.** The refusal said a context criterion "may name a
+parameter this container decodes after the one being calibrated. That is a dependency graph,
+not an expression." It is not. The reference resolves a criterion against what has been
+decoded *so far*, and says so in as many words: "If the parameter to compare is not present in
+the parsed data dict, we assume that we are comparing against the current raw value." So the
+rule is entirely positional — a preceding field of this container, or else the field being
+calibrated — and it needs no graph, no ordering pass and no cycle detection. The list is tried
+in order and the first entry whose criteria all hold wins.
+
+Worth recording as a mistake and not only as a feature. The refusal was written from the
+schema rather than from the implementation, and it had the wrong shape for a week.
+
+**What is genuinely refused, and why.** A `<ContextCalibratorList>` with no
+`<DefaultCalibrator>`: when nothing matches, the reference reports the *raw* value — an
+integer where a match would have given a float — and one generated struct field cannot be
+both, which is the same argument as a number whose width comes from the packet. And
+`useCalibratedValue` on a criterion naming the field being calibrated: the value has not been
+calibrated, that is what is being decided, and the reference quietly compares the raw one
+instead. Reproducing that silently is what this generator does not do.
+
+**The reference implements this**, so `context_calibrators.xml` comes with a stream and a
+golden — the third feature pinned to Python directly. It matched first time, including the
+corner worth naming: `LOOKAHEAD`'s criterion names `LATER`, which is decoded after it, so it
+resolves to `LOOKAHEAD`'s own raw value rather than `LATER`'s. Surprising, agreed on by all
+three implementations, and now fixed in place.
+
+**Its stream is the only one here whose bytes are shaped rather than arbitrary.** A context is
+chosen by a comparison, and a comparison against a uniformly random field almost never holds:
+`MODE == 1` over a random byte is one packet in 256, so five hundred packets would take each
+branch twice and the default four hundred and ninety times. The fields named by criteria are
+drawn from small ranges, the generator says why, and the test asserts every branch is still
+taken more than twenty times — so a stream that drifted into testing nothing would fail rather
+than pass quietly.
+
+**Two omissions the compiler caught**, both the same shape: a predicate that enumerates where
+something can appear, written before somewhere new appeared. Helper emission looked only at a
+field's *default* calibrator, so a spline used solely by a context produced a call to a
+function that was never written. And the companion-field naming appended `_eng` to an
+identifier that may already end in an underscore, so a parameter called `SELF` — escaped to
+`self_` — produced `self__eng`. Neither would have been a wrong number; both would have been
+somebody else's build failure.
+
 ## 2026-08-23 — MIL-STD-1750A, and it matched first time
 
 The generator compiles MIL-STD-1750A. Seventeen of seventeen bundled definitions compile.
