@@ -13,13 +13,14 @@
 //! acyclic, so a malformed database fails at load time rather than overflowing the stack on
 //! the first packet.
 
+use crate::commands::MetaCommand;
 use crate::containers::{
     BooleanExpr, CompareOp, Comparison, ComparisonValue, Condition, Container, Entry, EntryKind,
     Location, LocationReference, MatchCriteria, Operand, SpaceSystem,
 };
 use crate::db::{Unsupported, XtceDb};
 use crate::error::{RefKind, XtceError};
-use crate::ids::{ContainerId, ParamId, SpaceSystemId, Span, TypeId};
+use crate::ids::{ContainerId, MetaCommandId, ParamId, SpaceSystemId, Span, TypeId};
 use crate::intern::{FxHashMap, Interner, NameId};
 use crate::types::{
     AggregateMember, ArrayDimension, BinaryEncoding, ByteOrder, Calibrator, Charset,
@@ -42,6 +43,25 @@ struct Pending<'d> {
     element: Element<'d>,
     space_system: SpaceSystemId,
     qualified_name: NameId,
+    /// For a container, the telecommand whose `<CommandContainer>` it is.
+    ///
+    /// `None` for every telemetry container, and for the shared ones in a
+    /// `<CommandContainerSet>`. It is what tells the entry lowering that `argumentRef` in
+    /// this container resolves against that command's arguments and nothing else.
+    command: Option<MetaCommandId>,
+}
+
+/// A `<MetaCommand>` registered in pass 1.
+struct PendingCommand<'d> {
+    element: Element<'d>,
+    space_system: SpaceSystemId,
+    qualified_name: NameId,
+    /// The arguments it declares itself, by unqualified name, in document order.
+    arguments: Vec<(NameId, ParamId)>,
+    /// Its `<CommandContainer>`, if it has one.
+    container: Option<ContainerId>,
+    /// Resolved from `<BaseMetaCommand metaCommandRef=..>` once every command is registered.
+    base: Option<MetaCommandId>,
 }
 
 pub(crate) struct Lowering<'d> {
@@ -59,6 +79,14 @@ pub(crate) struct Lowering<'d> {
     pending_types: Vec<Pending<'d>>,
     pending_params: Vec<Pending<'d>>,
     pending_containers: Vec<Pending<'d>>,
+    pending_commands: Vec<PendingCommand<'d>>,
+    /// Every argument each command can name, its own and its bases', by unqualified name.
+    ///
+    /// Indexed by [`MetaCommandId`] and filled by `resolve_command_bases` before anything is
+    /// lowered, because an entry list resolves `argumentRef` through it.
+    command_arguments: Vec<FxHashMap<NameId, ParamId>>,
+    /// Bytes behind every `<FixedValueEntry>`, in one arena.
+    fixed_values: Vec<u8>,
 
     type_by_qualified: FxHashMap<NameId, TypeId>,
     type_by_leaf: FxHashMap<NameId, TypeId>,
@@ -66,6 +94,8 @@ pub(crate) struct Lowering<'d> {
     param_by_leaf: FxHashMap<NameId, ParamId>,
     container_by_qualified: FxHashMap<NameId, ContainerId>,
     container_by_leaf: FxHashMap<NameId, ContainerId>,
+    command_by_qualified: FxHashMap<NameId, MetaCommandId>,
+    command_by_leaf: FxHashMap<NameId, MetaCommandId>,
 
     unsupported: Vec<Unsupported>,
     /// Reusable buffer for building candidate qualified names during resolution.
@@ -86,12 +116,17 @@ impl<'d> Lowering<'d> {
             pending_types: Vec::new(),
             pending_params: Vec::new(),
             pending_containers: Vec::new(),
+            pending_commands: Vec::new(),
+            command_arguments: Vec::new(),
+            fixed_values: Vec::new(),
             type_by_qualified: FxHashMap::default(),
             type_by_leaf: FxHashMap::default(),
             param_by_qualified: FxHashMap::default(),
             param_by_leaf: FxHashMap::default(),
             container_by_qualified: FxHashMap::default(),
             container_by_leaf: FxHashMap::default(),
+            command_by_qualified: FxHashMap::default(),
+            command_by_leaf: FxHashMap::default(),
             unsupported: Vec::new(),
             scratch: String::with_capacity(128),
         }
@@ -106,6 +141,10 @@ impl<'d> Lowering<'d> {
         }
 
         self.register_space_system(root, None)?;
+        // Before anything is lowered: an entry list in a command container resolves
+        // `argumentRef` against the command's arguments *and its bases'*, so the inheritance
+        // has to be settled first.
+        self.resolve_command_bases()?;
 
         let types = self.lower_types()?;
         let mut parameters = self.lower_parameters()?;
@@ -113,6 +152,7 @@ impl<'d> Lowering<'d> {
         // into one synthetic parameter per index, so that nothing downstream has to know what
         // an array is.
         let (mut containers, entries) = self.lower_containers(&types, &mut parameters)?;
+        let meta_commands = self.lower_commands();
 
         link_inheritors(&mut containers);
         check_acyclic(&containers, &self.interner)?;
@@ -132,6 +172,8 @@ impl<'d> Lowering<'d> {
             containers,
             entries,
             root_containers,
+            meta_commands,
+            fixed_values: self.fixed_values,
             type_by_qualified: self.type_by_qualified,
             type_by_leaf: self.type_by_leaf,
             param_by_qualified: self.param_by_qualified,
@@ -199,10 +241,176 @@ impl<'d> Lowering<'d> {
             }
         }
 
+        if let Some(commands) = element.child(Tag::CommandMetaData) {
+            self.register_command_meta_data(commands, id)?;
+        }
+
         for child in element.children_with(Tag::SpaceSystem) {
             self.register_space_system(child, Some(id))?;
         }
         Ok(id)
+    }
+
+    /// Registers what a `<CommandMetaData>` section defines.
+    ///
+    /// It may hold its own `<ParameterTypeSet>` and `<ParameterSet>` as well as an
+    /// `<ArgumentTypeSet>` — the schema puts them there "so that `MetaCommand` data can be
+    /// built independently of `TelemetryMetaData`" — and all three register exactly as their
+    /// telemetry counterparts do. An argument type is a parameter type: the encodings are the
+    /// same elements, and `IntegerArgumentType` extends the same base `IntegerParameterType`
+    /// does.
+    fn register_command_meta_data(
+        &mut self,
+        element: Element<'d>,
+        space_system: SpaceSystemId,
+    ) -> Result<(), XtceError> {
+        for set in [Tag::ParameterTypeSet, Tag::ArgumentTypeSet] {
+            if let Some(set) = element.child(set) {
+                for child in set.children() {
+                    self.register(child, space_system, Definition::Type)?;
+                }
+            }
+        }
+        if let Some(set) = element.child(Tag::ParameterSet) {
+            for child in set.children_with(Tag::Parameter) {
+                self.register(child, space_system, Definition::Parameter)?;
+            }
+        }
+        // Containers here are the shared kind: "containers that can be referenced/shared by
+        // MetaCommand definitions". They are named at the system level like any other, which
+        // a MetaCommand's own private container is not.
+        if let Some(set) = element.child(Tag::CommandContainerSet) {
+            for child in set.children() {
+                self.register(child, space_system, Definition::Container)?;
+            }
+        }
+        if let Some(set) = element.child(Tag::MetaCommandSet) {
+            for child in set.children_with(Tag::MetaCommand) {
+                self.register_meta_command(child, space_system)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Registers one `<MetaCommand>`, its arguments and its container.
+    ///
+    /// Arguments are qualified under the command — `/SS/SET_MODE/MODE` — because the schema
+    /// says an argument reference "is always resolved locally to the metacommand", and two
+    /// commands may each declare a `MODE`. They are deliberately *not* added to the
+    /// unqualified index: that index is what `<Comparison parameterRef=..>` and every
+    /// telemetry reference searches, and an argument appearing there could shadow a real
+    /// parameter of the same name.
+    ///
+    /// The container is qualified under the command for the same reason and one more: the
+    /// schema's uniqueness key for container names covers `ContainerSet` and
+    /// `CommandContainerSet` but *not* a `MetaCommand`'s own `<CommandContainer>`, which is
+    /// "private except as referred to in `BaseMetaCommand`". Two commands may therefore give
+    /// their containers the same name, and registering both at the system level would reject
+    /// a file the schema allows. It is still indexed by its bare name, first one winning, so
+    /// that the usual `<BaseContainer containerRef="SOME_CMD_CONTAINER">` resolves.
+    fn register_meta_command(
+        &mut self,
+        element: Element<'d>,
+        space_system: SpaceSystemId,
+    ) -> Result<(), XtceError> {
+        let Some(name) = element.attr(AttrKey::Name) else {
+            return Err(XtceError::Missing {
+                what: "MetaCommand name attribute",
+                path: element.path(),
+            });
+        };
+        let id = MetaCommandId::new(u32::try_from(self.pending_commands.len()).unwrap_or(u32::MAX));
+
+        let ss_path = self
+            .ss_paths
+            .get(space_system.index())
+            .map_or(String::new(), Clone::clone);
+        let qualified = format!("{ss_path}/{name}");
+        let qualified_id = self.interner.intern(&qualified);
+        insert_unique(
+            &mut self.command_by_qualified,
+            qualified_id,
+            id,
+            RefKind::MetaCommand,
+            &qualified,
+            &element,
+        )?;
+        let leaf_id = self.interner.intern(name);
+        self.command_by_leaf.entry(leaf_id).or_insert(id);
+
+        let mut arguments = Vec::new();
+        if let Some(list) = element.child(Tag::ArgumentList) {
+            for argument in list.children_with(Tag::Argument) {
+                let Some(argument_name) = argument.attr(AttrKey::Name) else {
+                    return Err(XtceError::Missing {
+                        what: "Argument name attribute",
+                        path: argument.path(),
+                    });
+                };
+                let argument_qualified = format!("{qualified}/{argument_name}");
+                let argument_qualified_id = self.interner.intern(&argument_qualified);
+                let param_id =
+                    ParamId::new(u32::try_from(self.pending_params.len()).unwrap_or(u32::MAX));
+                self.pending_params.push(Pending {
+                    element: argument,
+                    space_system,
+                    qualified_name: argument_qualified_id,
+                    command: None,
+                });
+                insert_unique(
+                    &mut self.param_by_qualified,
+                    argument_qualified_id,
+                    param_id,
+                    RefKind::Parameter,
+                    &argument_qualified,
+                    &argument,
+                )?;
+                arguments.push((self.interner.intern(argument_name), param_id));
+            }
+        }
+
+        let mut container = None;
+        if let Some(element) = element.child(Tag::CommandContainer) {
+            let Some(container_name) = element.attr(AttrKey::Name) else {
+                return Err(XtceError::Missing {
+                    what: "CommandContainer name attribute",
+                    path: element.path(),
+                });
+            };
+            let container_qualified = format!("{qualified}/{container_name}");
+            let container_qualified_id = self.interner.intern(&container_qualified);
+            let container_id =
+                ContainerId::new(u32::try_from(self.pending_containers.len()).unwrap_or(u32::MAX));
+            self.pending_containers.push(Pending {
+                element,
+                space_system,
+                qualified_name: container_qualified_id,
+                command: Some(id),
+            });
+            insert_unique(
+                &mut self.container_by_qualified,
+                container_qualified_id,
+                container_id,
+                RefKind::Container,
+                &container_qualified,
+                &element,
+            )?;
+            let container_leaf = self.interner.intern(container_name);
+            self.container_by_leaf
+                .entry(container_leaf)
+                .or_insert(container_id);
+            container = Some(container_id);
+        }
+
+        self.pending_commands.push(PendingCommand {
+            element,
+            space_system,
+            qualified_name: qualified_id,
+            arguments,
+            container,
+            base: None,
+        });
+        Ok(())
     }
 
     fn register(
@@ -236,6 +444,7 @@ impl<'d> Lowering<'d> {
             element,
             space_system,
             qualified_name: qualified_id,
+            command: None,
         };
 
         match kind {
@@ -285,6 +494,79 @@ impl<'d> Lowering<'d> {
         Ok(())
     }
 
+    /// Resolves `<BaseMetaCommand>` links and works out what arguments each command can name.
+    ///
+    /// A command's arguments are its own plus every base's, with a derived declaration
+    /// shadowing an inherited one of the same name — the same rule a struct's fields follow,
+    /// and the reason the chain is walked root-first.
+    fn resolve_command_bases(&mut self) -> Result<(), XtceError> {
+        for index in 0..self.pending_commands.len() {
+            let (reference, space_system, path) = {
+                let command = &self.pending_commands[index];
+                let Some(base) = command.element.child(Tag::BaseMetaCommand) else {
+                    continue;
+                };
+                let Some(reference) = base.attr(AttrKey::MetaCommandRef) else {
+                    return Err(XtceError::Missing {
+                        what: "metaCommandRef attribute",
+                        path: base.path(),
+                    });
+                };
+                (reference.to_owned(), command.space_system, base.path())
+            };
+            let resolved = self
+                .resolve(&reference, space_system, RefKind::MetaCommand)
+                .ok_or_else(|| XtceError::UnresolvedReference {
+                    kind: RefKind::MetaCommand,
+                    reference: reference.clone(),
+                    path,
+                })?;
+            self.pending_commands[index].base = Some(MetaCommandId::new(resolved));
+        }
+
+        self.command_arguments = Vec::with_capacity(self.pending_commands.len());
+        for index in 0..self.pending_commands.len() {
+            // Root-first, so an argument a command declares itself wins over the inherited
+            // one it shadows.
+            let mut chain = vec![index];
+            let mut cursor = self.pending_commands[index].base;
+            while let Some(base) = cursor {
+                if chain.contains(&base.index()) {
+                    return Err(XtceError::InheritanceCycle {
+                        chain: chain
+                            .iter()
+                            .chain(std::iter::once(&base.index()))
+                            .map(|&at| self.command_name(at))
+                            .collect(),
+                    });
+                }
+                chain.push(base.index());
+                cursor = self
+                    .pending_commands
+                    .get(base.index())
+                    .and_then(|command| command.base);
+            }
+
+            let mut arguments = FxHashMap::default();
+            for &at in chain.iter().rev() {
+                if let Some(command) = self.pending_commands.get(at) {
+                    for &(name, parameter) in &command.arguments {
+                        arguments.insert(name, parameter);
+                    }
+                }
+            }
+            self.command_arguments.push(arguments);
+        }
+        Ok(())
+    }
+
+    fn command_name(&self, at: usize) -> String {
+        self.pending_commands
+            .get(at)
+            .map(|command| self.interner.resolve(command.qualified_name).to_owned())
+            .unwrap_or_default()
+    }
+
     // ------------------------------------------------------------------- pass 2: lower
 
     fn lower_types(&mut self) -> Result<Vec<ParameterType>, XtceError> {
@@ -306,12 +588,16 @@ impl<'d> Lowering<'d> {
         apply_time_unit_scaler(element, &mut encoding);
         let units = self.lower_units(element);
 
+        // An argument type is a parameter type. XTCE spells them differently because an
+        // argument may carry a `<ValidRangeSet>` a parameter may not, but the encodings are
+        // the same elements and every `*ArgumentType` extends the same base its
+        // `*ParameterType` twin does.
         let kind = match element.tag() {
-            Tag::IntegerParameterType => TypeKind::Integer,
-            Tag::FloatParameterType => TypeKind::Float,
-            Tag::StringParameterType => TypeKind::String,
-            Tag::BinaryParameterType => TypeKind::Binary,
-            Tag::BooleanParameterType => TypeKind::Boolean {
+            Tag::IntegerParameterType | Tag::IntegerArgumentType => TypeKind::Integer,
+            Tag::FloatParameterType | Tag::FloatArgumentType => TypeKind::Float,
+            Tag::StringParameterType | Tag::StringArgumentType => TypeKind::String,
+            Tag::BinaryParameterType | Tag::BinaryArgumentType => TypeKind::Binary,
+            Tag::BooleanParameterType | Tag::BooleanArgumentType => TypeKind::Boolean {
                 zero_label: element
                     .attr(AttrKey::ZeroStringValue)
                     .map(|text| self.interner.intern(text)),
@@ -319,24 +605,34 @@ impl<'d> Lowering<'d> {
                     .attr(AttrKey::OneStringValue)
                     .map(|text| self.interner.intern(text)),
             },
-            Tag::EnumeratedParameterType => self.lower_enumeration(element),
-            Tag::AbsoluteTimeParameterType => TypeKind::AbsoluteTime {
-                epoch: element
-                    .child(Tag::ReferenceTime)
-                    .and_then(|reference| reference.child(Tag::Epoch))
-                    .and_then(Element::text)
-                    .map(|text| self.interner.intern(text)),
-                offset_from: element
-                    .child(Tag::ReferenceTime)
-                    .and_then(|reference| reference.child(Tag::OffsetFrom))
-                    .and_then(|offset| offset.attr(AttrKey::ParameterRef))
-                    .and_then(|reference| {
-                        self.resolve_parameter_opt(reference, pending.space_system)
-                    }),
-            },
-            Tag::RelativeTimeParameterType => TypeKind::RelativeTime,
-            Tag::ArrayParameterType => self.lower_array_type(element, pending.space_system),
-            Tag::AggregateParameterType => self.lower_aggregate_type(element, pending.space_system),
+            Tag::EnumeratedParameterType | Tag::EnumeratedArgumentType => {
+                self.lower_enumeration(element)
+            }
+            Tag::AbsoluteTimeParameterType | Tag::AbsoluteTimeArgumentType => {
+                TypeKind::AbsoluteTime {
+                    epoch: element
+                        .child(Tag::ReferenceTime)
+                        .and_then(|reference| reference.child(Tag::Epoch))
+                        .and_then(Element::text)
+                        .map(|text| self.interner.intern(text)),
+                    offset_from: element
+                        .child(Tag::ReferenceTime)
+                        .and_then(|reference| reference.child(Tag::OffsetFrom))
+                        .and_then(|offset| offset.attr(AttrKey::ParameterRef))
+                        .and_then(|reference| {
+                            self.resolve_parameter_opt(reference, pending.space_system)
+                        }),
+                }
+            }
+            Tag::RelativeTimeParameterType | Tag::RelativeTimeArgumentType => {
+                TypeKind::RelativeTime
+            }
+            Tag::ArrayParameterType | Tag::ArrayArgumentType => {
+                self.lower_array_type(element, pending.space_system)
+            }
+            Tag::AggregateParameterType | Tag::AggregateArgumentType => {
+                self.lower_aggregate_type(element, pending.space_system)
+            }
             other => {
                 let element_name = element.name().to_owned();
                 self.note_unsupported(
@@ -792,13 +1088,16 @@ impl<'d> Lowering<'d> {
         for item in &pending {
             let element = item.element;
             let name = element.attr(AttrKey::Name).unwrap_or_default();
-            let type_ref =
-                element
-                    .attr(AttrKey::ParameterTypeRef)
-                    .ok_or_else(|| XtceError::Missing {
-                        what: "parameterTypeRef attribute",
-                        path: element.path(),
-                    })?;
+            // `<Parameter parameterTypeRef=..>` and `<Argument argumentTypeRef=..>` are the
+            // same thing named twice; an argument arrives here because arguments are lowered
+            // as parameters.
+            let type_ref = element
+                .attr(AttrKey::ParameterTypeRef)
+                .or_else(|| element.attr(AttrKey::ArgumentTypeRef))
+                .ok_or_else(|| XtceError::Missing {
+                    what: "parameterTypeRef attribute",
+                    path: element.path(),
+                })?;
             let type_id = self
                 .resolve(type_ref, item.space_system, RefKind::ParameterType)
                 .ok_or_else(|| XtceError::UnresolvedReference {
@@ -854,15 +1153,30 @@ impl<'d> Lowering<'d> {
                 None => None,
             };
 
-            let restriction = base_element
+            let mut restriction = base_element
                 .and_then(|base| base.child(Tag::RestrictionCriteria))
                 .map(|criteria| self.lower_criteria_children(criteria, item.space_system))
                 .unwrap_or_default();
+            // An `<ArgumentAssignment>` is a restriction criterion written the other way
+            // round. It says this command is the base command with an argument pinned to a
+            // value; that pinning is what specialises the definition, and comparing the same
+            // bits is what recognises an arriving packet as this command rather than as a
+            // sibling. So it joins the criteria the container already has.
+            if let Some(command) = item.command {
+                restriction.extend(self.argument_assignments(command)?);
+            }
 
             let start = entries.len();
             if let Some(list) = element.child(Tag::EntryList) {
                 for entry in list.children() {
-                    self.lower_entry(entry, item.space_system, types, parameters, &mut entries)?;
+                    self.lower_entry(
+                        entry,
+                        item.space_system,
+                        item.command,
+                        types,
+                        parameters,
+                        &mut entries,
+                    )?;
                 }
             }
 
@@ -890,43 +1204,94 @@ impl<'d> Lowering<'d> {
         Ok((containers, entries))
     }
 
+    /// `<FixedValueEntry>`: bits the definition writes and nobody supplies.
+    ///
+    /// The bytes go into a shared arena because an entry is `Copy` and cannot own them. The
+    /// width is the entry's own and is not derived from the bytes: XTCE requires both
+    /// attributes and does not require them to agree.
+    fn fixed_value_entry(&mut self, element: Element<'d>) -> Result<EntryKind, XtceError> {
+        let Some(hex) = element.attr(AttrKey::BinaryValue) else {
+            return Err(XtceError::Missing {
+                what: "binaryValue attribute",
+                path: element.path(),
+            });
+        };
+        let Some(size_in_bits) = element
+            .attr(AttrKey::SizeInBits)
+            .and_then(|text| text.trim().parse::<u32>().ok())
+        else {
+            return Err(XtceError::Missing {
+                what: "sizeInBits attribute",
+                path: element.path(),
+            });
+        };
+        let bytes = parse_hex(hex);
+        let start = self.fixed_values.len();
+        self.fixed_values.extend_from_slice(&bytes);
+        Ok(EntryKind::FixedValue {
+            value: Span::between(start, self.fixed_values.len()),
+            size_in_bits,
+        })
+    }
+
     /// Lowers one `<EntryList>` child, appending one entry — or, for an array, several.
     fn lower_entry(
         &mut self,
         element: Element<'d>,
         space_system: SpaceSystemId,
+        command: Option<MetaCommandId>,
         types: &[ParameterType],
         parameters: &mut Vec<Parameter>,
         out: &mut Vec<Entry>,
     ) -> Result<(), XtceError> {
         let kind = match element.tag() {
-            Tag::ParameterRefEntry | Tag::ArrayParameterRefEntry => {
-                let reference =
-                    element
-                        .attr(AttrKey::ParameterRef)
-                        .ok_or_else(|| XtceError::Missing {
-                            what: "parameterRef attribute",
-                            path: element.path(),
-                        })?;
-                let id = self
-                    .resolve(reference, space_system, RefKind::Parameter)
-                    .ok_or_else(|| XtceError::UnresolvedReference {
-                        kind: RefKind::Parameter,
-                        reference: reference.to_owned(),
-                        path: element.path(),
-                    })?;
+            Tag::ParameterRefEntry
+            | Tag::ArrayParameterRefEntry
+            | Tag::ArgumentRefEntry
+            | Tag::ArrayArgumentRefEntry => {
+                let argument = matches!(
+                    element.tag(),
+                    Tag::ArgumentRefEntry | Tag::ArrayArgumentRefEntry
+                );
+                let attribute = if argument {
+                    AttrKey::ArgumentRef
+                } else {
+                    AttrKey::ParameterRef
+                };
+                let reference = element.attr(attribute).ok_or_else(|| XtceError::Missing {
+                    what: if argument {
+                        "argumentRef attribute"
+                    } else {
+                        "parameterRef attribute"
+                    },
+                    path: element.path(),
+                })?;
+                // An argument reference is resolved against the command that owns this
+                // container and nowhere else — "there is no path, this is a local
+                // reference" — so it can neither reach another command's argument nor fall
+                // back to a telemetry parameter that happens to share the name.
+                let found = if argument {
+                    self.lower_argument_lookup(command, reference)
+                } else {
+                    self.resolve(reference, space_system, RefKind::Parameter)
+                        .map(ParamId::new)
+                };
+                let id = found.ok_or_else(|| XtceError::UnresolvedReference {
+                    kind: RefKind::Parameter,
+                    reference: reference.to_owned(),
+                    path: element.path(),
+                })?;
 
                 // An array is a repetition, so it becomes a repetition of entries. Doing it
                 // here means the interpreter, the code generator and the flight encoder all
                 // see ordinary fields and none of them has to know arrays exist.
-                if let Some(expanded) =
-                    self.expand_composite(element, ParamId::new(id), types, parameters)?
-                {
+                if let Some(expanded) = self.expand_composite(element, id, types, parameters)? {
                     out.extend(expanded);
                     return Ok(());
                 }
-                EntryKind::Parameter(ParamId::new(id))
+                EntryKind::Parameter(id)
             }
+            Tag::FixedValueEntry => self.fixed_value_entry(element)?,
             Tag::ContainerRefEntry => {
                 let reference =
                     element
@@ -1242,6 +1607,102 @@ impl<'d> Lowering<'d> {
         out
     }
 
+    /// One argument of `command`, by the bare name an `argumentRef` writes.
+    fn lower_argument_lookup(&self, command: Option<MetaCommandId>, name: &str) -> Option<ParamId> {
+        let name = self.interner.get(name.trim())?;
+        self.command_arguments
+            .get(command?.index())
+            .and_then(|arguments| arguments.get(&name))
+            .copied()
+    }
+
+    /// The criteria a command's `<ArgumentAssignmentList>` amounts to.
+    ///
+    /// Each assignment pins an argument of the *base* command to a value, so each becomes a
+    /// comparison against that argument. `argumentValue` is documented as a
+    /// "calibrated/engineering value", which is what `useCalibratedValue` defaulting to true
+    /// means for a `<Comparison>` — so the criterion is built that way, and an assignment on
+    /// an enumerated argument then compares labels, which the code generator refuses by name
+    /// rather than compiling into something that disagrees with the interpreter.
+    fn argument_assignments(
+        &mut self,
+        command: MetaCommandId,
+    ) -> Result<Vec<MatchCriteria>, XtceError> {
+        let Some(pending) = self.pending_commands.get(command.index()) else {
+            return Ok(Vec::new());
+        };
+        let Some(base) = pending.element.child(Tag::BaseMetaCommand) else {
+            return Ok(Vec::new());
+        };
+        let Some(list) = base.child(Tag::ArgumentAssignmentList) else {
+            return Ok(Vec::new());
+        };
+
+        let assignments: Vec<Element<'d>> = list.children_with(Tag::ArgumentAssignment).collect();
+        let mut out = Vec::with_capacity(assignments.len());
+        for assignment in assignments {
+            let Some(name) = assignment.attr(AttrKey::ArgumentName) else {
+                return Err(XtceError::Missing {
+                    what: "argumentName attribute",
+                    path: assignment.path(),
+                });
+            };
+            let parameter = self
+                .lower_argument_lookup(Some(command), name)
+                .ok_or_else(|| XtceError::UnresolvedReference {
+                    kind: RefKind::Parameter,
+                    reference: name.to_owned(),
+                    path: assignment.path(),
+                })?;
+            let literal = assignment.attr(AttrKey::ArgumentValue).unwrap_or_default();
+            let value = ComparisonValue::new(self.interner.intern(literal), literal);
+            out.push(MatchCriteria::Comparison(Comparison {
+                parameter,
+                operator: CompareOp::Equal,
+                value,
+                use_calibrated: true,
+            }));
+        }
+        Ok(out)
+    }
+
+    /// Every telecommand, once the containers behind them are lowered.
+    fn lower_commands(&mut self) -> Vec<MetaCommand> {
+        let pending = std::mem::take(&mut self.pending_commands);
+        let out = pending
+            .iter()
+            .map(|command| MetaCommand {
+                name: self
+                    .interner
+                    .intern(command.element.attr(AttrKey::Name).unwrap_or_default()),
+                qualified_name: command.qualified_name,
+                space_system: command.space_system,
+                is_abstract: command
+                    .element
+                    .attr(AttrKey::Abstract)
+                    .is_some_and(|text| text.eq_ignore_ascii_case("true")),
+                base: command.base,
+                container: command.container,
+                arguments: command
+                    .arguments
+                    .iter()
+                    .map(|&(_, parameter)| parameter)
+                    .collect(),
+                short_description: command
+                    .element
+                    .attr(AttrKey::ShortDescription)
+                    .map(|text| self.interner.intern(text)),
+                long_description: command
+                    .element
+                    .child(Tag::LongDescription)
+                    .and_then(Element::text)
+                    .map(|text| self.interner.intern(text)),
+            })
+            .collect();
+        self.pending_commands = pending;
+        out
+    }
+
     fn lower_comparison(
         &mut self,
         element: Element<'d>,
@@ -1446,6 +1907,7 @@ impl<'d> Lowering<'d> {
             RefKind::Parameter => self.param_by_leaf.get(&leaf_id).map(|id| id.raw()),
             RefKind::ParameterType => self.type_by_leaf.get(&leaf_id).map(|id| id.raw()),
             RefKind::Container => self.container_by_leaf.get(&leaf_id).map(|id| id.raw()),
+            RefKind::MetaCommand => self.command_by_leaf.get(&leaf_id).map(|id| id.raw()),
         }
     }
 
@@ -1455,6 +1917,7 @@ impl<'d> Lowering<'d> {
             RefKind::Parameter => self.param_by_qualified.get(&id).map(|id| id.raw()),
             RefKind::ParameterType => self.type_by_qualified.get(&id).map(|id| id.raw()),
             RefKind::Container => self.container_by_qualified.get(&id).map(|id| id.raw()),
+            RefKind::MetaCommand => self.command_by_qualified.get(&id).map(|id| id.raw()),
         }
     }
 

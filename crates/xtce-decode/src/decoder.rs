@@ -247,6 +247,22 @@ impl<'db> Decoder<'db> {
                     EntryKind::Container(child) => {
                         self.decode_container(child, cursor, packet, depth + 1)?;
                     }
+                    // A fixed value is in the packet and is nobody's value: the definition
+                    // wrote the bits, no parameter carries them, and there is nothing to
+                    // report. Only the cursor moves. Container selection is by restriction
+                    // criteria — XTCE has no rule that says a fixed value discriminates —
+                    // so this does not check the bits either.
+                    EntryKind::FixedValue { size_in_bits, .. } => {
+                        cursor
+                            .skip(size_in_bits as usize)
+                            .map_err(|error| DecodeError::Bits {
+                                parameter: format!(
+                                    "<FixedValueEntry> in {}",
+                                    self.container_name(id)
+                                ),
+                                source: error,
+                            })?;
+                    }
                     EntryKind::Unsupported { element } => {
                         return Err(DecodeError::Unsupported {
                             element: self.db.name(element).to_owned(),

@@ -2,9 +2,10 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::commands::MetaCommand;
 use crate::containers::{Container, Entry, SpaceSystem};
 use crate::error::XtceError;
-use crate::ids::{ContainerId, ParamId, SpaceSystemId, TypeId};
+use crate::ids::{ContainerId, MetaCommandId, ParamId, SpaceSystemId, Span, TypeId};
 use crate::intern::{FxHashMap, Interner, NameId};
 use crate::lower::Lowering;
 use crate::types::{Parameter, ParameterType, TypeKind};
@@ -39,6 +40,9 @@ pub struct XtceDb {
     containers: Vec<Container>,
     entries: Vec<Entry>,
     root_containers: Vec<ContainerId>,
+    meta_commands: Vec<MetaCommand>,
+    /// Bytes behind every `EntryKind::FixedValue`, in one arena.
+    fixed_values: Vec<u8>,
 
     type_by_qualified: FxHashMap<NameId, TypeId>,
     type_by_leaf: FxHashMap<NameId, TypeId>,
@@ -63,6 +67,8 @@ pub(crate) struct Parts {
     pub containers: Vec<Container>,
     pub entries: Vec<Entry>,
     pub root_containers: Vec<ContainerId>,
+    pub meta_commands: Vec<MetaCommand>,
+    pub fixed_values: Vec<u8>,
     pub type_by_qualified: FxHashMap<NameId, TypeId>,
     pub type_by_leaf: FxHashMap<NameId, TypeId>,
     pub param_by_qualified: FxHashMap<NameId, ParamId>,
@@ -84,6 +90,8 @@ impl XtceDb {
             containers: parts.containers,
             entries: parts.entries,
             root_containers: parts.root_containers,
+            meta_commands: parts.meta_commands,
+            fixed_values: parts.fixed_values,
             type_by_qualified: parts.type_by_qualified,
             type_by_leaf: parts.type_by_leaf,
             param_by_qualified: parts.param_by_qualified,
@@ -191,6 +199,36 @@ impl XtceDb {
     #[must_use]
     pub fn entries(&self) -> &[Entry] {
         &self.entries
+    }
+
+    /// Every telecommand the `<CommandMetaData>` section defines, in document order.
+    ///
+    /// Empty for a definition with no command half, which is most of them.
+    #[must_use]
+    pub fn meta_commands(&self) -> &[MetaCommand] {
+        &self.meta_commands
+    }
+
+    /// A telecommand by index.
+    #[must_use]
+    pub fn meta_command(&self, id: MetaCommandId) -> Option<&MetaCommand> {
+        self.meta_commands.get(id.index())
+    }
+
+    /// The bytes an `EntryKind::FixedValue` carries.
+    #[must_use]
+    pub fn fixed_value(&self, span: Span) -> &[u8] {
+        span.slice(&self.fixed_values)
+    }
+
+    /// Finds a telecommand by its name or by its qualified name.
+    #[must_use]
+    pub fn find_meta_command(&self, name: &str) -> Option<MetaCommandId> {
+        let wanted = self.interner.get(name)?;
+        self.meta_commands
+            .iter()
+            .position(|command| command.name == wanted || command.qualified_name == wanted)
+            .map(|index| MetaCommandId::new(u32::try_from(index).unwrap_or(u32::MAX)))
     }
 
     /// Containers that declare no `<BaseContainer>`, i.e. candidate decoding roots.
@@ -320,6 +358,7 @@ impl XtceDb {
             containers: self.containers.len(),
             abstract_containers: self.containers.iter().filter(|c| c.is_abstract).count(),
             entries: self.entries.len(),
+            meta_commands: self.meta_commands.len(),
             interned_names: self.interner.len(),
             interned_bytes: self.interner.bytes(),
             unsupported: self.unsupported.len(),
@@ -344,6 +383,8 @@ pub struct Stats {
     pub abstract_containers: usize,
     /// Total entries across all containers.
     pub entries: usize,
+    /// Number of telecommands.
+    pub meta_commands: usize,
     /// Distinct interned strings.
     pub interned_names: usize,
     /// Bytes of unique string data.

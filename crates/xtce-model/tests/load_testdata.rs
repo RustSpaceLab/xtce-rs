@@ -47,6 +47,13 @@ fn every_bundled_file_loads() {
                 EntryKind::Container(id) => {
                     assert!(db.container(id).is_some(), "{file}: dangling container id");
                 }
+                EntryKind::FixedValue { value, .. } => {
+                    assert_eq!(
+                        db.fixed_value(value).len(),
+                        value.len(),
+                        "{file}: fixed value span outside the arena"
+                    );
+                }
                 EntryKind::Unsupported { .. } => {}
             }
         }

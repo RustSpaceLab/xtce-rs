@@ -55,6 +55,23 @@ pub enum EntryKind {
     Parameter(ParamId),
     /// `<ContainerRefEntry>`: the referenced container's entries, inline.
     Container(ContainerId),
+    /// `<FixedValueEntry>`: bits the definition fixes, carrying no parameter.
+    ///
+    /// Only a command container may have one. It is how a telecommand carries its sync
+    /// pattern and the header bits the ground does not get to choose — the bits are in the
+    /// packet, they are not anybody's value, and nothing reports them.
+    FixedValue {
+        /// The bytes, as a span of [`crate::XtceDb::fixed_values`].
+        ///
+        /// `binaryValue` is `hexBinary`, so this is what it decodes to. Stored in a shared
+        /// arena because an entry is `Copy` and cannot own a `Vec`.
+        value: Span,
+        /// How many of those bits the entry occupies, from `sizeInBits`.
+        ///
+        /// May be fewer than the bytes hold, and may be more: XTCE does not require the two
+        /// to agree, so the width is the entry's and the bytes are the value.
+        size_in_bits: u32,
+    },
     /// An entry kind outside this crate's scope, e.g. `<IndirectParameterRefEntry>`.
     ///
     /// Present so the container's shape is preserved; decoding one reports

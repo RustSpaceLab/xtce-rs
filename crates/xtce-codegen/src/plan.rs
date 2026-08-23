@@ -480,6 +480,13 @@ impl<'db> Builder<'db> {
                         self.flatten(child, fields, offset, depth + 1)?;
                     }
                 }
+                EntryKind::FixedValue { .. } => {
+                    return Err(CodegenError::Unsupported {
+                        element: "FixedValueEntry".to_owned(),
+                        container: container_name.clone(),
+                        reason: "bits the definition fixes are modelled but not yet compiled",
+                    });
+                }
                 EntryKind::Unsupported { element } => {
                     return Err(CodegenError::Unsupported {
                         element: self.db.name(element).to_owned(),

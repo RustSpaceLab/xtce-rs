@@ -119,6 +119,8 @@ pub enum RefKind {
     ParameterType,
     /// `containerRef`, `baseContainer`.
     Container,
+    /// `metaCommandRef`.
+    MetaCommand,
 }
 
 impl fmt::Display for RefKind {
@@ -127,6 +129,7 @@ impl fmt::Display for RefKind {
             Self::Parameter => "parameter",
             Self::ParameterType => "parameter type",
             Self::Container => "container",
+            Self::MetaCommand => "telecommand",
         })
     }
 }

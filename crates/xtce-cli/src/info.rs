@@ -32,6 +32,27 @@ pub fn report(db: &XtceDb, elapsed: Duration, verbose: bool) {
         stats.entries,
     );
 
+    if stats.meta_commands > 0 {
+        // Counted apart from the containers and parameters above, which already include a
+        // command's packaging and its arguments: a telecommand *is* a container here, and
+        // saying so twice would make the totals look wrong.
+        let abstract_commands = db
+            .meta_commands()
+            .iter()
+            .filter(|command| command.is_abstract)
+            .count();
+        let arguments: usize = db
+            .meta_commands()
+            .iter()
+            .map(|command| command.arguments.len())
+            .sum();
+        println!(
+            "  {} telecommand(s) ({abstract_commands} abstract), {arguments} argument(s), \
+             counted among the containers and parameters above",
+            stats.meta_commands,
+        );
+    }
+
     let (decodable, blocked) = classify_containers(db);
     println!(
         "  {decodable} container(s) fully decodable, {} blocked",
@@ -130,6 +151,9 @@ fn classify_containers(db: &XtceDb) -> (usize, Vec<(ContainerId, String)>) {
                         reason = Some(format!("entry list contains <{}>", db.name(element)));
                         break;
                     }
+                    // Bits the definition fixes. Nothing to decode and nothing that can
+                    // make a container undecodable.
+                    EntryKind::FixedValue { .. } => {}
                     EntryKind::Parameter(parameter) => {
                         let Some(ty) = db.type_of(parameter) else {
                             continue;
@@ -216,6 +240,14 @@ fn print_containers(db: &XtceDb) {
                 EntryKind::Container(child) => {
                     let name = db.container(child).map_or("?", |c| db.name(c.name));
                     println!("      <container {name}>");
+                }
+                EntryKind::FixedValue {
+                    value,
+                    size_in_bits,
+                } => {
+                    let bytes = db.fixed_value(value);
+                    let hex: String = bytes.iter().map(|byte| format!("{byte:02X}")).collect();
+                    println!("      {:<28} {:<16} {size_in_bits}b", "<fixed value>", hex);
                 }
                 EntryKind::Unsupported { element } => {
                     println!("      <unsupported {}>", db.name(element));

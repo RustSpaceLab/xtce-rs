@@ -86,6 +86,29 @@ symbols! {
         SpaceSystem => "SpaceSystem",
         TelemetryMetaData => "TelemetryMetaData",
         CommandMetaData => "CommandMetaData",
+        ArgumentTypeSet => "ArgumentTypeSet",
+        MetaCommandSet => "MetaCommandSet",
+        MetaCommand => "MetaCommand",
+        BaseMetaCommand => "BaseMetaCommand",
+        ArgumentAssignmentList => "ArgumentAssignmentList",
+        ArgumentAssignment => "ArgumentAssignment",
+        ArgumentList => "ArgumentList",
+        Argument => "Argument",
+        CommandContainer => "CommandContainer",
+        CommandContainerSet => "CommandContainerSet",
+        ArgumentRefEntry => "ArgumentRefEntry",
+        ArrayArgumentRefEntry => "ArrayArgumentRefEntry",
+        FixedValueEntry => "FixedValueEntry",
+        IntegerArgumentType => "IntegerArgumentType",
+        FloatArgumentType => "FloatArgumentType",
+        StringArgumentType => "StringArgumentType",
+        BinaryArgumentType => "BinaryArgumentType",
+        BooleanArgumentType => "BooleanArgumentType",
+        EnumeratedArgumentType => "EnumeratedArgumentType",
+        AbsoluteTimeArgumentType => "AbsoluteTimeArgumentType",
+        RelativeTimeArgumentType => "RelativeTimeArgumentType",
+        ArrayArgumentType => "ArrayArgumentType",
+        AggregateArgumentType => "AggregateArgumentType",
         ParameterTypeSet => "ParameterTypeSet",
         ParameterSet => "ParameterSet",
         ContainerSet => "ContainerSet",
@@ -178,8 +201,7 @@ impl Tag {
     const fn is_skipped_section(self) -> bool {
         matches!(
             self,
-            Self::CommandMetaData
-                | Self::ServiceSet
+            Self::ServiceSet
                 | Self::MessageSet
                 | Self::StreamSet
                 | Self::AlgorithmSet
@@ -198,6 +220,12 @@ symbols! {
         ParameterRef => "parameterRef",
         ContainerRef => "containerRef",
         ParameterTypeRef => "parameterTypeRef",
+        ArgumentTypeRef => "argumentTypeRef",
+        ArgumentRef => "argumentRef",
+        ArgumentName => "argumentName",
+        ArgumentValue => "argumentValue",
+        MetaCommandRef => "metaCommandRef",
+        BinaryValue => "binaryValue",
         ArrayTypeRef => "arrayTypeRef",
         TypeRef => "typeRef",
         SizeInBits => "sizeInBits",
@@ -227,11 +255,14 @@ symbols! {
     }
 }
 
-// Sections of an XTCE document that telemetry decoding never reads are dropped during
-// parsing rather than materialised and ignored — see `Tag::is_skipped_section`. In a real
-// mission database `CommandMetaData` can be larger than the telemetry half, so this is a
-// load-time saving, not just tidiness. Skipped sections are recorded so `xtce info` can
-// report what the file contained but this crate did not model.
+// Sections of an XTCE document that nothing here reads are dropped during parsing rather
+// than materialised and ignored — see `Tag::is_skipped_section`. Skipped sections are
+// recorded so `xtce info` can report what the file contained but this crate did not model.
+//
+// `CommandMetaData` used to be on that list, and dropping it was the larger saving: in a
+// real mission database the command half can be bigger than the telemetry half. It is kept
+// now because a spacecraft has to read what the ground sends it, and a telecommand is
+// defined there and nowhere else.
 
 /// One element in the arena.
 #[derive(Clone, Copy, Debug)]

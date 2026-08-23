@@ -56,6 +56,8 @@ id_types! {
     TypeId,
     /// Index of a `SequenceContainer`.
     ContainerId,
+    /// Index of a `MetaCommand`.
+    MetaCommandId,
 }
 
 /// A contiguous slice of a shared arena, stored in two words.

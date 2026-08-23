@@ -43,6 +43,7 @@
     )
 )]
 
+pub mod commands;
 pub mod containers;
 pub mod db;
 pub mod error;
@@ -52,13 +53,14 @@ mod lower;
 pub mod types;
 pub mod xml;
 
+pub use commands::MetaCommand;
 pub use containers::{
     BooleanExpr, CompareOp, Comparison, ComparisonValue, Condition, Container, Entry, EntryKind,
     Location, LocationReference, MatchCriteria, Operand, SpaceSystem,
 };
 pub use db::{Stats, Unsupported, XtceDb};
 pub use error::{RefKind, XtceError};
-pub use ids::{ContainerId, ParamId, SpaceSystemId, Span, TypeId};
+pub use ids::{ContainerId, MetaCommandId, ParamId, SpaceSystemId, Span, TypeId};
 pub use intern::{Interner, NameId};
 pub use types::{
     AggregateMember, ArrayDimension, BinaryEncoding, ByteOrder, Calibrator, Charset,
