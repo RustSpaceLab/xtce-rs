@@ -888,3 +888,128 @@ fn a_mil_std_1750a_float_that_is_not_32_bits_is_refused() {
         "and what it is: {message}"
     );
 }
+
+// -------------------------------------------------------------------------------------
+// Telecommands
+// -------------------------------------------------------------------------------------
+
+/// A telecommand definition: two commands, one specialising the other.
+///
+/// `SetMode` extends `Base` by pinning `OPCODE` to 7, so a packet is `SetMode` when its
+/// opcode byte is 7 and `Base` — which is abstract, and therefore never the answer — when it
+/// is not. Between the sync pattern and the opcode there is nothing to decode: a
+/// `<FixedValueEntry>` is bits the definition wrote and nobody's value.
+const COMMANDS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="Test">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U8"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>
+    </ParameterTypeSet>
+    <ParameterSet><Parameter name="TM" parameterTypeRef="U8"/></ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="Report"><EntryList><ParameterRefEntry parameterRef="TM"/></EntryList></SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+  <CommandMetaData>
+    <ArgumentTypeSet>
+      <IntegerArgumentType name="U8_A"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerArgumentType>
+      <IntegerArgumentType name="U16_A"><IntegerDataEncoding sizeInBits="16" encoding="unsigned"/></IntegerArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <MetaCommand name="Base" abstract="true">
+        <ArgumentList><Argument name="OPCODE" argumentTypeRef="U8_A"/></ArgumentList>
+        <CommandContainer name="BaseContainer">
+          <EntryList>
+            <FixedValueEntry name="SYNC" binaryValue="1ACFFC1D" sizeInBits="32"/>
+            <ArgumentRefEntry argumentRef="OPCODE"/>
+          </EntryList>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="SetMode">
+        <BaseMetaCommand metaCommandRef="Base">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="OPCODE" argumentValue="7"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList><Argument name="MODE" argumentTypeRef="U16_A"/></ArgumentList>
+        <CommandContainer name="SetModeContainer">
+          <EntryList><ArgumentRefEntry argumentRef="MODE"/></EntryList>
+          <BaseContainer containerRef="BaseContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>
+  </CommandMetaData>
+</SpaceSystem>"#;
+
+/// A telecommand decodes with the machinery telemetry uses, because it is a container.
+///
+/// Nothing in the decoder knows what a command is. The root is named rather than defaulted —
+/// see below — and from there the argument assignment selects the specialisation exactly as
+/// a `<RestrictionCriteria>` would.
+#[test]
+fn a_telecommand_decodes_like_any_other_container() {
+    let db = load(COMMANDS);
+    let decoder = Decoder::with_root(&db, "BaseContainer").expect("root container");
+
+    // Sync, opcode 7, mode 0x0102.
+    let packet = [0x1A, 0xCF, 0xFC, 0x1D, 7, 0x01, 0x02];
+    let decoded = decoder.decode(&packet).expect("packet decodes");
+
+    let values: Vec<(String, RawValue<'_>)> = decoded
+        .iter_named()
+        .map(|(name, value)| (name.to_owned(), value.raw.clone()))
+        .collect();
+    assert_eq!(
+        values,
+        vec![
+            ("OPCODE".to_owned(), RawValue::Unsigned(7)),
+            ("MODE".to_owned(), RawValue::Unsigned(0x0102)),
+        ],
+        "the fixed value contributes no value, and the arguments do"
+    );
+    assert_eq!(
+        db.name(
+            db.container(decoded.container())
+                .expect("the container resolves")
+                .name
+        ),
+        "SetModeContainer",
+        "the argument assignment selected the specialisation"
+    );
+}
+
+/// An opcode the assignment does not match stops at the abstract base, and is refused.
+#[test]
+fn a_telecommand_whose_assignment_does_not_hold_is_not_that_command() {
+    let db = load(COMMANDS);
+    let decoder = Decoder::with_root(&db, "BaseContainer").expect("root container");
+
+    let packet = [0x1A, 0xCF, 0xFC, 0x1D, 8, 0x01, 0x02];
+    let error = decoder
+        .decode(&packet)
+        .expect_err("opcode 8 is no command here");
+    assert!(
+        matches!(error, DecodeError::UnrecognizedPacket { .. }),
+        "unexpected error: {error}"
+    );
+}
+
+/// Adding a command half does not take the default root away from the telemetry.
+///
+/// A command container with no `<BaseContainer>` is a root of the command tree, so counting
+/// it among the candidates would leave a definition that used to have exactly one root with
+/// two, and `Decoder::new` would stop working on a file whose telemetry had not changed.
+#[test]
+fn the_default_root_ignores_command_containers() {
+    let db = load(COMMANDS);
+    let decoder = Decoder::new(&db).expect("the telemetry root is still unambiguous");
+    let decoded = decoder.decode(&[42]).expect("packet decodes");
+    assert_eq!(
+        db.name(
+            db.container(decoded.container())
+                .expect("the container resolves")
+                .name
+        ),
+        "Report"
+    );
+}

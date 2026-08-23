@@ -232,6 +232,9 @@ impl XtceDb {
     }
 
     /// Containers that declare no `<BaseContainer>`, i.e. candidate decoding roots.
+    ///
+    /// Includes the roots of the command tree, which are containers like any other. See
+    /// [`Self::default_root_container`] for why the *default* root ignores them.
     #[must_use]
     pub fn root_containers(&self) -> &[ContainerId] {
         &self.root_containers
@@ -336,8 +339,16 @@ impl XtceDb {
                 return Some(id);
             }
         }
-        match self.root_containers.as_slice() {
-            [only] => Some(*only),
+        // Only telemetry. A command container with no `<BaseContainer>` is a root of the
+        // command tree, not a packet this would decode by default: a caller who wants one
+        // names it. Without this, adding a command half to a definition would take the
+        // default root away from the telemetry it already had.
+        let mut telemetry = self
+            .root_containers
+            .iter()
+            .filter(|id| self.container(**id).is_some_and(|c| c.command.is_none()));
+        match (telemetry.next(), telemetry.next()) {
+            (Some(only), None) => Some(*only),
             _ => None,
         }
     }

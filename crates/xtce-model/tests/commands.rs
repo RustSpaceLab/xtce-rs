@@ -410,3 +410,46 @@ fn a_definition_with_no_commands_is_unaffected() {
     assert_eq!(db.stats().meta_commands, 0);
     assert_eq!(db.containers().len(), 1);
 }
+
+/// A container that packs an abstract command is abstract, even without the attribute.
+///
+/// `abstract` on a `MetaCommand` means it is "not instantiated, rather only used as bases to
+/// inherit from to create specialized command definitions". No packet is one, so its
+/// container can never be a packet's final match either. That is what `abstract` means on a
+/// container, said one level up — and without carrying it down, a packet that matched no
+/// specialisation would decode as the base rather than being refused.
+#[test]
+fn a_container_packing_an_abstract_command_is_abstract() {
+    let db = load(INHERITED);
+    let base = db.meta_commands()[0].container.expect("Base packs itself");
+    let derived = db.meta_commands()[1]
+        .container
+        .expect("SetMode packs itself");
+
+    assert!(
+        db.container(base).expect("resolves").is_abstract,
+        "the container of an abstract command is abstract"
+    );
+    assert!(
+        !db.container(derived).expect("resolves").is_abstract,
+        "and a concrete command's is not"
+    );
+}
+
+/// The container a command packs knows which command that is; a telemetry container does not.
+#[test]
+fn a_command_container_points_back_at_its_command() {
+    let db = load(INHERITED);
+    let packing = db.meta_commands()[1]
+        .container
+        .expect("SetMode packs itself");
+    assert_eq!(
+        db.container(packing).expect("resolves").command,
+        Some(xtce_model::MetaCommandId::new(1))
+    );
+
+    let report = db
+        .find_container("Report")
+        .expect("the telemetry container");
+    assert_eq!(db.container(report).expect("resolves").command, None);
+}

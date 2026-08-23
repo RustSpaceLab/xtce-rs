@@ -1,6 +1,6 @@
 //! Sequence containers, entry lists and the match criteria that select between them.
 
-use crate::ids::{ContainerId, ParamId, SpaceSystemId, Span};
+use crate::ids::{ContainerId, MetaCommandId, ParamId, SpaceSystemId, Span};
 use crate::intern::NameId;
 
 /// A `<xtce:SequenceContainer>`.
@@ -16,6 +16,11 @@ pub struct Container {
     pub is_abstract: bool,
     /// The container this one extends, from `<BaseContainer containerRef=..>`.
     pub base: Option<ContainerId>,
+    /// The telecommand this container packs, when it is a `<CommandContainer>`.
+    ///
+    /// `None` for a telemetry container — and also for a shared one in a
+    /// `<CommandContainerSet>`, which belongs to no single command.
+    pub command: Option<MetaCommandId>,
     /// Criteria under which this container specialises [`Self::base`]. All must hold.
     pub restriction: Vec<MatchCriteria>,
     /// This container's own entries, as a span of [`crate::XtceDb::entries`].

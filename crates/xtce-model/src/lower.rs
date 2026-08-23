@@ -560,6 +560,14 @@ impl<'d> Lowering<'d> {
         Ok(())
     }
 
+    /// Whether a `MetaCommand` is marked `abstract="true"`.
+    fn command_is_abstract(&self, command: MetaCommandId) -> bool {
+        self.pending_commands
+            .get(command.index())
+            .and_then(|pending| pending.element.attr(AttrKey::Abstract))
+            .is_some_and(|text| text.eq_ignore_ascii_case("true"))
+    }
+
     fn command_name(&self, at: usize) -> String {
         self.pending_commands
             .get(at)
@@ -1184,10 +1192,19 @@ impl<'d> Lowering<'d> {
                 name: self.interner.intern(name),
                 qualified_name: item.qualified_name,
                 space_system: item.space_system,
+                // A container is abstract when it says so — or when it packs a command that
+                // does. `abstract` on a `MetaCommand` means it is "not instantiated, rather
+                // only used as bases to inherit from", so no packet is one, so its container
+                // can never be the final match for a packet either. That is the same thing
+                // `abstract` means on a container, said one level up.
                 is_abstract: element
                     .attr(AttrKey::Abstract)
-                    .is_some_and(|text| text.eq_ignore_ascii_case("true")),
+                    .is_some_and(|text| text.eq_ignore_ascii_case("true"))
+                    || item
+                        .command
+                        .is_some_and(|command| self.command_is_abstract(command)),
                 base,
+                command: item.command,
                 restriction,
                 entries: Span::between(start, entries.len()),
                 inheritors: Vec::new(),
