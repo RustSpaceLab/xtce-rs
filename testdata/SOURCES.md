@@ -44,7 +44,7 @@ text are retained, which `testdata/spp/LICENSE.txt` does.
 
 ### Written for this project
 
-Nine files here are not vendored. All exist for the same reason: an implementation path that
+Ten files here are not vendored. All exist for the same reason: an implementation path that
 the real mission files never reach, and so would never be compared against anything.
 
 | File | Why |
@@ -57,6 +57,7 @@ the real mission files never reach, and so would never be compared against anyth
 | `aggregates.xml` | the same for `<AggregateParameterType>`, plus the two nested in each other, which is where the naming can go wrong |
 | `mil_1750a.xml` + `mil_1750a_stream.bin` | **no mission file uses MIL-STD-1750A** — but the reference implements it, so this one is a golden case like the six real ones |
 | `context_calibrators.xml` + `context_calibrators_stream.bin` | **no mission file has a `<ContextCalibratorList>`** — the reference implements one, so this is a golden case too, and the only stream whose bytes are shaped so that the criteria actually fire |
+| `commands.xml` | **no mission file has a `<CommandMetaData>` section**, and the reference has no command support of any kind — not even a `NotImplementedError`: the string does not appear in its source, and a definition carrying one loads with the command half silently ignored |
 
 `byte_order_stream.bin`, `mil_1750a_stream.bin` and `context_calibrators_stream.bin` are the
 only packet streams here that were not flown. It is written by

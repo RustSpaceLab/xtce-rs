@@ -245,6 +245,94 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — CommandMetaData, the section that was thrown away
+
+The other half of XTCE. `<CommandMetaData>` is where telecommands are defined, and this crate
+dropped the whole subtree during parsing — it was on the skip list beside `ServiceSet` and
+`AlgorithmSet`, recorded in `skipped_sections()` so `xtce info` could say the file had one.
+That was a reasonable line for a telemetry decoder and an untenable one for `xtce-flight`,
+whose claim is the spacecraft side: it encodes telemetry the ground reads and decodes what the
+ground sends up, and the second half is defined here and nowhere else.
+
+### The shape that made it small
+
+A telecommand is a container of fields selected by fixed values, which is what a telemetry
+container already is. So it lowers into the machinery that exists rather than beside it:
+
+* an `<Argument>` becomes a parameter, qualified under its command;
+* a `<CommandContainer>` becomes a container;
+* an `<ArgumentAssignment>` becomes a restriction criterion;
+* a `<FixedValueEntry>` becomes a new entry kind, the only genuinely new thing.
+
+The interpreter, the code generator and the flight emitter needed no special case for
+commands, only for that one entry kind. Four commits, one per layer, each green on its own.
+
+### The assignment is a criterion read backwards
+
+Worth recording because it is the load-bearing idea. The schema says an
+`<ArgumentAssignmentList>` "specialise[s] this command definition when inheriting from a more
+general MetaCommand by restricting the specific values of otherwise general arguments" —
+which is the sentence a `<RestrictionCriteria>` gets. Assigning `OPCODE = 7` is what makes a
+command a specialisation of its base; comparing `OPCODE == 7` is what recognises an arriving
+packet as that command. One statement, read forwards for building and backwards for parsing,
+so dispatch came for free.
+
+### Two scoping rules, both quoted rather than invented
+
+Arguments are qualified under their command — `/T/SetMode/MODE` — because "an argument
+instance is the name of an argument as the reference is always resolved locally to the
+metacommand. There is no path, this is a local reference." They are kept out of the
+unqualified index every telemetry reference searches, so a `MODE` argument cannot shadow a
+`MODE` parameter and an `argumentRef` cannot fall back to one. Both directions have a test.
+
+A command's own container is qualified under it too. The schema's uniqueness key for container
+names covers `ContainerSet` and `CommandContainerSet` but *not* a `MetaCommand`'s own
+`<CommandContainer>`, which it calls "private except as referred to in BaseMetaCommand" — so
+two commands may name their containers the same, and registering both at the system level
+would have rejected a file the schema allows.
+
+### Two things that would have been silently wrong
+
+An `abstract` `MetaCommand` whose container does not say so. These are written with the
+attribute on the command, and taken literally that leaves the base container concrete — so a
+packet matching no specialisation decodes *as the base* instead of being refused. An abstract
+command is "not instantiated, rather only used as bases to inherit from", so no packet is one,
+so its packaging can never be a packet's final answer. Carried down.
+
+And the default root. A command container with no `<BaseContainer>` is a root of the command
+tree, so counting it among the candidates would leave a definition that used to have exactly
+one root with two, and `Decoder::new` would stop working on a file whose telemetry had not
+changed a line. Adding a command half must not take anything away from the telemetry half.
+
+### The fixed value, and what nothing checks
+
+`<FixedValueEntry>` is the one thing in a command container no decoder reads: the bits are in
+the packet, nobody's value is in them, and their whole effect on decoding is the offset of
+what follows. Both decoders step over them. Neither checks them, which is deliberate — XTCE
+selects a container by its restriction criteria and has no rule that makes a fixed value
+discriminate, and a generator that checked would refuse packets the interpreter accepts.
+
+That makes it the only part of the generated code whose correctness no comparison can see. A
+field at the wrong offset is caught by the differential test; a fixed value with the wrong
+bytes is caught by nothing, because the encoder writes them and no decoder reads them back. So
+the values are asserted against literal bytes, on both sides, in tests that spell them out.
+
+XTCE requires `binaryValue` and `sizeInBits` and does not require them to agree, and says
+nothing about what to do when they do not. The rule chosen: read the bytes as one big-endian
+unsigned number and keep the low `sizeInBits` of it — a wider value truncates from the left, a
+narrower one zero-extends. `DEADBEEF` in sixteen bits is `BEEF`. Both directions are in
+`commands.xml` and both have a test.
+
+### No rung at all
+
+`space_packet_parser` has no command support of any kind. Not a `NotImplementedError` like
+arrays and aggregates get — the string `CommandMetaData` does not appear in its source, and a
+definition carrying one loads with the command half silently ignored. So the oracle is the
+schema, quoted in the tests, and the only differential available is generated against
+interpreted. `SUPPORTED.md` says so in the same words it uses for aggregates.
+
+149 tests, nineteen bundled definitions, `cargo xtask diff` still nine for nine.
+
 ## 2026-08-23 — ContextCalibrator, and the dependency graph that was not one
 
 Calibrators selected by criteria compile. Eighteen of eighteen bundled definitions compile,

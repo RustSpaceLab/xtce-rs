@@ -22,6 +22,14 @@ validated against that same implementation packet for packet.
 
 Scope is a deliberate subset of XTCE, documented in [`SUPPORTED.md`](SUPPORTED.md).
 
+Telecommands are read too, as of 2026-08-23. `<CommandMetaData>` was dropped during parsing
+until then, which is defensible for a telemetry decoder and not for the spacecraft side, where
+a telecommand is defined there and nowhere else. A command turns out to need no new machinery:
+it is a container of fields selected by fixed values, so an argument becomes a parameter, a
+`<CommandContainer>` becomes a container, and an `<ArgumentAssignment>` becomes the restriction
+criterion it already was. The reference has no command support of any kind, so the schema is
+the oracle — as it is for arrays and aggregates.
+
 #### Correctness
 
 Correctness is defined as agreement with the reference, not as passing tests written
@@ -92,7 +100,7 @@ committed under `testdata/golden/`.
 ### Everything, the short way
 
 ```console
-$ cargo test --workspace     # 128 tests
+$ cargo test --workspace     # 149 tests
 $ cargo xtask diff           # the differential suite, 9 definition/stream pairs
 ```
 
@@ -120,8 +128,8 @@ a floor, not a benchmark; use `cargo bench` for real numbers.
 
 | Command | Proves |
 |---|---|
-| `cargo test -p xtce-model` | the XML reader and IR on all 10 bundled definitions |
-| `cargo test -p xtce-decode` | bit reading (property tests against a one-bit-at-a-time oracle), and 25 end-to-end cases over inline XML snippets |
+| `cargo test -p xtce-model` | the XML reader and IR on all 19 bundled definitions, including what `<CommandMetaData>` lowers into |
+| `cargo test -p xtce-decode` | bit reading (property tests against a one-bit-at-a-time oracle), and 29 end-to-end cases over inline XML snippets |
 | `cargo test -p xtce-codegen` | the generated decoder equals the interpreted one on all 7200 JPSS packets, field by field |
 | `cargo test -p xtce-codegen-e2e` | every bundled definition compiles under `#![no_std]`, and each agrees with the interpreter |
 | `cargo xtask diff` | the interpreted decoder equals the Python reference on nine streams, six of them real |

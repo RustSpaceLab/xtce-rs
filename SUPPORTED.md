@@ -21,9 +21,32 @@ make the differential tests impossible to run at all.
 | Section | Level | Note |
 |---|---|---|
 | `TelemetryMetaData` | Decodable | the whole point |
-| `CommandMetaData` | Rejected | subtree dropped during parsing, counted in `skipped_sections()` |
+| `CommandMetaData` | Decodable | telecommands: see below. Was rejected until 2026-08-23 |
 | `ServiceSet`, `MessageSet`, `StreamSet`, `AlgorithmSet` | Rejected | as above |
 | `AliasSet`, `AncillaryDataSet` | Rejected | metadata only, never affects decoding |
+
+## Telecommands
+
+A `<MetaCommand>` is a container of fields selected by fixed values, which is what a
+`<SequenceContainer>` is, so it is lowered into the same machinery rather than beside it.
+Nothing downstream — the interpreter, the code generator, the flight emitter — has a special
+case for commands.
+
+| Element | Level | Note |
+|---|---|---|
+| `MetaCommand` | Decodable | `abstract` carried down to its container: no packet is an abstract command |
+| `BaseMetaCommand` | Decodable | inheritance, cycle-checked at load |
+| `ArgumentList`, `Argument` | Decodable | each becomes a parameter qualified under its command, `/SS/Cmd/ARG`, absent from the unqualified index so it cannot shadow a telemetry parameter |
+| `ArgumentAssignment` | Decodable | becomes a restriction criterion on the command's container, with `useCalibratedValue` true — the schema calls `argumentValue` a calibrated value |
+| `CommandContainer` | Decodable | a container; qualified under its command, since the schema calls it private and does not require its name to be unique |
+| `ArgumentRefEntry`, `ArrayArgumentRefEntry` | Decodable | resolved against the owning command's arguments only: "there is no path, this is a local reference" |
+| `ParameterRefEntry` in a command container | Decodable | a command may name parameters as well as arguments |
+| `FixedValueEntry` | Decodable | the bits are stepped over and reported as nobody's value; see the divergence table |
+| `*ArgumentType` (integer, float, string, binary, boolean, enumerated, time, array, aggregate) | Decodable | the same types under a different name; `ValidRangeSet` is ignored, as ranges are everywhere here |
+| `CommandContainerSet` | Decodable | shared containers, registered like telemetry ones |
+| `BlockMetaCommand` | Rejected | a sequence of commands, not a packet layout |
+| `VerifierSet`, `TransmissionConstraintList`, `Interlock`, `ParameterToSetList` | Rejected | operational behaviour, not packet layout |
+| `ArgumentAssignment` on an enumerated argument | Refused when compiled | `argumentValue` is a calibrated value, so it would compare labels; the interpreter does compare them |
 
 ## Parameter types
 
@@ -90,6 +113,8 @@ covered by a test.
 | `RepeatEntry` | ignored | fixed counts honoured |
 | `signMagnitude` / `onesComplement` | rejected | decoded |
 | `ArrayParameterType`, `AggregateParameterType` | raise `NotImplementedError` at load — on its roadmap | expanded into one parameter per leaf |
+| `CommandMetaData` | no command support of any kind — the string does not appear in its source, and a definition carrying one loads with the command half silently ignored | telecommands are decoded, and compiled |
+| `FixedValueEntry` | — | the bits are stepped over, not checked: XTCE selects a container by its restriction criteria and has no rule that makes a fixed value discriminate |
 | Enumeration `maxValue` ranges | not implemented | honoured |
 | Out-of-scope construct | raises at load | represented; raises at decode |
 | Comparing a text value against a number (`Condition` with two parameter operands) | `==` false, `!=` true, ordering raises `TypeError` | the same three outcomes, the ordering case as `DecodeError::IncomparableValue` |
@@ -148,6 +173,11 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | An array dimension read from the packet | Refused | the expansion happens when the file loads, before any packet exists |
 | A type that contains itself | Refused | XTCE forbids it, and following it would not terminate |
 | More than 4096 leaves in one entry | Refused | each becomes a parameter and a struct field |
+| `MetaCommand`, `CommandContainer`, `ArgumentRefEntry` | Yes | a telecommand is a container by the time the generator sees it |
+| `ArgumentAssignment` | Yes | compiled as the restriction criterion it is |
+| An `ArgumentAssignment` on an enumerated argument | Refused | `argumentValue` is a calibrated value, so it compares labels, which the dispatcher does not |
+| `FixedValueEntry` | Yes | the decoder steps over the bits; `ContainerPlan::fixed` carries them for an encoder, reduced to the declared width — a wider `binaryValue` truncates from the left, a narrower one zero-extends |
+| A `FixedValueEntry` after a data-dependent width | Refused | where its bits go is not known at generation time |
 | `LocationInContainerInBits`, `RepeatEntry` | Refused | |
 | `BooleanExpression`: `Condition`, `ANDedConditions`, `ORedConditions` | Yes | nested, against a literal; two inheritors that both match are still `Ambiguous` |
 | A `Condition` between two parameters | Refused | five type-pair cases and a Python-compatibility answer for text against a number; nothing in reach uses one |
