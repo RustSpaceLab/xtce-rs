@@ -551,11 +551,11 @@ impl<'db> Builder<'db> {
         // leaves bits above the width, and the reference sign-extends without masking them
         // away. Between 57 and 63 bits that can produce a number wider than an `i64`, which
         // the reference's arbitrary-precision integers hold and nothing here can.
+        // Spelled with `is_some_and` rather than a `let` chain: those are stable only from
+        // 1.88, and this project builds on 1.85.
         if swap_bytes
             && matches!(repr, Repr::Signed(_))
-            && let Width::Fixed(bits) = width
-            && bits % 8 != 0
-            && bits > 56
+            && width.fixed().is_some_and(|bits| bits % 8 != 0 && bits > 56)
         {
             return Err(refuse(
                 "IntegerDataEncoding",
