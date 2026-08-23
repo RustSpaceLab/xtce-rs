@@ -33,6 +33,10 @@ const CASES: &[(&str, &str, Option<&str>)] = &[
     ("boolean_criteria", "boolean_criteria.xml", Some("Root")),
     // `leastSignificantByteFirst`, which no mission definition in reach sets at all.
     ("byte_order", "byte_order.xml", None),
+    // Arrays, which are expanded into one field per element when the file is loaded. The
+    // reference raises NotImplementedError for them, so this pair is all the checking there
+    // is.
+    ("arrays", "arrays.xml", None),
 ];
 
 fn main() {

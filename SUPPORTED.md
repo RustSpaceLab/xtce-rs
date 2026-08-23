@@ -37,7 +37,7 @@ make the differential tests impossible to run at all.
 | `BinaryParameterType` | Decodable | fixed, `DynamicValue` and `DiscreteLookupList` sizing |
 | `AbsoluteTimeParameterType` | Decodable | `Encoding` with `offset` / `scale`; `Epoch` and `OffsetFrom` are modelled but not applied |
 | `RelativeTimeParameterType` | Represented | no epoch arithmetic |
-| `ArrayParameterType` | Represented | `TypeKind::Unsupported` |
+| `ArrayParameterType` | Decodable | expanded when the file loads into one parameter per element, named `ARR[0]`, `ARR[1][2]`; row-major, inclusive indices, up to 4096 elements per entry |
 | `AggregateParameterType` | Represented | `TypeKind::Unsupported` |
 
 ## Data encodings
@@ -89,6 +89,7 @@ covered by a test.
 | `LocationInContainerInBits` | ignored | honoured |
 | `RepeatEntry` | ignored | fixed counts honoured |
 | `signMagnitude` / `onesComplement` | rejected | decoded |
+| `ArrayParameterType` | raises `NotImplementedError` at load — on its roadmap | expanded into one parameter per element |
 | Enumeration `maxValue` ranges | not implemented | honoured |
 | Out-of-scope construct | raises at load | represented; raises at decode |
 | Comparing a text value against a number (`Condition` with two parameter operands) | `==` false, `!=` true, ordering raises `TypeError` | the same three outcomes, the ordering case as `DecodeError::IncomparableValue` |
@@ -140,13 +141,15 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | Text or binary whose width comes from another field | Yes | `DynamicValue` with a `LinearAdjustment`; the fields after it are walked with a cursor |
 | A *numeric* field of variable width | Refused | a number's width picks its Rust type, which cannot vary per packet |
 | A dynamic width landing off a byte boundary | Refused at run time | `DecodeError::Unaligned`, since only the packet says where it lands |
+| `ArrayParameterType`, `ArrayParameterRefEntry` | Yes | the entry is already one field per element by the time the generator sees it |
+| An array dimension read from the packet | Refused | the expansion happens when the file loads, before any packet exists |
 | `LocationInContainerInBits`, `RepeatEntry` | Refused | |
 | `BooleanExpression`: `Condition`, `ANDedConditions`, `ORedConditions` | Yes | nested, against a literal; two inheritors that both match are still `Ambiguous` |
 | A `Condition` between two parameters | Refused | five type-pair cases and a Python-compatibility answer for text against a number; nothing in reach uses one |
 | A `Condition` with a literal on the left | Refused | the interpreter compares it as text there |
 | MIL-STD-1750A floats | Refused | |
 
-Every one of the fourteen bundled definitions compiles, including CTIM — 9493 parameters
+Every one of the fifteen bundled definitions compiles, including CTIM — 9493 parameters
 and 38 concrete containers — and IDEX and SUDA, whose science packets carry a binary blob
 whose length comes from `PKT_LEN`. Each is checked against the interpreter on its real packet
 stream by `xtce-codegen-e2e`, and the interpreter is checked against `space_packet_parser`,
@@ -169,6 +172,14 @@ differing in the last bit. A generator that used one power routine for both woul
 other test in this repository. It is compared over 4352 generated packets, of which a few
 hundred are ones both implementations must *refuse* — a spline that may not extrapolate,
 asked for a point outside itself.
+
+`arrays.xml` is the fifth, and the only feature in this project with no Python rung at all:
+the reference refuses arrays outright. What stands in for it is that the semantics were not
+invented — XTCE 1.2 states the index convention and the row-major order in as many words, and
+`crates/xtce-model/tests/arrays.rs` quotes both and pins the expansion against them. Its
+two-dimensional array is two by three rather than square on purpose: over a square one a
+transposed expansion produces the same fields over the same bits, and the differential test
+cannot see the difference because both implementations read the same expansion.
 
 `byte_order.xml` is the fourth, and the only one with a packet stream of its own. No mission
 definition in reach sets `byteOrder` at all, so there is no recorded telemetry with a

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Written for this project. No bundled mission definition has an `<ArrayParameterType>`, and
+  neither does the reference implementation: `space_packet_parser` raises `NotImplementedError`
+  for one and says supporting it is on its roadmap. So unlike every other feature here, this
+  one has no Python rung — `SUPPORTED.md` records it under deliberate divergences, next to
+  `signMagnitude`, which the reference also rejects and this crate decodes.
+
+  What replaces that rung is that the semantics are not invented. XTCE 1.2 states them:
+
+  * `DimensionType`: "For partial entries of an array, the starting and ending index for each
+    dimension … Indexes are zero based." Both ends inclusive.
+  * `DimensionListType`: "Array[1stDim][2ndDim][lastDim]. The last dimension is assumed to be
+    the least significant — that is this dimension will cycle through its combination before
+    the next to last dimension changes." Row-major.
+
+  An array entry is expanded into one parameter per element when the file loads, so what the
+  decoders see is ordinary fields with names like `TEMPS[3]`. This file is here to check that
+  the expansion lands where it should:
+
+  * TEMPS is one-dimensional and byte-aligned, the shape a real mission uses.
+  * GRID is two by three. The extents differ on purpose: over a square array a transposed
+    expansion produces the same field count over the same bits and every test passes.
+  * WINDOW is a subset of a ten-element array, indices 3 to 5, and keeps those indices in its
+    names — renumbering from zero would make it impossible to line up with the same array
+    read whole.
+  * BITS is an array of four-bit elements, so the elements are not byte-aligned and the
+    array as a whole is not a whole number of bytes either.
+  * FLOATS is an array of a type that is not an integer, to catch an expansion that quietly
+    assumed one.
+  * PLAIN either side of them is the control: a generator that expanded the wrong entry, or
+    lost one, moves everything after it.
+-->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="Arrays">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U8">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U4">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="S16">
+        <IntegerDataEncoding sizeInBits="16" encoding="twosComplement"/>
+      </IntegerParameterType>
+      <FloatParameterType name="F32">
+        <FloatDataEncoding sizeInBits="32" encoding="IEEE754"/>
+      </FloatParameterType>
+
+      <!-- Six sixteen-bit temperatures. -->
+      <ArrayParameterType name="TEMPS_T" arrayTypeRef="S16">
+        <DimensionList>
+          <Dimension>
+            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+            <EndingIndex><FixedValue>5</FixedValue></EndingIndex>
+          </Dimension>
+        </DimensionList>
+      </ArrayParameterType>
+
+      <!-- Two rows of three. Not square, so a transposed expansion is visible. -->
+      <ArrayParameterType name="GRID_T" arrayTypeRef="U8">
+        <DimensionList>
+          <Dimension>
+            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+            <EndingIndex><FixedValue>1</FixedValue></EndingIndex>
+          </Dimension>
+          <Dimension>
+            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+            <EndingIndex><FixedValue>2</FixedValue></EndingIndex>
+          </Dimension>
+        </DimensionList>
+      </ArrayParameterType>
+
+      <!-- Ten declared; the entry takes three of them. -->
+      <ArrayParameterType name="WINDOW_T" arrayTypeRef="U8">
+        <DimensionList>
+          <Dimension>
+            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+            <EndingIndex><FixedValue>9</FixedValue></EndingIndex>
+          </Dimension>
+        </DimensionList>
+      </ArrayParameterType>
+
+      <!-- Six nibbles: neither the elements nor the array are whole bytes. -->
+      <ArrayParameterType name="BITS_T" arrayTypeRef="U4">
+        <DimensionList>
+          <Dimension>
+            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+            <EndingIndex><FixedValue>5</FixedValue></EndingIndex>
+          </Dimension>
+        </DimensionList>
+      </ArrayParameterType>
+
+      <ArrayParameterType name="FLOATS_T" arrayTypeRef="F32">
+        <DimensionList>
+          <Dimension>
+            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+            <EndingIndex><FixedValue>2</FixedValue></EndingIndex>
+          </Dimension>
+        </DimensionList>
+      </ArrayParameterType>
+    </ParameterTypeSet>
+
+    <ParameterSet>
+      <Parameter name="LEAD" parameterTypeRef="U8"/>
+      <Parameter name="TEMPS" parameterTypeRef="TEMPS_T"/>
+      <Parameter name="MIDDLE" parameterTypeRef="U8"/>
+      <Parameter name="GRID" parameterTypeRef="GRID_T"/>
+      <Parameter name="WINDOW" parameterTypeRef="WINDOW_T"/>
+      <Parameter name="BITS" parameterTypeRef="BITS_T"/>
+      <Parameter name="FLOATS" parameterTypeRef="FLOATS_T"/>
+      <Parameter name="TAIL" parameterTypeRef="U8"/>
+    </ParameterSet>
+
+    <ContainerSet>
+      <SequenceContainer name="Telemetry">
+        <EntryList>
+          <ParameterRefEntry parameterRef="LEAD"/>
+          <ParameterRefEntry parameterRef="TEMPS"/>
+          <ParameterRefEntry parameterRef="MIDDLE"/>
+          <ParameterRefEntry parameterRef="GRID"/>
+          <ArrayParameterRefEntry parameterRef="WINDOW">
+            <DimensionList>
+              <Dimension>
+                <StartingIndex><FixedValue>3</FixedValue></StartingIndex>
+                <EndingIndex><FixedValue>5</FixedValue></EndingIndex>
+              </Dimension>
+            </DimensionList>
+          </ArrayParameterRefEntry>
+          <ParameterRefEntry parameterRef="BITS"/>
+          <ParameterRefEntry parameterRef="FLOATS"/>
+          <ParameterRefEntry parameterRef="TAIL"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

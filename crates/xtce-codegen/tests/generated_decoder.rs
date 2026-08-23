@@ -221,7 +221,7 @@ fn every_bundled_definition_compiles() {
         }
     }
     definitions.sort();
-    assert_eq!(definitions.len(), 14, "the bundled definitions changed");
+    assert_eq!(definitions.len(), 15, "the bundled definitions changed");
 
     for path in definitions {
         let name = path.display().to_string();

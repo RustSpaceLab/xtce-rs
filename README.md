@@ -92,7 +92,7 @@ committed under `testdata/golden/`.
 ### Everything, the short way
 
 ```console
-$ cargo test --workspace     # 109 tests
+$ cargo test --workspace     # 118 tests
 $ cargo xtask diff           # the differential suite, 7 definition/stream pairs
 ```
 

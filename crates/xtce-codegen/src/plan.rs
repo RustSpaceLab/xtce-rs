@@ -657,6 +657,15 @@ impl<'db> Builder<'db> {
         Ok(match &ty.kind {
             TypeKind::Integer | TypeKind::Float | TypeKind::AbsoluteTime { .. } => numeric,
             TypeKind::Boolean { .. } => Repr::Bool,
+            // An entry naming an array is expanded into one entry per element when the file
+            // is loaded, so a field of this type is a parameter referenced some other way —
+            // as a criterion's operand, say — and there is no single value to give it.
+            TypeKind::Array { .. } => {
+                return Err(refuse(
+                    "ArrayParameterType",
+                    "an array is expanded into its elements; the array itself has no value",
+                ));
+            }
             TypeKind::Enumerated(list) => {
                 if !numeric.is_integral() {
                     return Err(refuse(

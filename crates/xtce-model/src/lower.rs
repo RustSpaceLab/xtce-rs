@@ -22,10 +22,10 @@ use crate::error::{RefKind, XtceError};
 use crate::ids::{ContainerId, ParamId, SpaceSystemId, Span, TypeId};
 use crate::intern::{FxHashMap, Interner, NameId};
 use crate::types::{
-    BinaryEncoding, ByteOrder, Calibrator, Charset, ContextCalibrator, DataEncoding,
-    DiscreteLookup, Enumeration, EnumerationList, FloatCoding, FloatEncoding, IntegerCoding,
-    IntegerEncoding, LinearAdjustment, Parameter, ParameterType, PolynomialTerm, SizeSpec, Spline,
-    SplinePoint, StringDelimiter, StringEncoding, TypeKind,
+    ArrayDimension, BinaryEncoding, ByteOrder, Calibrator, Charset, ContextCalibrator,
+    DataEncoding, DiscreteLookup, Enumeration, EnumerationList, FloatCoding, FloatEncoding,
+    IntegerCoding, IntegerEncoding, LinearAdjustment, Parameter, ParameterType, PolynomialTerm,
+    SizeSpec, Spline, SplinePoint, StringDelimiter, StringEncoding, TypeKind,
 };
 use crate::xml::{AttrKey, Dom, Element, Tag};
 
@@ -108,8 +108,11 @@ impl<'d> Lowering<'d> {
         self.register_space_system(root, None)?;
 
         let types = self.lower_types()?;
-        let parameters = self.lower_parameters()?;
-        let (mut containers, entries) = self.lower_containers()?;
+        let mut parameters = self.lower_parameters()?;
+        // `lower_containers` may append to `parameters`: an entry naming an array is expanded
+        // into one synthetic parameter per index, so that nothing downstream has to know what
+        // an array is.
+        let (mut containers, entries) = self.lower_containers(&types, &mut parameters)?;
 
         link_inheritors(&mut containers);
         check_acyclic(&containers, &self.interner)?;
@@ -332,6 +335,7 @@ impl<'d> Lowering<'d> {
                     }),
             },
             Tag::RelativeTimeParameterType => TypeKind::RelativeTime,
+            Tag::ArrayParameterType => self.lower_array_type(element, pending.space_system),
             other => {
                 let element_name = element.name().to_owned();
                 self.note_unsupported(
@@ -372,6 +376,66 @@ impl<'d> Lowering<'d> {
             .filter_map(Element::text)
             .map(|text| self.interner.intern(text))
             .collect()
+    }
+
+    /// `<ArrayParameterType>`: an element type and one dimension per axis.
+    ///
+    /// Anything the expansion could not carry out is reported as unsupported rather than
+    /// guessed at, and the type still loads — `xtce info` names it, and only a container that
+    /// actually uses it is blocked.
+    fn lower_array_type(&mut self, element: Element<'d>, space_system: SpaceSystemId) -> TypeKind {
+        let unsupported = |lower: &mut Self, reason: &'static str| {
+            let name = element.name().to_owned();
+            lower.note_unsupported(&name, &element.path(), reason);
+            TypeKind::Unsupported {
+                element: lower.interner.intern(&name),
+            }
+        };
+
+        let Some(reference) = element.attr(AttrKey::ArrayTypeRef) else {
+            return unsupported(self, "an array type with no arrayTypeRef has no elements");
+        };
+        let Some(element_type) = self.resolve(reference, space_system, RefKind::ParameterType)
+        else {
+            return unsupported(self, "the arrayTypeRef does not resolve");
+        };
+
+        let Some(list) = element.child(Tag::DimensionList) else {
+            return unsupported(self, "an array type with no DimensionList has no size");
+        };
+
+        let mut dimensions = Vec::new();
+        for dimension in list.children_with(Tag::Dimension) {
+            // `StartingIndex` and `EndingIndex` are `IntegerValueType`, so each may also be a
+            // `DynamicValue` or a `DiscreteLookupList`. Those make the element count a
+            // property of the packet, and the expansion happens before any packet exists.
+            let (Some(start), Some(end)) = (
+                fixed_index(dimension.child(Tag::StartingIndex)),
+                fixed_index(dimension.child(Tag::EndingIndex)),
+            ) else {
+                return unsupported(
+                    self,
+                    "only a Dimension with fixed StartingIndex and EndingIndex is expanded; a \
+                     dimension read from the packet is not",
+                );
+            };
+            if start < 0 || end < start {
+                return unsupported(
+                    self,
+                    "a Dimension must run from a non-negative index upwards",
+                );
+            }
+            dimensions.push(ArrayDimension { start, end });
+        }
+
+        if dimensions.is_empty() {
+            return unsupported(self, "an array type with no Dimension has no size");
+        }
+
+        TypeKind::Array {
+            element: TypeId::new(element_type),
+            dimensions,
+        }
     }
 
     fn lower_enumeration(&mut self, element: Element<'d>) -> TypeKind {
@@ -719,7 +783,11 @@ impl<'d> Lowering<'d> {
         Ok(out)
     }
 
-    fn lower_containers(&mut self) -> Result<(Vec<Container>, Vec<Entry>), XtceError> {
+    fn lower_containers(
+        &mut self,
+        types: &[ParameterType],
+        parameters: &mut Vec<Parameter>,
+    ) -> Result<(Vec<Container>, Vec<Entry>), XtceError> {
         let pending = std::mem::take(&mut self.pending_containers);
         let mut containers = Vec::with_capacity(pending.len());
         let mut entries: Vec<Entry> = Vec::new();
@@ -749,7 +817,7 @@ impl<'d> Lowering<'d> {
             let start = entries.len();
             if let Some(list) = element.child(Tag::EntryList) {
                 for entry in list.children() {
-                    entries.push(self.lower_entry(entry, item.space_system)?);
+                    self.lower_entry(entry, item.space_system, types, parameters, &mut entries)?;
                 }
             }
 
@@ -777,13 +845,17 @@ impl<'d> Lowering<'d> {
         Ok((containers, entries))
     }
 
+    /// Lowers one `<EntryList>` child, appending one entry — or, for an array, several.
     fn lower_entry(
         &mut self,
         element: Element<'d>,
         space_system: SpaceSystemId,
-    ) -> Result<Entry, XtceError> {
+        types: &[ParameterType],
+        parameters: &mut Vec<Parameter>,
+        out: &mut Vec<Entry>,
+    ) -> Result<(), XtceError> {
         let kind = match element.tag() {
-            Tag::ParameterRefEntry => {
+            Tag::ParameterRefEntry | Tag::ArrayParameterRefEntry => {
                 let reference =
                     element
                         .attr(AttrKey::ParameterRef)
@@ -798,6 +870,16 @@ impl<'d> Lowering<'d> {
                         reference: reference.to_owned(),
                         path: element.path(),
                     })?;
+
+                // An array is a repetition, so it becomes a repetition of entries. Doing it
+                // here means the interpreter, the code generator and the flight encoder all
+                // see ordinary fields and none of them has to know arrays exist.
+                if let Some(expanded) =
+                    self.expand_array(element, ParamId::new(id), types, parameters)?
+                {
+                    out.extend(expanded);
+                    return Ok(());
+                }
                 EntryKind::Parameter(ParamId::new(id))
             }
             Tag::ContainerRefEntry => {
@@ -847,11 +929,163 @@ impl<'d> Lowering<'d> {
             .and_then(Element::text)
             .and_then(|text| text.trim().parse::<u32>().ok());
 
-        Ok(Entry {
+        out.push(Entry {
             kind,
             location,
             repeat,
-        })
+        });
+        Ok(())
+    }
+
+    /// Turns an entry that names an array into one entry per element, or `None` if it does
+    /// not name one.
+    ///
+    /// Each element becomes a synthetic parameter carrying the array's element type and a
+    /// name of the form `ARR[2]`, or `ARR[1][2]` for two dimensions. The indices are the
+    /// array's own, so a subset entry over indices 2 to 4 produces `ARR[2]`, `ARR[3]`,
+    /// `ARR[4]` — not a fresh count from zero, which would be impossible to correlate with
+    /// anything on the ground.
+    ///
+    /// The synthetic parameters go into the arena but **not** into the name-resolution index.
+    /// That index is what `<Comparison parameterRef=…>`, `DynamicValue` and context
+    /// calibrators all search, and a synthetic entry there could shadow a real parameter.
+    // One function because it is one decision — how many elements there are, and what each is
+    // called — and the pieces are only meaningful together.
+    #[allow(clippy::too_many_lines)]
+    fn expand_array(
+        &mut self,
+        element: Element<'d>,
+        parameter: ParamId,
+        types: &[ParameterType],
+        parameters: &mut Vec<Parameter>,
+    ) -> Result<Option<Vec<Entry>>, XtceError> {
+        let Some(declared) = parameters.get(parameter.index()) else {
+            return Ok(None);
+        };
+        let Some(ty) = types.get(declared.type_id.index()) else {
+            return Ok(None);
+        };
+        let TypeKind::Array {
+            element: element_type,
+            dimensions,
+        } = &ty.kind
+        else {
+            return Ok(None);
+        };
+
+        let element_type = *element_type;
+        let declared_dimensions = dimensions.clone();
+        let base_name = self.interner.resolve(declared.name).to_owned();
+        let qualified = declared.qualified_name;
+        let space_system = declared.space_system;
+        let path = element.path();
+
+        // A `<DimensionList>` on the *entry* subsets the array; the type carries the full
+        // size. XTCE 1.2 §4.3.5.2.4: "Only used for subsetting an array. The array's maximum
+        // dimension sizes are set in the type."
+        let spans = match element.child(Tag::DimensionList) {
+            None => declared_dimensions.clone(),
+            Some(list) => {
+                let mut subset = Vec::new();
+                for dimension in list.children_with(Tag::Dimension) {
+                    let (Some(start), Some(end)) = (
+                        fixed_index(dimension.child(Tag::StartingIndex)),
+                        fixed_index(dimension.child(Tag::EndingIndex)),
+                    ) else {
+                        return Err(XtceError::ArrayNotExpanded {
+                            reason: "a subset with an index read from the packet cannot be \
+                                     expanded when the file is loaded"
+                                .to_owned(),
+                            path,
+                        });
+                    };
+                    subset.push(ArrayDimension { start, end });
+                }
+                if subset.len() != declared_dimensions.len() {
+                    return Err(XtceError::ArrayNotExpanded {
+                        reason: format!(
+                            "the type has {} dimension(s) and the subset gives {}",
+                            declared_dimensions.len(),
+                            subset.len()
+                        ),
+                        path,
+                    });
+                }
+                for (chosen, whole) in subset.iter().zip(&declared_dimensions) {
+                    if chosen.start < whole.start || chosen.end > whole.end || chosen.is_empty() {
+                        return Err(XtceError::ArrayNotExpanded {
+                            reason: format!(
+                                "the subset {}..={} lies outside the declared {}..={}",
+                                chosen.start, chosen.end, whole.start, whole.end
+                            ),
+                            path,
+                        });
+                    }
+                }
+                subset
+            }
+        };
+
+        let count = spans
+            .iter()
+            .try_fold(1usize, |total, span| total.checked_mul(span.len()?));
+        let Some(count) = count else {
+            return Err(XtceError::ArrayNotExpanded {
+                reason: "the element count overflows a usize".to_owned(),
+                path,
+            });
+        };
+        if count > MAX_ARRAY_ELEMENTS {
+            return Err(XtceError::ArrayNotExpanded {
+                reason: format!(
+                    "{count} elements is past the {MAX_ARRAY_ELEMENTS} this expands, and each \
+                     one becomes a parameter and a struct field"
+                ),
+                path,
+            });
+        }
+
+        // Row-major, because XTCE says so: "the last dimension is assumed to be the least
+        // significant — that is this dimension will cycle through its combination before the
+        // next to last dimension changes."
+        let mut indices: Vec<i64> = spans.iter().map(|span| span.start).collect();
+        let mut out = Vec::with_capacity(count);
+        for _ in 0..count {
+            let mut name = base_name.clone();
+            for index in &indices {
+                let _ = std::fmt::Write::write_fmt(&mut name, format_args!("[{index}]"));
+            }
+            let Ok(id) = u32::try_from(parameters.len()) else {
+                return Err(XtceError::ArrayNotExpanded {
+                    reason: "the parameter arena is full".to_owned(),
+                    path,
+                });
+            };
+            parameters.push(Parameter {
+                name: self.interner.intern(&name),
+                qualified_name: qualified,
+                space_system,
+                type_id: element_type,
+                short_description: None,
+                long_description: None,
+                initial_value: None,
+            });
+            out.push(Entry {
+                kind: EntryKind::Parameter(ParamId::new(id)),
+                location: None,
+                repeat: None,
+            });
+
+            // Advance the odometer, last axis first.
+            for (axis, index) in indices.iter_mut().enumerate().rev() {
+                *index += 1;
+                if *index <= spans[axis].end {
+                    break;
+                }
+                *index = spans[axis].start;
+            }
+        }
+        Ok(Some(out))
     }
 
     // --------------------------------------------------------------- match criteria
@@ -1254,6 +1488,25 @@ fn float_coding(text: &str) -> FloatCoding {
         "MILSTD_1750A" | "MIL-1750A" => FloatCoding::MilStd1750A,
         _ => FloatCoding::Ieee754,
     }
+}
+
+/// How many elements one entry may expand into.
+///
+/// Every element becomes a parameter in the arena and a field in any generated decoder, so a
+/// definition asking for a million of them would produce something no compiler will finish.
+/// The limit is arbitrary but named: nothing in a real database comes close, and the refusal
+/// says how many were asked for.
+const MAX_ARRAY_ELEMENTS: usize = 4096;
+
+/// A `<StartingIndex>` or `<EndingIndex>` that is a plain `<FixedValue>`.
+///
+/// `None` for the `DynamicValue` and `DiscreteLookupList` forms, which the caller refuses:
+/// both make the count a property of the packet.
+fn fixed_index(element: Option<Element<'_>>) -> Option<i64> {
+    element?
+        .child(Tag::FixedValue)
+        .and_then(Element::text)
+        .and_then(|text| text.trim().parse::<i64>().ok())
 }
 
 fn byte_order(text: Option<&str>) -> ByteOrder {

@@ -20,7 +20,7 @@ use xtce_model::XtceDb;
 // `udp` is absent on purpose: it has no packet stream, so compiling it in the library above
 // is the whole of its check.
 use xtce_codegen_e2e::{
-    boolean_criteria, byte_order, calibrators, ctim, idex, numeric_edges, suda,
+    arrays, boolean_criteria, byte_order, calibrators, ctim, idex, numeric_edges, suda,
 };
 
 fn testdata(relative: &str) -> PathBuf {
@@ -673,4 +673,100 @@ fn byte_order_matches_the_interpreter() {
     // 512 packets, one in four with an APID nothing describes.
     assert_eq!(compared, 384);
     assert_eq!(refused, 128);
+}
+
+/// Arrays, against the interpreter, over generated packets.
+///
+/// This one has no Python rung. `space_packet_parser` raises `NotImplementedError` for an
+/// `<ArrayParameterType>` and says supporting it is on its roadmap, so there is no reference
+/// answer to compare against and `SUPPORTED.md` records the difference next to
+/// `signMagnitude`, which it also rejects and this crate decodes.
+///
+/// What the two implementations *can* be held to is the same expansion. It happens once, when
+/// the file loads, and both of them read whatever it produced — so this test is not proving
+/// the semantics, which `crates/xtce-model/tests/arrays.rs` pins against the XTCE text. It is
+/// proving that reading 27 fields whose offsets came from an expansion is no different from
+/// reading 27 fields written out by hand, including the six nibbles that are not byte-aligned
+/// and the three floats behind them.
+#[test]
+fn arrays_match_the_interpreter() {
+    const BYTES: usize = 39;
+
+    let db = XtceDb::from_path(testdata("arrays.xml")).expect("definition loads");
+    let decoder = Decoder::new(&db).expect("root container");
+
+    let mut packets: Vec<Vec<u8>> = (0..=255u8).map(|byte| vec![byte; BYTES]).collect();
+    let mut state = 0x1D87_2B41_0F3E_A95Cu64;
+    for _ in 0..2048 {
+        let mut packet = vec![0u8; BYTES];
+        for chunk in packet.chunks_mut(8) {
+            state ^= state >> 12;
+            state ^= state << 25;
+            state ^= state >> 27;
+            let bytes = state.wrapping_mul(0x2545_F491_4F6C_DD1D).to_be_bytes();
+            chunk.copy_from_slice(&bytes[..chunk.len()]);
+        }
+        packets.push(packet);
+    }
+
+    for (index, packet) in packets.iter().enumerate() {
+        let mut interpreted = decoder.new_packet(packet);
+        assert_same_packet!(
+            arrays,
+            db,
+            decoder,
+            interpreted,
+            packet.as_slice(),
+            format!("packet {index}")
+        );
+    }
+}
+
+/// The expanded names reach the generated decoder, in order.
+///
+/// A separate assertion from the comparison above because the interpreter derives its names
+/// from the same expansion: if the expansion transposed the two-dimensional array, both would
+/// agree and both would be wrong. This checks the names against the XTCE text directly.
+#[test]
+fn the_expanded_field_names_are_the_ones_xtce_describes() {
+    let packet = vec![0u8; 39];
+    let arrays::Packet::Telemetry(decoded) =
+        arrays::decode(&packet).expect("an all-zero packet decodes");
+
+    let mut names = Vec::new();
+    decoded.for_each_value(|name, _, _| names.push(name));
+    assert_eq!(
+        names,
+        [
+            "LEAD",
+            "TEMPS[0]",
+            "TEMPS[1]",
+            "TEMPS[2]",
+            "TEMPS[3]",
+            "TEMPS[4]",
+            "TEMPS[5]",
+            "MIDDLE",
+            // Two by three, last index fastest.
+            "GRID[0][0]",
+            "GRID[0][1]",
+            "GRID[0][2]",
+            "GRID[1][0]",
+            "GRID[1][1]",
+            "GRID[1][2]",
+            // A subset of a ten-element array, keeping its own indices.
+            "WINDOW[3]",
+            "WINDOW[4]",
+            "WINDOW[5]",
+            "BITS[0]",
+            "BITS[1]",
+            "BITS[2]",
+            "BITS[3]",
+            "BITS[4]",
+            "BITS[5]",
+            "FLOATS[0]",
+            "FLOATS[1]",
+            "FLOATS[2]",
+            "TAIL",
+        ]
+    );
 }

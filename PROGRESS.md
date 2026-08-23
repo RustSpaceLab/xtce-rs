@@ -245,6 +245,53 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — arrays, expanded before anything sees them
+
+`ArrayParameterType` decodes. Fifteen of fifteen bundled definitions compile.
+
+**An array is a repetition, so it becomes a repetition of entries.** When the file loads, an
+entry naming an array is replaced by one entry per element, each pointing at a synthetic
+parameter of the element type named `TEMPS[3]` or `GRID[1][2]`. Nothing downstream knows
+arrays exist: the interpreter walks ordinary entries, the generator emits ordinary fields, the
+flight encoder writes ordinary struct members. The whole feature is one function in `lower.rs`
+and a `TypeKind` variant, and it needed no change at all in three of the four crates.
+
+The synthetic parameters go in the arena but **not** in the name-resolution index. That index
+is what `<Comparison parameterRef=…>`, `DynamicValue` and context calibrators search, and a
+synthetic `ARR[0]` sitting in it could shadow a real parameter of that name with nothing
+saying so. A test names that: the elements are present in the arena and a definition that
+tries to reference one does not load.
+
+**This is the first feature here with no Python rung.** `space_packet_parser` raises
+`NotImplementedError` for an `<ArrayParameterType>` and says supporting it is on its roadmap
+— its own test asserts the raise. So there is no reference answer, and `SUPPORTED.md` records
+the difference next to `signMagnitude`, which it also rejects and this crate decodes.
+
+What stands in for the missing rung is that the semantics were not invented. XTCE 1.2 states
+both of the things that could have been guessed wrong, and `crates/xtce-model/tests/arrays.rs`
+quotes them:
+
+* `DimensionType` — "the starting and ending index for each dimension … Indexes are zero
+  based", both ends inclusive.
+* `DimensionListType` — "the last dimension is assumed to be the least significant … this
+  dimension will cycle through its combination before the next to last dimension changes",
+  which is row-major.
+
+**The two-dimensional fixture is two by three, not square.** That is the whole point of it.
+Over a square array a transposed expansion produces the same number of fields covering the
+same bits, so it passes everything. Confirmed by mutating the expansion to advance the first
+axis first: the two tests that check *names* fail, and `arrays_match_the_interpreter` still
+passes — because both implementations read the same expansion, so a differential test cannot
+see a shared misreading. That is worth knowing about the shape of the evidence here, not just
+about arrays.
+
+**Refused by name:** a dimension whose index comes from the packet (the expansion happens
+before any packet exists), a subset outside the dimensions the type declares, and more than
+4096 elements in one entry — each element is a parameter and a struct field, and the refusal
+says how many were asked for. A subset keeps the array's own indices: three elements of a ten
+element array are `WINDOW[3]`, `WINDOW[4]`, `WINDOW[5]`, because renumbering from zero would
+make them impossible to line up with the same array read whole.
+
 ## 2026-08-23 — little-endian, and the first feature pinned to Python directly
 
 `leastSignificantByteFirst` compiles. Fourteen of fourteen bundled definitions now do.

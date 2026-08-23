@@ -65,6 +65,19 @@ pub enum TypeKind {
     },
     /// `RelativeTimeParameterType`.
     RelativeTime,
+    /// `ArrayParameterType`: a repetition of one element type.
+    ///
+    /// A parameter of this type never reaches a decoder. The container entry that names it is
+    /// expanded at load time into one synthetic parameter per index, each of the element
+    /// type, so everything downstream sees ordinary fields — see `XtceDb::array_element_of`.
+    /// The type is kept because `xtce info` reports it and because the expansion needs it.
+    Array {
+        /// The type each element has.
+        element: TypeId,
+        /// One entry per dimension, outermost first. XTCE writes `Array[1st][2nd][last]` and
+        /// says the last dimension varies fastest, so the layout is row-major.
+        dimensions: Vec<ArrayDimension>,
+    },
     /// A parameter type this crate models structurally but cannot decode.
     ///
     /// Loading succeeds; decoding a parameter of this type reports
@@ -88,8 +101,39 @@ impl TypeKind {
             Self::Enumerated(_) => "enumerated",
             Self::AbsoluteTime { .. } => "absolute-time",
             Self::RelativeTime => "relative-time",
+            Self::Array { .. } => "array",
             Self::Unsupported { .. } => "unsupported",
         }
+    }
+}
+
+/// One `<xtce:Dimension>` of an array, as a pair of inclusive zero-based indices.
+///
+/// XTCE 1.2 §4.3.2.4.2: "For partial entries of an array, the starting and ending index for
+/// each dimension … Indexes are zero based." Both ends are inclusive, so a dimension of
+/// `0..=4` has five elements.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ArrayDimension {
+    /// `StartingIndex`, zero-based and inclusive.
+    pub start: i64,
+    /// `EndingIndex`, zero-based and inclusive.
+    pub end: i64,
+}
+
+impl ArrayDimension {
+    /// How many elements the dimension spans, or `None` if it runs backwards.
+    #[must_use]
+    pub fn len(&self) -> Option<usize> {
+        // `try_from` rather than a cast: the sign is exactly what makes a backwards
+        // dimension unusable, so losing it here would turn one into a plausible length.
+        let span = self.end.checked_sub(self.start)?;
+        usize::try_from(span).ok()?.checked_add(1)
+    }
+
+    /// Whether the dimension spans nothing, which XTCE cannot express but a file can say.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len().is_none()
     }
 }
 

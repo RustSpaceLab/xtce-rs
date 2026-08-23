@@ -1,0 +1,243 @@
+//! What an `<ArrayParameterType>` expands into, exactly.
+//!
+//! An array entry is turned into one parameter per element when the file is loaded, so that
+//! nothing downstream — the interpreter, the code generator, the flight encoder — has to know
+//! arrays exist. That makes the expansion the only place the semantics live, and these tests
+//! pin it by name and by offset rather than by "it decodes".
+//!
+//! There is no reference to check against here. `space_packet_parser` raises
+//! `NotImplementedError` for `ArrayParameterType` and says supporting it is on its roadmap,
+//! so the oracle is XTCE 1.2 itself. Two clauses of it do the work:
+//!
+//! * `DimensionType`: "For partial entries of an array, the starting and ending index for
+//!   each dimension … Indexes are zero based." Both ends are inclusive.
+//! * `DimensionListType`: "Array[1stDim][2ndDim][lastDim]. The last dimension is assumed to
+//!   be the least significant — that is this dimension will cycle through its combination
+//!   before the next to last dimension changes." Row-major.
+
+use xtce_model::{EntryKind, XtceDb};
+
+/// Wraps a parameter type set, parameter set and entry list in a loadable document.
+fn definition(types: &str, parameters: &str, entries: &str) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="T">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U8"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>
+      {types}
+    </ParameterTypeSet>
+    <ParameterSet>{parameters}</ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="Only"><EntryList>{entries}</EntryList></SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>"#
+    )
+}
+
+/// A `<Dimension>` from `start` to `end`, inclusive.
+fn dimension(start: i64, end: i64) -> String {
+    format!(
+        "<Dimension><StartingIndex><FixedValue>{start}</FixedValue></StartingIndex>\
+         <EndingIndex><FixedValue>{end}</FixedValue></EndingIndex></Dimension>"
+    )
+}
+
+/// The parameter names the only container's entries resolve to, in order.
+fn expanded(xml: &str) -> Vec<String> {
+    let db = XtceDb::from_xml(xml).expect("the definition loads");
+    let container = db.containers().first().expect("one container");
+    container
+        .entries
+        .slice(db.entries())
+        .iter()
+        .map(|entry| match entry.kind {
+            EntryKind::Parameter(id) => {
+                let parameter = db.parameter(id).expect("the parameter resolves");
+                db.name(parameter.name).to_owned()
+            }
+            _ => "<not a parameter>".to_owned(),
+        })
+        .collect()
+}
+
+#[test]
+fn one_dimension_expands_in_order() {
+    let xml = definition(
+        &format!(
+            r#"<ArrayParameterType name="ARR_T" arrayTypeRef="U8"><DimensionList>{}</DimensionList></ArrayParameterType>"#,
+            dimension(0, 4)
+        ),
+        r#"<Parameter name="ARR" parameterTypeRef="ARR_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="ARR"/>"#,
+    );
+    assert_eq!(
+        expanded(&xml),
+        ["ARR[0]", "ARR[1]", "ARR[2]", "ARR[3]", "ARR[4]"],
+        "five inclusive indices, named by their own index"
+    );
+}
+
+/// Two dimensions, with **different** extents.
+///
+/// The extents differ on purpose. With a square array a transposed expansion produces the
+/// same number of fields covering the same bits, and every test passes; 2 by 3 is the
+/// smallest shape where row-major and column-major disagree about which name sits where.
+#[test]
+fn two_dimensions_expand_with_the_last_varying_fastest() {
+    let xml = definition(
+        &format!(
+            r#"<ArrayParameterType name="ARR_T" arrayTypeRef="U8"><DimensionList>{}{}</DimensionList></ArrayParameterType>"#,
+            dimension(0, 1),
+            dimension(0, 2)
+        ),
+        r#"<Parameter name="ARR" parameterTypeRef="ARR_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="ARR"/>"#,
+    );
+    assert_eq!(
+        expanded(&xml),
+        [
+            "ARR[0][0]",
+            "ARR[0][1]",
+            "ARR[0][2]",
+            "ARR[1][0]",
+            "ARR[1][1]",
+            "ARR[1][2]",
+        ],
+        "XTCE says the last dimension cycles before the one before it changes"
+    );
+}
+
+/// A `<DimensionList>` on the *entry* subsets the array, and keeps the array's own indices.
+///
+/// XTCE: "Only used for subsetting an array. The array's maximum dimension sizes are set in
+/// the type." Renumbering the subset from zero would make its fields impossible to line up
+/// with the same array read whole.
+#[test]
+fn a_subset_keeps_the_indices_it_covers() {
+    let xml = definition(
+        &format!(
+            r#"<ArrayParameterType name="ARR_T" arrayTypeRef="U8"><DimensionList>{}</DimensionList></ArrayParameterType>"#,
+            dimension(0, 9)
+        ),
+        r#"<Parameter name="ARR" parameterTypeRef="ARR_T"/>"#,
+        &format!(
+            r#"<ArrayParameterRefEntry parameterRef="ARR"><DimensionList>{}</DimensionList></ArrayParameterRefEntry>"#,
+            dimension(2, 4)
+        ),
+    );
+    assert_eq!(expanded(&xml), ["ARR[2]", "ARR[3]", "ARR[4]"]);
+}
+
+/// A subset that runs past the type's declared size is a definition error.
+#[test]
+fn a_subset_outside_the_declared_dimensions_is_refused() {
+    let xml = definition(
+        &format!(
+            r#"<ArrayParameterType name="ARR_T" arrayTypeRef="U8"><DimensionList>{}</DimensionList></ArrayParameterType>"#,
+            dimension(0, 3)
+        ),
+        r#"<Parameter name="ARR" parameterTypeRef="ARR_T"/>"#,
+        &format!(
+            r#"<ArrayParameterRefEntry parameterRef="ARR"><DimensionList>{}</DimensionList></ArrayParameterRefEntry>"#,
+            dimension(2, 9)
+        ),
+    );
+    let Err(error) = XtceDb::from_xml(&xml) else {
+        panic!("a subset past the end cannot load");
+    };
+    assert!(
+        error.to_string().contains("outside the declared"),
+        "unexpected error: {error}"
+    );
+}
+
+/// An index the packet supplies cannot be expanded when the file is loaded.
+#[test]
+fn a_dimension_read_from_the_packet_is_not_expanded() {
+    let xml = definition(
+        r#"<ArrayParameterType name="ARR_T" arrayTypeRef="U8"><DimensionList>
+             <Dimension>
+               <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+               <EndingIndex><DynamicValue><ParameterInstanceRef parameterRef="N"/></DynamicValue></EndingIndex>
+             </Dimension>
+           </DimensionList></ArrayParameterType>"#,
+        r#"<Parameter name="N" parameterTypeRef="U8"/><Parameter name="ARR" parameterTypeRef="ARR_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="N"/><ParameterRefEntry parameterRef="ARR"/>"#,
+    );
+    // The type loads — `xtce info` should still name it — but the container that uses it is
+    // blocked rather than silently short.
+    let db = XtceDb::from_xml(&xml).expect("the definition loads");
+    assert!(
+        db.unsupported()
+            .iter()
+            .any(|item| item.element.contains("ArrayParameterType")),
+        "the array should be reported as represented but not decodable"
+    );
+}
+
+/// The synthetic parameters are not visible to a `parameterRef`.
+///
+/// They live in the arena so that entries can point at them, but not in the index that
+/// `<Comparison parameterRef=…>`, `DynamicValue` and context calibrators search. A synthetic
+/// `ARR[0]` there could shadow a real parameter of that name, and nothing would say so.
+#[test]
+fn synthetic_elements_cannot_be_referenced_by_name() {
+    let xml = definition(
+        &format!(
+            r#"<ArrayParameterType name="ARR_T" arrayTypeRef="U8"><DimensionList>{}</DimensionList></ArrayParameterType>"#,
+            dimension(0, 2)
+        ),
+        r#"<Parameter name="ARR" parameterTypeRef="ARR_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="ARR"/>"#,
+    );
+    let db = XtceDb::from_xml(&xml).expect("the definition loads");
+
+    // Present in the arena…
+    let names: Vec<&str> = db
+        .parameters()
+        .iter()
+        .map(|parameter| db.name(parameter.name))
+        .collect();
+    assert!(names.contains(&"ARR[0]"), "{names:?}");
+
+    // …and a definition that tries to name one does not load.
+    let referencing = definition(
+        &format!(
+            r#"<ArrayParameterType name="ARR_T" arrayTypeRef="U8"><DimensionList>{}</DimensionList></ArrayParameterType>"#,
+            dimension(0, 2)
+        ),
+        r#"<Parameter name="ARR" parameterTypeRef="ARR_T"/><Parameter name="OTHER" parameterTypeRef="U8"/>"#,
+        r#"<ParameterRefEntry parameterRef="ARR"/><ParameterRefEntry parameterRef="ARR[0]"/>"#,
+    );
+    assert!(
+        XtceDb::from_xml(&referencing).is_err(),
+        "a synthetic element must not resolve as a reference"
+    );
+}
+
+/// The expansion has a ceiling, and says what it was asked for.
+#[test]
+fn an_array_larger_than_the_ceiling_is_refused_with_its_size() {
+    let xml = definition(
+        &format!(
+            r#"<ArrayParameterType name="ARR_T" arrayTypeRef="U8"><DimensionList>{}</DimensionList></ArrayParameterType>"#,
+            dimension(0, 9999)
+        ),
+        r#"<Parameter name="ARR" parameterTypeRef="ARR_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="ARR"/>"#,
+    );
+    let Err(error) = XtceDb::from_xml(&xml) else {
+        panic!("ten thousand elements is too many");
+    };
+    let message = error.to_string();
+    assert!(
+        message.contains("10000"),
+        "the refusal should say how many: {message}"
+    );
+    assert!(
+        message.contains("4096"),
+        "and what the ceiling is: {message}"
+    );
+}

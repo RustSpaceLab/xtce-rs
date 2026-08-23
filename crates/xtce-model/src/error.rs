@@ -95,6 +95,19 @@ pub enum XtceError {
         /// Element path within the document.
         path: String,
     },
+
+    /// An array entry could not be turned into one parameter per element.
+    ///
+    /// Loading fails rather than the array being dropped: an entry that does not expand
+    /// leaves every field after it at the wrong offset, and a container decoded at the wrong
+    /// offsets is worse than one that refuses.
+    #[error("cannot expand the array at {path}: {reason}")]
+    ArrayNotExpanded {
+        /// Why the expansion could not be carried out.
+        reason: String,
+        /// Element path within the document.
+        path: String,
+    },
 }
 
 /// Which XTCE namespace a reference is resolved in.

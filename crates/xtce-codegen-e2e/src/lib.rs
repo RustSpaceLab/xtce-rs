@@ -83,3 +83,9 @@ pub mod boolean_criteria {
 pub mod byte_order {
     include!(concat!(env!("OUT_DIR"), "/byte_order.rs"));
 }
+
+/// Arrays, expanded into one field per element.
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+pub mod arrays {
+    include!(concat!(env!("OUT_DIR"), "/arrays.rs"));
+}
