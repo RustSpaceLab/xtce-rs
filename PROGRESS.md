@@ -245,6 +245,44 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — MIL-STD-1750A, and it matched first time
+
+The generator compiles MIL-STD-1750A. Seventeen of seventeen bundled definitions compile.
+
+**It is not a float format in the IEEE sense and shares none of its arithmetic.** A 24-bit
+two's-complement mantissa in the top of the word and an 8-bit two's-complement exponent in the
+bottom, neither biased, no implicit leading one, no infinities and no NaN. The value is
+`mantissa * 2 ** (exponent - 23)`. The interpreter already had it, tested against the
+standard's own table of reference values; the generator emits the same arithmetic and reuses
+the `powi` helper written for calibrators.
+
+**The reference implements it**, which arrays and aggregates cannot say — so `mil_1750a.xml`
+comes with a packet stream and a golden, and this is the second feature whose interpreted path
+is pinned to `space_packet_parser` directly. It matched on the first run, big-endian,
+little-endian, four bits off a byte boundary and calibrated. After four features where reading
+the reference or running it turned something up, one that simply agreed is worth recording too.
+
+Nothing in that stream needs fixing up, unlike `byte_order_stream.bin`, which has to turn its
+binary16 NaNs into infinities. Every one of the 2³² MIL words denotes a finite number, so
+there is nothing whose *kind* the two implementations could disagree about.
+
+**One thing nearly went wrong quietly.** `calibration_for` decides whether a field is numeric
+enough to carry a calibrator, from a list of `Repr` variants. Adding `Repr::Mil1750a` without
+adding it to that list would have dropped a calibrator on a MIL field silently — the
+interpreter reaches calibration for any numeric type, and a MIL raw value arrives as a float
+like any other. `mil_1750a.xml` has a calibrated MIL field for exactly that reason.
+
+**And one thing that is wrong, found on the way and not fixed.** Reading the reference's
+polynomial calibrator to check the MIL case showed it computes `x ** n`, which for a float
+base is a libm `pow` call, where `xtce-decode` uses `powi` — square and multiply. Measured
+over 200 000 random values: identical for exponents 0 and 1, 84 disagreements at exponent 2,
+and 16 561 — about 8% — at exponent 3. `calibrators.xml` has exactly that shape and is
+compared only against the interpreter, so nothing is presently wrong; the gap is that the
+float polynomial has never been held to the reference and would not survive it. Recorded in
+`BLOCKERS.md` rather than fixed, because `pow` is not required to be correctly rounded and the
+reference's own answer can differ between platforms — a golden over it would depend on the
+machine that made it, and `powi` at least gives the same answer everywhere.
+
 ## 2026-08-23 — a MIL-STD-1750A float of the wrong width
 
 `mil_std_1750a` takes `bits as u32`. For a field declared 32 bits wide, which is what the

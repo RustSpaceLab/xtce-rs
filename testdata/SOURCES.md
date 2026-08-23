@@ -44,7 +44,7 @@ text are retained, which `testdata/spp/LICENSE.txt` does.
 
 ### Written for this project
 
-Five files here are not vendored. All exist for the same reason: an implementation path that
+Seven files here are not vendored. All exist for the same reason: an implementation path that
 the real mission files never reach, and so would never be compared against anything.
 
 | File | Why |
@@ -55,12 +55,14 @@ the real mission files never reach, and so would never be compared against anyth
 | `byte_order.xml` + `byte_order_stream.bin` | **no mission file sets `byteOrder`** — so there is no recorded telemetry with a little-endian field, and no bytes to put in front of the reference |
 | `arrays.xml` | **no mission file has an `<ArrayParameterType>`**, and neither does the reference: it raises `NotImplementedError` and calls the feature roadmap |
 | `aggregates.xml` | the same for `<AggregateParameterType>`, plus the two nested in each other, which is where the naming can go wrong |
+| `mil_1750a.xml` + `mil_1750a_stream.bin` | **no mission file uses MIL-STD-1750A** — but the reference implements it, so this one is a golden case like the six real ones |
 
-`byte_order_stream.bin` is the only packet stream here that was not flown. It is written by
+`byte_order_stream.bin` and `mil_1750a_stream.bin` are the only packet streams here that were
+not flown. It is written by
 `tools/gen_byte_order_stream.py` from a fixed seed, so regenerating it produces the same file
-and the golden taken over it stays meaningful. It is a golden case like the six real ones,
-which makes little-endian the only feature whose interpreted path is checked against
-`space_packet_parser` directly. Doing that found two divergences the first time it ran; see
+and the golden taken over it stays meaningful. Both are golden cases like the six real ones, which makes little-endian and MIL-STD-1750A the
+only two features whose interpreted paths are checked against `space_packet_parser` directly.
+Little-endian found two divergences the first time it ran; MIL-STD-1750A matched. See
 `SUPPORTED.md`.
 
 Neither is a substitute for a real sample; they are a supplement to one. `calibrators.xml` in

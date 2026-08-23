@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Written for this project. No bundled mission definition uses MIL-STD-1750A, so the
+  interpreter's implementation of it had never been compared against anything but the
+  standard's own table of reference values, and the generator refused it outright.
+
+  Unlike arrays and aggregates, the reference *does* implement this one — so this file comes
+  with a packet stream and a golden, and MIL-STD-1750A becomes the second feature here whose
+  interpreted path is pinned to `space_packet_parser` directly rather than to hand-computed
+  values. The ladder runs the whole way: generated against interpreted against Python, on the
+  same bytes.
+
+  The format is not a float in the IEEE sense and nothing about it is a special case of one:
+
+      MSB                                         LSB MSB          LSB
+      | S|                   Mantissa                 |    Exponent   |
+        0  1                                        23 24            31
+
+  A 24-bit two's-complement mantissa in the top of the word and an 8-bit two's-complement
+  exponent in the bottom, neither biased, no implicit leading one, no infinities and no NaN.
+  The value is `mantissa * 2 ** (exponent - 23)`. Every 32-bit pattern denotes a finite
+  number, which is why the stream can be filled with arbitrary bytes and none of it has to be
+  fixed up — the opposite of `byte_order_stream.bin`, which has to avoid binary16 NaNs.
+
+  What varies here:
+
+  * MIL_BE is the plain case, byte-aligned.
+  * MIL_LE is the same format little-endian, which the reference implements by reading the
+    four bytes the other way round before splitting them.
+  * MIL_ODD starts four bits into a byte, so the word is assembled from five bytes.
+  * MIL_CAL carries a polynomial calibrator. A MIL raw value is a float, so it takes the
+    `powi` path rather than the exact-integer one — and a generator that forgot MIL is a
+    numeric type would drop the calibrator silently, which is a wrong number rather than a
+    refusal.
+  * F32_BE is the control: an IEEE-754 word of the same width, so a generator that used one
+    conversion for both is caught.
+-->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="Mil1750a">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U1">
+        <IntegerDataEncoding sizeInBits="1" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U2">
+        <IntegerDataEncoding sizeInBits="2" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U3">
+        <IntegerDataEncoding sizeInBits="3" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U4">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U11">
+        <IntegerDataEncoding sizeInBits="11" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U14">
+        <IntegerDataEncoding sizeInBits="14" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U16">
+        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
+      </IntegerParameterType>
+
+      <FloatParameterType name="MIL_T">
+        <FloatDataEncoding sizeInBits="32" encoding="MILSTD_1750A"/>
+      </FloatParameterType>
+      <FloatParameterType name="MIL_LE_T">
+        <FloatDataEncoding sizeInBits="32" encoding="MILSTD_1750A"
+                           byteOrder="leastSignificantByteFirst"/>
+      </FloatParameterType>
+      <FloatParameterType name="MIL_CAL_T">
+        <FloatDataEncoding sizeInBits="32" encoding="MILSTD_1750A">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="2.5" exponent="1"/>
+              <Term coefficient="-0.75" exponent="0"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </FloatDataEncoding>
+      </FloatParameterType>
+      <FloatParameterType name="F32_T">
+        <FloatDataEncoding sizeInBits="32" encoding="IEEE754"/>
+      </FloatParameterType>
+    </ParameterTypeSet>
+
+    <ParameterSet>
+      <Parameter name="VERSION" parameterTypeRef="U3"/>
+      <Parameter name="TYPE" parameterTypeRef="U1"/>
+      <Parameter name="SEC_HDR_FLAG" parameterTypeRef="U1"/>
+      <Parameter name="PKT_APID" parameterTypeRef="U11"/>
+      <Parameter name="SEQ_FLGS" parameterTypeRef="U2"/>
+      <Parameter name="SEQ_CTR" parameterTypeRef="U14"/>
+      <Parameter name="PKT_LEN" parameterTypeRef="U16"/>
+
+      <Parameter name="MIL_BE" parameterTypeRef="MIL_T"/>
+      <Parameter name="MIL_LE" parameterTypeRef="MIL_LE_T"/>
+      <Parameter name="NIB" parameterTypeRef="U4"/>
+      <Parameter name="MIL_ODD" parameterTypeRef="MIL_T"/>
+      <Parameter name="PAD_4" parameterTypeRef="U4"/>
+      <Parameter name="F32_BE" parameterTypeRef="F32_T"/>
+      <Parameter name="MIL_CAL" parameterTypeRef="MIL_CAL_T"/>
+    </ParameterSet>
+
+    <ContainerSet>
+      <SequenceContainer name="CCSDSPacket" abstract="true">
+        <EntryList>
+          <ParameterRefEntry parameterRef="VERSION"/>
+          <ParameterRefEntry parameterRef="TYPE"/>
+          <ParameterRefEntry parameterRef="SEC_HDR_FLAG"/>
+          <ParameterRefEntry parameterRef="PKT_APID"/>
+          <ParameterRefEntry parameterRef="SEQ_FLGS"/>
+          <ParameterRefEntry parameterRef="SEQ_CTR"/>
+          <ParameterRefEntry parameterRef="PKT_LEN"/>
+        </EntryList>
+      </SequenceContainer>
+
+      <SequenceContainer name="Payload">
+        <EntryList>
+          <ParameterRefEntry parameterRef="MIL_BE"/>
+          <ParameterRefEntry parameterRef="MIL_LE"/>
+          <!-- Four bits, so the word below is assembled from five bytes. -->
+          <ParameterRefEntry parameterRef="NIB"/>
+          <ParameterRefEntry parameterRef="MIL_ODD"/>
+          <ParameterRefEntry parameterRef="PAD_4"/>
+          <ParameterRefEntry parameterRef="F32_BE"/>
+          <ParameterRefEntry parameterRef="MIL_CAL"/>
+        </EntryList>
+        <BaseContainer containerRef="CCSDSPacket">
+          <RestrictionCriteria>
+            <Comparison parameterRef="PKT_APID" value="200" useCalibratedValue="false"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

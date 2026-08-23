@@ -29,6 +29,12 @@ pub enum Repr {
     Float32,
     /// IEEE-754 binary64.
     Float64,
+    /// MIL-STD-1750A, which is 32 bits and nothing else.
+    ///
+    /// Not a float format in the IEEE sense at all: a 24-bit two's-complement mantissa in
+    /// the top of the word and an 8-bit two's-complement exponent in the bottom, neither
+    /// biased, with no implicit leading one and no infinities.
+    Mil1750a,
     /// A boolean, true when the raw value is non-zero.
     Bool,
     /// An enumeration: `(value, max_value, label)` sorted by value.
@@ -589,9 +595,18 @@ impl<'db> Builder<'db> {
         repr: &Repr,
         refuse: &impl Fn(&str, &'static str) -> CodegenError,
     ) -> Result<Option<Calibration>, CodegenError> {
+        // MIL-STD-1750A belongs here too: the interpreter reaches calibration for any
+        // numeric type, and a raw MIL value arrives as a float like any other. Leaving it
+        // out would drop the calibrator silently, which is the shape of divergence this
+        // project exists to avoid.
         let numeric = matches!(
             repr,
-            Repr::Unsigned | Repr::Signed(_) | Repr::Float16 | Repr::Float32 | Repr::Float64
+            Repr::Unsigned
+                | Repr::Signed(_)
+                | Repr::Float16
+                | Repr::Float32
+                | Repr::Float64
+                | Repr::Mil1750a
         );
         if !numeric {
             return Ok(None);
@@ -792,20 +807,23 @@ fn encoding_repr(
             )
         }
         DataEncoding::Float(encoding) => {
-            if encoding.coding != FloatCoding::Ieee754 {
-                return Err(refuse(
-                    "FloatDataEncoding",
-                    "only IEEE-754 is compiled; MIL-STD-1750A is not",
-                ));
-            }
-            let repr = match encoding.size_in_bits {
-                16 => Repr::Float16,
-                32 => Repr::Float32,
-                64 => Repr::Float64,
-                _ => {
+            let repr = match (encoding.coding, encoding.size_in_bits) {
+                (FloatCoding::Ieee754, 16) => Repr::Float16,
+                (FloatCoding::Ieee754, 32) => Repr::Float32,
+                (FloatCoding::Ieee754, 64) => Repr::Float64,
+                (FloatCoding::Ieee754, _) => {
                     return Err(refuse(
                         "FloatDataEncoding",
                         "IEEE-754 must be 16, 32 or 64 bits",
+                    ));
+                }
+                (FloatCoding::MilStd1750A, 32) => Repr::Mil1750a,
+                // The reference refuses to load a definition that says otherwise, and the
+                // interpreter refuses to decode one. There is no wider form of the format.
+                (FloatCoding::MilStd1750A, _) => {
+                    return Err(refuse(
+                        "FloatDataEncoding",
+                        "MIL-STD-1750A is a 32-bit format and has no other width",
                     ));
                 }
             };

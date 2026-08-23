@@ -818,7 +818,7 @@ fn visit_values(field: &Field) -> (TokenStream, TokenStream) {
         let eng = ident(eng_ident);
         let raw = match &field.repr {
             Repr::Signed(_) => quote! { Value::Signed(self.#stored) },
-            Repr::Float16 | Repr::Float32 | Repr::Float64 => {
+            Repr::Float16 | Repr::Float32 | Repr::Float64 | Repr::Mil1750a => {
                 quote! { Value::Float(self.#stored) }
             }
             _ => quote! { Value::Unsigned(self.#stored) },
@@ -835,7 +835,7 @@ fn visit_values(field: &Field) -> (TokenStream, TokenStream) {
             quote! { Value::Signed(self.#stored) },
             quote! { Value::Signed(self.#stored) },
         ),
-        Repr::Float16 | Repr::Float32 | Repr::Float64 => (
+        Repr::Float16 | Repr::Float32 | Repr::Float64 | Repr::Mil1750a => (
             quote! { Value::Float(self.#stored) },
             quote! { Value::Float(self.#stored) },
         ),
@@ -873,7 +873,7 @@ fn rust_type(repr: &Repr) -> TokenStream {
     match repr {
         Repr::Unsigned | Repr::Bool | Repr::Enumerated(_) => quote!(u64),
         Repr::Signed(_) => quote!(i64),
-        Repr::Float16 | Repr::Float32 | Repr::Float64 => quote!(f64),
+        Repr::Float16 | Repr::Float32 | Repr::Float64 | Repr::Mil1750a => quote!(f64),
         Repr::Text { .. } => quote!(&'a str),
         Repr::Binary => quote!(&'a [u8]),
     }
@@ -984,6 +984,10 @@ fn numeric_from_u64(repr: &Repr, raw: &Expr, width: Width, unmasked: bool) -> To
         Repr::Signed(coding) => signed(raw, bits, *coding, unmasked),
         // These three sit in argument position, where parentheses would only trip
         // `unused_parens`.
+        Repr::Mil1750a => {
+            let value = raw.widened(64).into_tokens();
+            quote! { mil_std_1750a(#value) }
+        }
         Repr::Float16 => {
             let value = raw.widened(16).into_tokens();
             quote! { half_to_f64(#value) }
@@ -1573,6 +1577,7 @@ fn helpers(plan: &Plan) -> TokenStream {
             .map(|f| &f.repr)
     };
     let needs_half = reprs().any(|repr| *repr == Repr::Float16);
+    let needs_mil = reprs().any(|repr| *repr == Repr::Mil1750a);
     let needs_text = reprs().any(|repr| matches!(repr, Repr::Text { .. }));
     let needs_terminator = reprs().any(|repr| {
         matches!(
@@ -1601,8 +1606,8 @@ fn helpers(plan: &Plan) -> TokenStream {
     };
     let needs_power = calibrations().any(|c| matches!(c, Calibration::Polynomial(_)));
     // Every polynomial needs it: the integral path falls back to it on overflow, and the
-    // float path is nothing else.
-    let needs_powi = needs_power;
+    // float path is nothing else. So does MIL-STD-1750A, which scales by a power of two.
+    let needs_powi = needs_power || needs_mil;
     let needs_spline = calibrations().any(|c| matches!(c, Calibration::Spline(_)));
 
     // Only where a swap survives the reversed-load shortcut: a field off a byte boundary, or
@@ -1625,6 +1630,7 @@ fn helpers(plan: &Plan) -> TokenStream {
         quote!()
     };
     let half = if needs_half { half_helper() } else { quote!() };
+    let mil = if needs_mil { mil_helper() } else { quote!() };
     let text = if needs_text { text_helper() } else { quote!() };
     let terminated = if needs_terminator {
         terminated_helper()
@@ -1656,6 +1662,7 @@ fn helpers(plan: &Plan) -> TokenStream {
     quote! {
         #cursor
         #half
+        #mil
         #text
         #terminated
         #leading
@@ -1734,6 +1741,26 @@ fn swap_helper() -> TokenStream {
                 remaining >>= 8;
             }
             out
+        }
+    }
+}
+
+/// MIL-STD-1750A, which is not a float format in the IEEE sense.
+///
+/// A 24-bit two's-complement mantissa in the top of the word and an 8-bit two's-complement
+/// exponent in the bottom, neither biased, no implicit leading one, no infinities and no
+/// NaN. Line for line what `xtce_decode::decoder::mil_std_1750a` computes, which in turn is
+/// what the reference computes: `mantissa * 2 ** (exponent - 23)`.
+///
+/// Both fields are masked before the sign extension, so the shifts below have nothing above
+/// their width to discard and the masking and unmasked forms coincide.
+fn mil_helper() -> TokenStream {
+    quote! {
+        fn mil_std_1750a(bits: u64) -> f64 {
+            let word = bits as u32;
+            let exponent = ((((word & 0xFF) as u64) << 56) as i64) >> 56;
+            let mantissa = (((((word >> 8) & 0x00FF_FFFF) as u64) << 40) as i64) >> 40;
+            (mantissa as f64) * powi(2.0, (exponent as i32) - 23)
         }
     }
 }

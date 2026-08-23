@@ -36,6 +36,12 @@
   "parse_seconds": 0.953711
  },
  {
+  "case": "mil_1750a",
+  "packet_count": 512,
+  "load_seconds": 0.005853,
+  "parse_seconds": 0.045225
+ },
+ {
   "case": "suda",
   "packet_count": 13,
   "load_seconds": 0.019747,

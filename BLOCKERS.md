@@ -23,6 +23,26 @@ nothing in reach uses.
 2. **Talk to `greglucas/space-data-toolkit`.** Section 7 of the specification suggests it,
    and the benchmark it asked for now exists.
 
+## Known divergences with no test behind them
+
+* **A polynomial calibrator over a *float* encoding.** `xtce-decode` raises the raw value to
+  its power with `powi` — square and multiply. The reference writes `x ** n`, which for a
+  float base is CPython's `**`, which is a libm `pow` call. Measured on 2026-08-23 over
+  200 000 random values: they agree for exponents 0 and 1, differ for 84 values at exponent 2,
+  and for **16 561 — about 8% — at exponent 3**. Python also raises `OverflowError` where
+  `powi` returns infinity.
+
+  Not fixed, and not turned into a golden, on purpose. `pow` is not required by the C standard
+  to be correctly rounded, so the reference's own answer can differ between platforms;
+  committing a golden over one would make the suite depend on the machine that produced it.
+  `powi` at least gives the same answer everywhere. `calibrators.xml` exercises exactly this
+  shape but is compared only against the interpreter, so nothing here is currently wrong —
+  the gap is that the interpreter's float polynomial has never been held to the reference and
+  would not survive being held to it.
+
+  What it would take: decide whether bit-for-bit agreement with a platform-dependent `pow` is
+  worth having, and if so, whether `powf` is close enough on the machines that matter.
+
 ## Things deliberately left undone
 
 * **`CommandMetaData`.** Out of scope by design, dropped during parsing, counted in

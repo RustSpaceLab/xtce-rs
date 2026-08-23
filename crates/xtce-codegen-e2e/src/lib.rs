@@ -90,6 +90,12 @@ pub mod arrays {
     include!(concat!(env!("OUT_DIR"), "/arrays.rs"));
 }
 
+/// MIL-STD-1750A, big-endian, little-endian, unaligned and calibrated.
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+pub mod mil_1750a {
+    include!(concat!(env!("OUT_DIR"), "/mil_1750a.rs"));
+}
+
 /// Aggregates, and arrays and aggregates nested in each other.
 #[allow(dead_code, clippy::all, clippy::pedantic)]
 pub mod aggregates {

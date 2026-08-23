@@ -113,6 +113,13 @@ CASES: tuple[Case, ...] = (
         xtce="byte_order.xml",
         packets="byte_order_stream.bin",
     ),
+    # The second generated stream, for the same reason: no mission definition uses
+    # MIL-STD-1750A, and the reference does implement it, so this is the only way to compare.
+    Case(
+        name="mil_1750a",
+        xtce="mil_1750a.xml",
+        packets="mil_1750a_stream.bin",
+    ),
     # A definition pointed at a stream it does not describe. Every packet reaches the
     # abstract root and finds no inheritor whose restriction criteria hold, so the reference
     # raises UnrecognizedPacketTypeError for all of them. Without this case the rejection

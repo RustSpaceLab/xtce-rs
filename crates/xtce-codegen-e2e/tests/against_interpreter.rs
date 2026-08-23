@@ -20,7 +20,8 @@ use xtce_model::XtceDb;
 // `udp` is absent on purpose: it has no packet stream, so compiling it in the library above
 // is the whole of its check.
 use xtce_codegen_e2e::{
-    aggregates, arrays, boolean_criteria, byte_order, calibrators, ctim, idex, numeric_edges, suda,
+    aggregates, arrays, boolean_criteria, byte_order, calibrators, ctim, idex, mil_1750a,
+    numeric_edges, suda,
 };
 
 fn testdata(relative: &str) -> PathBuf {
@@ -850,4 +851,73 @@ fn the_nested_field_names_are_the_ones_xtce_describes() {
             "TAIL",
         ]
     );
+}
+
+/// MIL-STD-1750A, against the interpreter, over the whole stream.
+///
+/// The second feature here whose interpreted path is pinned to Python directly, through
+/// `cargo xtask diff` — the reference implements this format, unlike arrays and aggregates.
+/// So the ladder runs the whole way: this test is the generated-against-interpreted rung and
+/// the golden is the interpreted-against-Python one.
+///
+/// The format is not a special case of IEEE-754 and shares none of its arithmetic: a 24-bit
+/// two's-complement mantissa and an 8-bit two's-complement exponent, neither biased, scaled
+/// by `2 ** (exponent - 23)`. Every 32-bit pattern denotes a finite number, which is why the
+/// stream needed no fixing up — there is no NaN to disagree about.
+#[test]
+fn mil_std_1750a_matches_the_interpreter() {
+    let db = XtceDb::from_path(testdata("mil_1750a.xml")).expect("definition loads");
+    let decoder = Decoder::new(&db).expect("root container");
+    let (same_raw, same_eng) = comparators!(mil_1750a);
+
+    let stream = std::fs::read(testdata("mil_1750a_stream.bin")).expect("the stream is present");
+    let mut compared = 0usize;
+    let mut refused = 0usize;
+
+    for (index, framed) in PacketIter::new(&stream, 0).enumerate() {
+        let packet = framed.expect("the stream is well framed");
+        let bytes = packet.bytes();
+
+        let mut interpreted = decoder.new_packet(bytes);
+        let by_interpreter = decoder.decode_into(&mut interpreted, bytes);
+        let by_generator = mil_1750a::decode(bytes);
+
+        match (by_interpreter, by_generator) {
+            (Err(_), Err(_)) => refused += 1,
+            (Ok(()), Ok(compiled)) => {
+                let mut fields = Vec::new();
+                compiled.for_each_value(|name, raw, eng| fields.push((name, raw, eng)));
+                assert_eq!(
+                    fields.len(),
+                    interpreted.len(),
+                    "packet {index}: field counts"
+                );
+                for ((name, raw, eng), value) in fields.iter().zip(interpreted.values()) {
+                    assert!(
+                        same_raw(raw, &value.raw),
+                        "packet {index}: {name}: raw differs — generated {raw:?}, \
+                         interpreted {:?}",
+                        value.raw
+                    );
+                    assert!(
+                        same_eng(eng, &value.eng),
+                        "packet {index}: {name}: engineering differs — generated {eng:?}, \
+                         interpreted {:?}",
+                        value.eng
+                    );
+                }
+                compared += 1;
+            }
+            (interpreted_result, generated_result) => panic!(
+                "packet {index}: the two disagree about whether it decodes — interpreter \
+                 {:?}, generated {:?}",
+                interpreted_result.err(),
+                generated_result.err()
+            ),
+        }
+    }
+
+    // 512 packets, one in four with an APID nothing describes.
+    assert_eq!(compared, 384);
+    assert_eq!(refused, 128);
 }
