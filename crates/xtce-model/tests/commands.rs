@@ -554,3 +554,163 @@ fn a_command_parameter_type_is_reachable_from_both_kinds_of_reference() {
         Some(24)
     );
 }
+
+/// An assignment reaches an argument declared two commands up the chain.
+///
+/// The effective argument scope is built root-first over the whole chain, so a command sees
+/// every argument its ancestors declare. Two levels is where a one-level shortcut would still
+/// pass, so this goes three deep: `Leaf` pins an argument that `Root` declares and `Middle`
+/// never mentions.
+#[test]
+fn an_assignment_reaches_an_argument_two_levels_up() {
+    let db = load(
+        r#"    <ArgumentTypeSet>
+      <IntegerArgumentType name="U8_A"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <MetaCommand name="Root" abstract="true">
+        <ArgumentList><Argument name="OPCODE" argumentTypeRef="U8_A"/></ArgumentList>
+        <CommandContainer name="RootContainer">
+          <EntryList><ArgumentRefEntry argumentRef="OPCODE"/></EntryList>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="Middle" abstract="true">
+        <BaseMetaCommand metaCommandRef="Root"/>
+        <ArgumentList><Argument name="SUBSYSTEM" argumentTypeRef="U8_A"/></ArgumentList>
+        <CommandContainer name="MiddleContainer">
+          <EntryList><ArgumentRefEntry argumentRef="SUBSYSTEM"/></EntryList>
+          <BaseContainer containerRef="RootContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="Leaf">
+        <BaseMetaCommand metaCommandRef="Middle">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="OPCODE" argumentValue="9"/>
+            <ArgumentAssignment argumentName="SUBSYSTEM" argumentValue="4"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList><Argument name="LEVEL" argumentTypeRef="U8_A"/></ArgumentList>
+        <CommandContainer name="LeafContainer">
+          <EntryList><ArgumentRefEntry argumentRef="LEVEL"/></EntryList>
+          <BaseContainer containerRef="MiddleContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>"#,
+    );
+
+    let leaf = db.meta_commands()[2].container.expect("Leaf packs itself");
+    let criteria = &db.container(leaf).expect("resolves").restriction;
+    assert_eq!(criteria.len(), 2);
+
+    let named: Vec<&str> = criteria
+        .iter()
+        .map(|criterion| match criterion {
+            MatchCriteria::Comparison(comparison) => db.name(
+                db.parameter(comparison.parameter)
+                    .expect("resolves")
+                    .qualified_name,
+            ),
+            other => panic!("expected a comparison, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        named,
+        vec!["/T/Root/OPCODE", "/T/Middle/SUBSYSTEM"],
+        "each assignment pins the argument at the level that declares it"
+    );
+}
+
+/// A container in a `<CommandContainerSet>` is shared, and belongs to no single command.
+///
+/// The schema puts them there so that MetaCommand definitions can "reference/share" them, and
+/// keys their names at the system level like a telemetry container's. So they register like
+/// one — and, unlike a command's own private container, they carry no back-link to a command.
+#[test]
+fn a_shared_command_container_belongs_to_no_command() {
+    let db = load(
+        r#"    <ArgumentTypeSet>
+      <IntegerArgumentType name="U8_A"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerArgumentType>
+    </ArgumentTypeSet>
+    <ParameterTypeSet>
+      <IntegerParameterType name="HDR_T"><IntegerDataEncoding sizeInBits="16" encoding="unsigned"/></IntegerParameterType>
+    </ParameterTypeSet>
+    <ParameterSet><Parameter name="HDR" parameterTypeRef="HDR_T"/></ParameterSet>
+    <CommandContainerSet>
+      <SequenceContainer name="SharedHeader" abstract="true">
+        <EntryList><ParameterRefEntry parameterRef="HDR"/></EntryList>
+      </SequenceContainer>
+    </CommandContainerSet>
+    <MetaCommandSet>
+      <MetaCommand name="Cmd">
+        <ArgumentList><Argument name="A" argumentTypeRef="U8_A"/></ArgumentList>
+        <CommandContainer name="Packing">
+          <EntryList><ArgumentRefEntry argumentRef="A"/></EntryList>
+          <BaseContainer containerRef="SharedHeader"/>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>"#,
+    );
+
+    let shared = db.find_container("SharedHeader").expect("it registers");
+    let shared = db.container(shared).expect("resolves");
+    assert_eq!(
+        db.name(shared.qualified_name),
+        "/T/SharedHeader",
+        "named at the system level, not under a command"
+    );
+    assert_eq!(
+        shared.command, None,
+        "shared: it packs no single command, so it points back at none"
+    );
+    assert!(
+        shared.is_command,
+        "but it is still a telecommand's packaging, which is what root selection asks"
+    );
+
+    // The command's own container does point back, and inherits the shared one.
+    let packing = db.meta_commands()[0].container.expect("Cmd packs itself");
+    let packing = db.container(packing).expect("resolves");
+    assert!(packing.command.is_some());
+    assert_eq!(
+        packing
+            .base
+            .map(|id| db.name(db.container(id).expect("resolves").name)),
+        Some("SharedHeader")
+    );
+}
+
+/// A shared command container does not become the default root.
+///
+/// The awkward one. A `<CommandContainerSet>` container that is neither abstract nor derived
+/// looks exactly like a telemetry root: no `<BaseContainer>`, a name keyed at the system
+/// level, entries like any other. Counting it would leave a definition that had one root with
+/// two, and `Decoder::new` would stop working on a file whose telemetry had not changed —
+/// the same failure a command's own container would have caused, one level further out.
+#[test]
+fn a_shared_command_container_does_not_steal_the_default_root() {
+    let db = load(
+        r#"    <ParameterTypeSet>
+      <IntegerParameterType name="HDR_T"><IntegerDataEncoding sizeInBits="16" encoding="unsigned"/></IntegerParameterType>
+    </ParameterTypeSet>
+    <ParameterSet><Parameter name="HDR" parameterTypeRef="HDR_T"/></ParameterSet>
+    <CommandContainerSet>
+      <SequenceContainer name="SharedHeader">
+        <EntryList><ParameterRefEntry parameterRef="HDR"/></EntryList>
+      </SequenceContainer>
+    </CommandContainerSet>"#,
+    );
+
+    let default = db
+        .default_root_container()
+        .expect("the telemetry root is still unambiguous");
+    assert_eq!(
+        db.name(db.container(default).expect("resolves").name),
+        "Report"
+    );
+    // It is still a root of its own tree, and still reachable by name.
+    assert!(
+        db.root_containers().len() > 1,
+        "both are roots; only the default ignores one"
+    );
+    assert!(db.find_container("SharedHeader").is_some());
+}

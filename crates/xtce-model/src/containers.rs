@@ -16,10 +16,18 @@ pub struct Container {
     pub is_abstract: bool,
     /// The container this one extends, from `<BaseContainer containerRef=..>`.
     pub base: Option<ContainerId>,
+    /// Whether this container came from `<CommandMetaData>` rather than the telemetry half.
+    ///
+    /// True for a `MetaCommand`'s own `<CommandContainer>` *and* for a shared one in a
+    /// `<CommandContainerSet>`. It is what root selection needs: a telecommand is not a packet
+    /// to decode by default, whoever owns it.
+    pub is_command: bool,
     /// The telecommand this container packs, when it is a `<CommandContainer>`.
     ///
     /// `None` for a telemetry container — and also for a shared one in a
-    /// `<CommandContainerSet>`, which belongs to no single command.
+    /// `<CommandContainerSet>`, which is a telecommand's packaging but belongs to no single
+    /// command. [`Self::is_command`] is the question to ask about the half of the document
+    /// a container came from; this one is the question about ownership.
     pub command: Option<MetaCommandId>,
     /// Criteria under which this container specialises [`Self::base`]. All must hold.
     pub restriction: Vec<MatchCriteria>,

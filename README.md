@@ -13,7 +13,7 @@ validated against that same implementation packet for packet.
 
 | Crate | What it does |
 |---|---|
-| `xtce-model` | XTCE XML → arena-backed IR, reference resolution, validation |
+| `xtce-model` | XTCE XML → arena-backed IR, reference resolution, validation; telemetry and telecommands |
 | `xtce-decode` | IR + `&[u8]` → parameter values |
 | `xtce-codegen` | IR → a static Rust decoder with every offset baked in |
 | `xtce-cli` | `xtce info`, `xtce decode`, `xtce codegen`, `xtce bench` |

@@ -43,6 +43,10 @@ struct Pending<'d> {
     element: Element<'d>,
     space_system: SpaceSystemId,
     qualified_name: NameId,
+    /// For a container, whether it came from `<CommandMetaData>` at all.
+    ///
+    /// True for a shared `<CommandContainerSet>` container as well as a command's own.
+    is_command: bool,
     /// For a container, the telecommand whose `<CommandContainer>` it is.
     ///
     /// `None` for every telemetry container, and for the shared ones in a
@@ -301,6 +305,13 @@ impl<'d> Lowering<'d> {
         if let Some(set) = element.child(Tag::CommandContainerSet) {
             for child in set.children() {
                 self.register(child, space_system, Definition::Container)?;
+                // Registered like a telemetry container — the schema keys its name the same
+                // way — but it is still a telecommand's packaging, and root selection has to
+                // know that or a shared one with no `<BaseContainer>` would look like a
+                // packet to decode by default.
+                if let Some(last) = self.pending_containers.last_mut() {
+                    last.is_command = true;
+                }
             }
         }
         if let Some(set) = element.child(Tag::MetaCommandSet) {
@@ -411,6 +422,7 @@ impl<'d> Lowering<'d> {
                     element: argument,
                     space_system,
                     qualified_name: argument_qualified_id,
+                    is_command: false,
                     command: None,
                 });
                 insert_unique(
@@ -441,6 +453,7 @@ impl<'d> Lowering<'d> {
                 element,
                 space_system,
                 qualified_name: container_qualified_id,
+                is_command: true,
                 command: Some(id),
             });
             insert_unique(
@@ -500,6 +513,7 @@ impl<'d> Lowering<'d> {
             element,
             space_system,
             qualified_name: qualified_id,
+            is_command: false,
             command: None,
         };
 
@@ -1281,6 +1295,7 @@ impl<'d> Lowering<'d> {
                         .command
                         .is_some_and(|command| self.command_is_abstract(command)),
                 base,
+                is_command: item.is_command,
                 command: item.command,
                 restriction,
                 entries: Span::between(start, entries.len()),

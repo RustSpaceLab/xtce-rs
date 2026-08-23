@@ -346,7 +346,7 @@ impl XtceDb {
         let mut telemetry = self
             .root_containers
             .iter()
-            .filter(|id| self.container(**id).is_some_and(|c| c.command.is_none()));
+            .filter(|id| self.container(**id).is_some_and(|c| !c.is_command));
         match (telemetry.next(), telemetry.next()) {
             (Some(only), None) => Some(*only),
             _ => None,
