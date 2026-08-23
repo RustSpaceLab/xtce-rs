@@ -208,12 +208,14 @@ fn a_fixed_value_entry_keeps_its_bytes() {
     assert_eq!(entries.len(), 2, "the fixed value and the opcode");
 
     let EntryKind::FixedValue {
+        name,
         value,
         size_in_bits,
     } = entries[0].kind
     else {
         panic!("expected a fixed value, got {:?}", entries[0].kind);
     };
+    assert_eq!(name.map(|name| db.name(name)), Some("SYNC"));
     assert_eq!(size_in_bits, 32);
     assert_eq!(db.fixed_value(value), &[0x1A, 0xCF, 0xFC, 0x1D]);
 }

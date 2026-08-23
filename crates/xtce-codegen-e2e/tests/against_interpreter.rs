@@ -20,8 +20,8 @@ use xtce_model::XtceDb;
 // `udp` is absent on purpose: it has no packet stream, so compiling it in the library above
 // is the whole of its check.
 use xtce_codegen_e2e::{
-    aggregates, arrays, boolean_criteria, byte_order, calibrators, context_calibrators, ctim, idex,
-    mil_1750a, numeric_edges, suda,
+    aggregates, arrays, boolean_criteria, byte_order, calibrators, commands, context_calibrators,
+    ctim, idex, mil_1750a, numeric_edges, suda,
 };
 
 fn testdata(relative: &str) -> PathBuf {
@@ -1004,4 +1004,74 @@ fn context_calibrators_match_the_interpreter() {
              every branch of the context chain"
         );
     }
+}
+
+/// A telecommand, generated against interpreted, over every opcode and a spread of payloads.
+///
+/// No Python rung at all here — the reference has no command support of any kind, so this
+/// pair is all the checking there is, as it is for arrays and aggregates. And as there, the
+/// comparison cannot see a misreading both sides inherit from the same lowering. What it can
+/// prove is the part that is specific to commands: that the argument assignment picks the
+/// right specialisation, that the arguments land where the fixed values leave them — SPARE is
+/// four bits, so `MODE` sits off a byte boundary — and that a packet whose opcode matches
+/// neither command is refused by both rather than decoded as the abstract base.
+#[test]
+fn telecommands_match_the_interpreter() {
+    let db = XtceDb::from_path(testdata("commands.xml")).expect("definition loads");
+    let decoder = Decoder::with_root(&db, "CmdBaseContainer").expect("root container");
+
+    // The two commands are different lengths, so every packet is built to the longer one and
+    // the shorter simply ignores the tail — which is what a real receiver does.
+    const BYTES: usize = 16;
+    let mut state = 0x1BAD_C0DE_D15E_A5E1u64;
+    let mut seen = [0usize; 2];
+
+    for round in 0..1024usize {
+        let mut packet = vec![0u8; BYTES];
+        for chunk in packet.chunks_mut(8) {
+            state ^= state >> 12;
+            state ^= state << 25;
+            state ^= state >> 27;
+            let bytes = state.wrapping_mul(0x2545_F491_4F6C_DD1D).to_be_bytes();
+            chunk.copy_from_slice(&bytes[..chunk.len()]);
+        }
+        // The sync pattern is not read by either decoder — a fixed value is nobody's value —
+        // but a packet that does not carry it is not a command, so it goes in anyway.
+        packet[0..4].copy_from_slice(&[0x1A, 0xCF, 0xFC, 0x1D]);
+        // Opcode 1 or 2, so both specialisations come up; a random byte would be neither in
+        // 254 packets out of 256.
+        let opcode = 1 + u8::try_from(round % 2).expect("0 or 1");
+        packet[6] = opcode;
+        seen[usize::from(opcode) - 1] += 1;
+
+        let mut interpreted = decoder.new_packet(&packet);
+        assert_same_packet!(
+            commands,
+            db,
+            decoder,
+            interpreted,
+            packet.as_slice(),
+            format!("packet {round}, opcode {opcode}")
+        );
+    }
+
+    assert!(
+        seen.iter().all(|count| *count > 400),
+        "one of the commands went untested: {seen:?}"
+    );
+
+    // An opcode neither assignment claims is not a command. The base is abstract because the
+    // MetaCommand is, so neither decoder may answer with it.
+    let mut packet = vec![0u8; BYTES];
+    packet[0..4].copy_from_slice(&[0x1A, 0xCF, 0xFC, 0x1D]);
+    packet[6] = 3;
+    let mut interpreted = decoder.new_packet(&packet);
+    assert!(
+        decoder.decode_into(&mut interpreted, &packet).is_err(),
+        "the interpreter accepted an opcode no command declares"
+    );
+    assert!(
+        commands::decode(&packet).is_err(),
+        "the generated decoder accepted an opcode no command declares"
+    );
 }

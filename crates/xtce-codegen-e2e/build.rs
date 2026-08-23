@@ -43,6 +43,10 @@ const CASES: &[(&str, &str, Option<&str>)] = &[
     ("mil_1750a", "mil_1750a.xml", None),
     // Context calibrators, which the reference also implements.
     ("context_calibrators", "context_calibrators.xml", None),
+    // A telecommand: arguments, argument assignments and fixed values. The reference has no
+    // command support at all, so this pair is all the checking there is. Rooted at the
+    // abstract base command's container, because that is where the two specialisations meet.
+    ("commands", "commands.xml", Some("CmdBaseContainer")),
 ];
 
 fn main() {

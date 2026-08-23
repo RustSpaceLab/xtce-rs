@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Written for this project. No bundled mission definition has a `<CommandMetaData>` section at
+  all, and neither does the reference: `space_packet_parser` has no command support of any
+  kind — not a `NotImplementedError` like arrays and aggregates get, the string
+  `CommandMetaData` simply does not appear in its source, and a definition carrying one loads
+  with the command half silently ignored. So this file has no Python rung and sits in
+  `SUPPORTED.md`'s divergence table beside them.
+
+  What replaces the rung is that XTCE states the semantics outright, in the schema this
+  repository already ships. A telecommand is not a new shape — it is a container of fields
+  selected by fixed values, which is what a telemetry container is — and the pieces map one
+  for one:
+
+  * `ArgumentInstanceRefType`: "An argument instance is the name of an argument as the
+    reference is always resolved locally to the metacommand … There is no path, this is a
+    local reference." So an argument is a parameter scoped to its command.
+  * `ArgumentAssignmentListType`: the list "specialise[s] this command definition when
+    inheriting from a more general MetaCommand by restricting the specific values of otherwise
+    general arguments." So an assignment is a restriction criterion.
+  * `CommandMetaDataType`: "Arguments are user provided to the specific command definition.
+    Parameters are provided/calculated/determined by the software creating the command
+    instance." So a command container may name both, and this one does — SEQ_COUNT is the
+    sending software's, MODE and GAIN are the operator's.
+
+  What varies here:
+
+  * SYNC is a `<FixedValueEntry>` of a whole four bytes: the CCSDS attached sync marker, the
+    commonest reason a real command container has one at all.
+  * SPARE is four bits of one, so everything after it in `SetMode` is off a byte boundary.
+  * TRAILER gives *four* bytes for a sixteen-bit field. XTCE requires `binaryValue` and
+    `sizeInBits` and does not require them to agree, so the value is read as one big-endian
+    number and truncated from the left: `DEADBEEF` in sixteen bits is `BEEF`.
+  * OPCODE is inherited and pinned by each specialisation, which is how the two commands are
+    told apart. It is a plain integer on purpose: `argumentValue` is a calibrated value, so an
+    assignment on an *enumerated* argument would compare labels, which is refused rather than
+    compiled.
+  * SetGain's arguments are a byte and a float, so the two commands differ in length as well
+    as in content.
+
+  The telemetry half is here for the collision it makes: MODE is both a telemetry parameter
+  and an argument of `SetMode`. They are different things, and a generator that let one shadow
+  the other would decode the wrong field.
+-->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="Commands">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="TM_U8">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="MODE" parameterTypeRef="TM_U8"/>
+    </ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="Report">
+        <EntryList>
+          <ParameterRefEntry parameterRef="MODE"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+
+  <CommandMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="CMD_U16">
+        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
+      </IntegerParameterType>
+    </ParameterTypeSet>
+
+    <ParameterSet>
+      <!-- The sending software's, not the operator's: a sequence count, not an option. -->
+      <Parameter name="SEQ_COUNT" parameterTypeRef="CMD_U16"/>
+    </ParameterSet>
+
+    <ArgumentTypeSet>
+      <IntegerArgumentType name="U8_A">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U4_A">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="S16_A">
+        <IntegerDataEncoding sizeInBits="16" encoding="twosComplement"/>
+      </IntegerArgumentType>
+      <FloatArgumentType name="F32_A">
+        <FloatDataEncoding sizeInBits="32" encoding="IEEE754"/>
+      </FloatArgumentType>
+    </ArgumentTypeSet>
+
+    <MetaCommandSet>
+      <MetaCommand name="CmdBase" abstract="true" shortDescription="Everything a command carries">
+        <ArgumentList>
+          <Argument name="OPCODE" argumentTypeRef="U8_A"/>
+        </ArgumentList>
+        <CommandContainer name="CmdBaseContainer">
+          <EntryList>
+            <FixedValueEntry name="SYNC" binaryValue="1ACFFC1D" sizeInBits="32"/>
+            <ParameterRefEntry parameterRef="SEQ_COUNT"/>
+            <ArgumentRefEntry argumentRef="OPCODE"/>
+          </EntryList>
+        </CommandContainer>
+      </MetaCommand>
+
+      <MetaCommand name="SetMode">
+        <BaseMetaCommand metaCommandRef="CmdBase">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="OPCODE" argumentValue="1"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <!-- Shares a name with the telemetry parameter, deliberately. -->
+          <Argument name="MODE" argumentTypeRef="U4_A"/>
+        </ArgumentList>
+        <CommandContainer name="SetModeContainer">
+          <EntryList>
+            <FixedValueEntry name="SPARE" binaryValue="0A" sizeInBits="4"/>
+            <ArgumentRefEntry argumentRef="MODE"/>
+          </EntryList>
+          <BaseContainer containerRef="CmdBaseContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+
+      <MetaCommand name="SetGain">
+        <BaseMetaCommand metaCommandRef="CmdBase">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="OPCODE" argumentValue="2"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="CHANNEL" argumentTypeRef="U8_A"/>
+          <Argument name="GAIN" argumentTypeRef="F32_A"/>
+          <Argument name="TRIM" argumentTypeRef="S16_A"/>
+        </ArgumentList>
+        <CommandContainer name="SetGainContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="CHANNEL"/>
+            <ArgumentRefEntry argumentRef="GAIN"/>
+            <ArgumentRefEntry argumentRef="TRIM"/>
+            <!-- Four bytes given for sixteen bits: the low half is what goes on the wire. -->
+            <FixedValueEntry name="TRAILER" binaryValue="DEADBEEF" sizeInBits="16"/>
+          </EntryList>
+          <BaseContainer containerRef="CmdBaseContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>
+  </CommandMetaData>
+</SpaceSystem>

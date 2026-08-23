@@ -1242,10 +1242,14 @@ impl<'d> Lowering<'d> {
                 path: element.path(),
             });
         };
+        let name = element
+            .attr(AttrKey::Name)
+            .map(|text| self.interner.intern(text));
         let bytes = parse_hex(hex);
         let start = self.fixed_values.len();
         self.fixed_values.extend_from_slice(&bytes);
         Ok(EntryKind::FixedValue {
+            name,
             value: Span::between(start, self.fixed_values.len()),
             size_in_bits,
         })

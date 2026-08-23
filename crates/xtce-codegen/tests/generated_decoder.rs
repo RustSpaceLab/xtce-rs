@@ -221,13 +221,37 @@ fn every_bundled_definition_compiles() {
         }
     }
     definitions.sort();
-    assert_eq!(definitions.len(), 18, "the bundled definitions changed");
+    assert_eq!(definitions.len(), 19, "the bundled definitions changed");
 
     for path in definitions {
         let name = path.display().to_string();
         let db = XtceDb::from_path(&path).unwrap_or_else(|error| panic!("{name}: {error}"));
         let result = xtce_codegen::generate(&db, &xtce_codegen::Options::default());
         assert!(result.is_ok(), "{name}: no longer compiles: {result:?}");
+
+        // The default root is a telemetry container, so a definition with a command half
+        // would otherwise have that half compiled by nothing. Each command that packs itself
+        // is a root of its own.
+        for command in db.meta_commands() {
+            let Some(id) = command.container else {
+                continue;
+            };
+            let Some(container) = db.container(id) else {
+                continue;
+            };
+            let root = db.name(container.name).to_owned();
+            let result = xtce_codegen::generate(
+                &db,
+                &xtce_codegen::Options {
+                    root: Some(root.clone()),
+                    source_label: None,
+                },
+            );
+            assert!(
+                result.is_ok(),
+                "{name}: the command container {root} no longer compiles: {result:?}"
+            );
+        }
     }
 }
 

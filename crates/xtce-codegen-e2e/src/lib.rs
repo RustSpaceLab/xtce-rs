@@ -107,3 +107,9 @@ pub mod mil_1750a {
 pub mod aggregates {
     include!(concat!(env!("OUT_DIR"), "/aggregates.rs"));
 }
+
+/// A telecommand: arguments, argument assignments and fixed values.
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+pub mod commands {
+    include!(concat!(env!("OUT_DIR"), "/commands.rs"));
+}

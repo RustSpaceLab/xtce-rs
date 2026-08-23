@@ -66,6 +66,9 @@ pub enum EntryKind {
     /// pattern and the header bits the ground does not get to choose — the bits are in the
     /// packet, they are not anybody's value, and nothing reports them.
     FixedValue {
+        /// The entry's `name`, if it has one. Optional in the schema, and for diagnostics
+        /// only: nothing resolves a reference to it.
+        name: Option<NameId>,
         /// The bytes, as a span of [`crate::XtceDb::fixed_values`].
         ///
         /// `binaryValue` is `hexBinary`, so this is what it decodes to. Stored in a shared

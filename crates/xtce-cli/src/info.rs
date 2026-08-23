@@ -242,12 +242,17 @@ fn print_containers(db: &XtceDb) {
                     println!("      <container {name}>");
                 }
                 EntryKind::FixedValue {
+                    name,
                     value,
                     size_in_bits,
                 } => {
                     let bytes = db.fixed_value(value);
                     let hex: String = bytes.iter().map(|byte| format!("{byte:02X}")).collect();
-                    println!("      {:<28} {:<16} {size_in_bits}b", "<fixed value>", hex);
+                    let label = name.map_or_else(
+                        || "<fixed value>".to_owned(),
+                        |name| format!("<fixed {}>", db.name(name)),
+                    );
+                    println!("      {label:<28} {hex:<16} {size_in_bits}b");
                 }
                 EntryKind::Unsupported { element } => {
                     println!("      <unsupported {}>", db.name(element));

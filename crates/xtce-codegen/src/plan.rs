@@ -219,6 +219,33 @@ pub struct ContainerPlan {
     pub static_prefix_bits: usize,
     /// Fields in decode order.
     pub fields: Vec<Field>,
+    /// Bits the definition writes itself, from `<FixedValueEntry>`, in decode order.
+    ///
+    /// Only a telecommand has these. They are in the packet and they are nobody's value, so
+    /// a decoder does nothing with them but step over — their whole effect on decoding is
+    /// the offset of everything after them, which is already baked into the fields. An
+    /// *encoder* is the reader that needs them: they are bits it has to put on the wire and
+    /// the caller does not get to choose.
+    pub fixed: Vec<FixedBits>,
+}
+
+/// One `<FixedValueEntry>`, resolved to a bit range and the bytes that go in it.
+#[derive(Clone, Debug)]
+pub struct FixedBits {
+    /// The entry's `name`, if it has one — the attribute is optional. For diagnostics.
+    pub xtce_name: Option<String>,
+    /// Bit offset from the start of the packet.
+    pub bit_offset: usize,
+    /// How many bits the entry occupies, from `sizeInBits`.
+    pub bit_width: u32,
+    /// Exactly `bit_width.div_ceil(8)` bytes, right-aligned, unused leading bits zeroed.
+    ///
+    /// XTCE gives `binaryValue` as `hexBinary` and `sizeInBits` separately, and does not
+    /// require them to agree. Read as one big-endian unsigned number and kept to the low
+    /// `sizeInBits` of it: a wider value is truncated from the left, a narrower one is
+    /// zero-extended. Normalising here means neither the decoder nor the encoder has to
+    /// think about it again.
+    pub value: Vec<u8>,
 }
 
 impl ContainerPlan {
@@ -341,7 +368,7 @@ pub fn build(db: &XtceDb, root: ContainerId) -> Result<Plan, CodegenError> {
         idents: HashMap::new(),
     };
     let root_name = builder.container_name(root)?.to_owned();
-    let node = builder.node(root, &[], Some(0), 0)?;
+    let node = builder.node(root, &[], &[], Some(0), 0)?;
     Ok(Plan {
         root: node,
         containers: builder.containers,
@@ -364,6 +391,28 @@ const MAX_DEPTH: usize = 64;
 ///
 /// Becomes `None` the moment a field's width comes from the data: from there on the offsets
 /// are whatever the packet says, and the generated decoder has to carry a cursor.
+/// `bytes` as exactly `bit_width.div_ceil(8)` bytes, right-aligned, leading bits cleared.
+///
+/// XTCE gives a fixed value as `hexBinary` and its width separately, and does not require the
+/// two to agree. Reading the bytes as one big-endian unsigned number and keeping the low
+/// `bit_width` bits of it is the only interpretation that handles both directions: a value
+/// wider than the field is truncated from the left, a narrower one is zero-extended.
+fn right_aligned(bytes: &[u8], bit_width: u32) -> Vec<u8> {
+    let wanted = (bit_width as usize).div_ceil(8);
+    let mut out = vec![0u8; wanted];
+    // Copy from the right: the last `wanted` bytes, or all of them into the tail.
+    let taken = bytes.len().min(wanted);
+    out[wanted - taken..].copy_from_slice(&bytes[bytes.len() - taken..]);
+    // Clear whatever the width does not reach in the leading byte.
+    let spare = wanted * 8 - bit_width as usize;
+    if spare > 0 {
+        if let Some(first) = out.first_mut() {
+            *first &= 0xFF_u8 >> spare;
+        }
+    }
+    out
+}
+
 type Cursor = Option<usize>;
 
 trait CursorExt {
@@ -392,6 +441,7 @@ impl<'db> Builder<'db> {
         &mut self,
         id: ContainerId,
         inherited: &[Field],
+        inherited_fixed: &[FixedBits],
         bit_offset: Cursor,
         depth: usize,
     ) -> Result<Node, CodegenError> {
@@ -407,8 +457,9 @@ impl<'db> Builder<'db> {
         let name = self.db.name(container.name).to_owned();
 
         let mut fields = inherited.to_vec();
+        let mut fixed = inherited_fixed.to_vec();
         let mut offset = bit_offset;
-        self.flatten(id, &mut fields, &mut offset, 0)?;
+        self.flatten(id, &mut fields, &mut fixed, &mut offset, 0)?;
         assign_unique_idents(&mut fields);
 
         let plan = if container.is_abstract {
@@ -429,6 +480,7 @@ impl<'db> Builder<'db> {
                 bit_length: if dynamic { None } else { offset },
                 static_prefix_bits,
                 fields: fields.clone(),
+                fixed: fixed.clone(),
             });
             Some(self.containers.len() - 1)
         };
@@ -436,7 +488,10 @@ impl<'db> Builder<'db> {
         let mut children = Vec::new();
         for &inheritor in &container.inheritors {
             let criteria = self.criteria(inheritor, &fields)?;
-            children.push((criteria, self.node(inheritor, &fields, offset, depth + 1)?));
+            children.push((
+                criteria,
+                self.node(inheritor, &fields, &fixed, offset, depth + 1)?,
+            ));
         }
 
         Ok(Node {
@@ -452,6 +507,7 @@ impl<'db> Builder<'db> {
         &mut self,
         id: ContainerId,
         fields: &mut Vec<Field>,
+        fixed: &mut Vec<FixedBits>,
         offset: &mut Cursor,
         depth: usize,
     ) -> Result<(), CodegenError> {
@@ -477,15 +533,31 @@ impl<'db> Builder<'db> {
             match entry.kind {
                 EntryKind::Container(child) => {
                     for _ in 0..repeat {
-                        self.flatten(child, fields, offset, depth + 1)?;
+                        self.flatten(child, fields, fixed, offset, depth + 1)?;
                     }
                 }
-                EntryKind::FixedValue { .. } => {
-                    return Err(CodegenError::Unsupported {
-                        element: "FixedValueEntry".to_owned(),
-                        container: container_name.clone(),
-                        reason: "bits the definition fixes are modelled but not yet compiled",
-                    });
+                EntryKind::FixedValue {
+                    name,
+                    value,
+                    size_in_bits,
+                } => {
+                    for _ in 0..repeat {
+                        let Some(bit_offset) = *offset else {
+                            return Err(CodegenError::Unsupported {
+                                element: "FixedValueEntry".to_owned(),
+                                container: container_name.clone(),
+                                reason: "the entry sits after a data-dependent width, so where \
+                                         its bits go is not known at generation time",
+                            });
+                        };
+                        fixed.push(FixedBits {
+                            xtce_name: name.map(|name| self.db.name(name).to_owned()),
+                            bit_offset,
+                            bit_width: size_in_bits,
+                            value: right_aligned(self.db.fixed_value(value), size_in_bits),
+                        });
+                        *offset = offset.advance(Width::Fixed(size_in_bits));
+                    }
                 }
                 EntryKind::Unsupported { element } => {
                     return Err(CodegenError::Unsupported {
