@@ -351,8 +351,10 @@ impl GuardTest {
 /// finite list, so the answer for each entry is known when the code is generated, and what is
 /// left for run time is a membership test over the raw values.
 ///
-/// Adjacent ranges are merged, so an enumeration whose labels all satisfy the comparison
-/// becomes one range rather than two hundred.
+/// Adjacent ranges are merged where the `<EnumerationList>` is in ascending order, which it
+/// almost always is, so an enumeration whose labels all satisfy the comparison becomes one
+/// range rather than two hundred. Out of order it simply does not merge: the set is the same
+/// either way, only longer to write.
 fn labels_satisfying(
     entries: &[(i128, i128, String)],
     operator: CompareOp,
