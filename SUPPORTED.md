@@ -47,7 +47,7 @@ case for commands.
 | `CommandContainerSet` | Decodable | shared containers, registered like telemetry ones |
 | `BlockMetaCommand` | Rejected | a sequence of commands, not a packet layout |
 | `VerifierSet`, `TransmissionConstraintList`, `Interlock`, `ParameterToSetList` | Rejected | operational behaviour, not packet layout |
-| `ArgumentAssignment` on an enumerated argument | Refused when compiled | `argumentValue` is a calibrated value, so it would compare labels; the interpreter does compare them |
+| `ArgumentAssignment` on an enumerated argument | Decodable, and compiled | `argumentValue` is a calibrated value, and an enumeration's is a label; the labels are resolved to raw values when code is generated |
 
 ## Parameter types
 
@@ -155,6 +155,8 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | `DefaultCalibrator` / `SplineCalibrator` | Yes | orders 0 and 1; out of range without extrapolation is `DecodeError::Calibration` |
 | A criterion asking for the calibrated value of a calibrated parameter | Refused | the interpreter compares a float there, and the dispatcher runs before anything is decoded |
 | A criterion asking for the calibrated value of a boolean | Refused | its engineering value is 0 or 1, not its raw bits |
+| A criterion on an *enumeration*'s calibrated value | Yes | its engineering value is a label, so the labels satisfying the comparison are resolved to raw values when the code is generated and the dispatcher tests membership of a set. Every operator, because the interpreter compares labels as text and so does the reference |
+| A criterion on an enumeration value with no label | No match, whatever the operator | the interpreter refuses such a packet while decoding the enumeration, so a generated decoder that matched one would answer where the reference errors. Both refuse; the errors differ |
 | A calibrator on an enumeration or a boolean | Ignored | XTCE looks both up from the *raw* value; the reference returns before it reaches a calibrator, so applying one would be wrong |
 | `ContextCalibrator` | Yes | tried in order, first match wins; a criterion naming a parameter not yet decoded resolves to the value being calibrated, as the reference does |
 | A `ContextCalibratorList` with no `DefaultCalibrator` | Refused | nothing applies when no context matches and the reference then reports the *raw* value, so the engineering value's type would depend on the packet |
@@ -176,7 +178,7 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | More than 4096 leaves in one entry | Refused | each becomes a parameter and a struct field |
 | `MetaCommand`, `CommandContainer`, `ArgumentRefEntry` | Yes | a telecommand is a container by the time the generator sees it |
 | `ArgumentAssignment` | Yes | compiled as the restriction criterion it is |
-| An `ArgumentAssignment` on an enumerated argument | Refused | `argumentValue` is a calibrated value, so it compares labels, which the dispatcher does not |
+| An `ArgumentAssignment` on an enumerated argument | Yes | `argumentValue` is a calibrated value, so it compares labels — see the enumeration row above |
 | `FixedValueEntry` | Yes | the decoder steps over the bits; `ContainerPlan::fixed` carries them for an encoder, reduced to the declared width — a wider `binaryValue` truncates from the left, a narrower one zero-extends |
 | A `FixedValueEntry` after a data-dependent width | Refused | where its bits go is not known at generation time |
 | `LocationInContainerInBits`, `RepeatEntry` | Refused | |

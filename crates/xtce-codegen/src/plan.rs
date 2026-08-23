@@ -86,6 +86,16 @@ impl Repr {
         matches!(self, Self::Unsigned | Self::Signed(_) | Self::Bool)
     }
 
+    /// Whether a criterion may test a field of this shape.
+    ///
+    /// The integers, and an enumeration — whose raw value is one and whose engineering value
+    /// is a label the generator resolves to a set of them. Not a float, whose literal would
+    /// have to survive a round trip through text; not a string or a blob.
+    #[must_use]
+    pub fn is_comparable(&self) -> bool {
+        self.is_integral() || matches!(self, Self::Enumerated(_))
+    }
+
     /// Whether this field borrows from the packet rather than owning a scalar.
     #[must_use]
     pub fn borrows(&self) -> bool {
@@ -270,10 +280,97 @@ pub struct Guard {
     pub repr: Repr,
     /// Whether the field's bytes are reversed first, as [`Field::swap_bytes`].
     pub swap_bytes: bool,
-    /// The operator.
-    pub operator: CompareOp,
-    /// The literal, already read as an integer.
-    pub value: i128,
+    /// What the bits are tested against.
+    pub test: GuardTest,
+}
+
+/// What a [`Guard`] compares its bits with.
+///
+/// Two shapes, because XTCE has two. A criterion on a number compares the number. A criterion
+/// on an enumeration with `useCalibratedValue` — which is the *default* — compares the
+/// engineering value, and an enumeration's engineering value is a label: a string. Rather
+/// than put a string comparison in the dispatcher, the labels satisfying the comparison are
+/// worked out when the code is generated and become a set of raw values to test membership
+/// of, which is exact and needs no text at run time.
+#[derive(Clone, Debug)]
+pub enum GuardTest {
+    /// The field's own value against a literal.
+    Value {
+        /// The operator.
+        operator: CompareOp,
+        /// The literal, already read as an integer.
+        value: i128,
+    },
+    /// The field's *label* against a literal, resolved to the raw values that satisfy it.
+    Labels {
+        /// The operator, for the generated comment and for diagnostics.
+        operator: CompareOp,
+        /// The literal as written, for the same reason.
+        literal: String,
+        /// Inclusive raw ranges whose labels satisfy the comparison, in definition order.
+        ///
+        /// A raw value with no label is in none of them, whatever the operator: the
+        /// interpreter refuses such a packet outright when it decodes the enumeration, so a
+        /// generated decoder that matched one would be answering where the reference errors.
+        /// Empty means the comparison holds for nothing the field can carry.
+        ranges: Vec<(i128, i128)>,
+    },
+}
+
+impl GuardTest {
+    /// The operator, whichever shape this is.
+    #[must_use]
+    pub const fn operator(&self) -> CompareOp {
+        match self {
+            Self::Value { operator, .. } | Self::Labels { operator, .. } => *operator,
+        }
+    }
+
+    /// The single raw value this test accepts, when it accepts exactly one.
+    ///
+    /// What an encoder needs: it has to write one value, and a criterion that names a set is
+    /// not a packet it can produce.
+    #[must_use]
+    pub fn sole_value(&self) -> Option<i128> {
+        match self {
+            Self::Value { operator, value } if *operator == CompareOp::Equal => Some(*value),
+            Self::Labels { ranges, .. } => match ranges.as_slice() {
+                [(low, high)] if low == high => Some(*low),
+                _ => None,
+            },
+            Self::Value { .. } => None,
+        }
+    }
+}
+
+/// The raw values of `entries` whose labels satisfy `operator` against `literal`.
+///
+/// The interpreter compares an enumeration's engineering value — a label — with the literal
+/// as text, which is what the reference does because Python compares strings that way. Every
+/// operator is therefore meaningful and every one is resolvable here: the enumeration is a
+/// finite list, so the answer for each entry is known when the code is generated, and what is
+/// left for run time is a membership test over the raw values.
+///
+/// Adjacent ranges are merged, so an enumeration whose labels all satisfy the comparison
+/// becomes one range rather than two hundred.
+fn labels_satisfying(
+    entries: &[(i128, i128, String)],
+    operator: CompareOp,
+    literal: &str,
+) -> Vec<(i128, i128)> {
+    let mut ranges: Vec<(i128, i128)> = Vec::new();
+    for (value, max, label) in entries {
+        if !operator.matches(label.as_str().cmp(literal)) {
+            continue;
+        }
+        match ranges.last_mut() {
+            Some(last) if last.1.saturating_add(1) >= *value && *value >= last.0 => {
+                last.1 = last.1.max(*max);
+            }
+            _ => ranges.push((*value, *max)),
+        }
+    }
+    ranges
 }
 
 /// One inheritor's restriction criteria, as a tree the dispatcher can evaluate.
@@ -411,6 +508,31 @@ fn right_aligned(bytes: &[u8], bit_width: u32) -> Vec<u8> {
         }
     }
     out
+}
+
+/// What one criterion tests, given what it tests it on.
+///
+/// The one place the two guard builders agree, because getting this different in the
+/// dispatcher and in a context calibrator would mean the same XML meant two things.
+fn guard_test(
+    repr: &Repr,
+    use_calibrated: bool,
+    operator: CompareOp,
+    literal_text: &str,
+    literal: Option<i128>,
+    refuse: &impl Fn(&'static str) -> CodegenError,
+) -> Result<GuardTest, CodegenError> {
+    // An enumeration's *engineering* value is its label. Anything else's is a number, and for
+    // the numbers that reach here it is the raw one.
+    if let (Repr::Enumerated(entries), true) = (repr, use_calibrated) {
+        return Ok(GuardTest::Labels {
+            operator,
+            literal: literal_text.to_owned(),
+            ranges: labels_satisfying(entries, operator, literal_text),
+        });
+    }
+    let value = literal.ok_or_else(|| refuse("the criterion's value is not an integer"))?;
+    Ok(GuardTest::Value { operator, value })
 }
 
 type Cursor = Option<usize>;
@@ -679,10 +801,20 @@ impl<'db> Builder<'db> {
                     bit_width: bits,
                     repr: repr.clone(),
                     swap_bytes,
-                    operator: CompareOp::Equal,
-                    value: 0,
+                    // A placeholder: `context_guard` replaces the test and keeps the rest.
+                    test: GuardTest::Value {
+                        operator: CompareOp::Equal,
+                        value: 0,
+                    },
                 };
-                Self::contexts_for(ty, preceding, &current, calibration.as_ref(), &refuse)?
+                Self::contexts_for(
+                    self.db,
+                    ty,
+                    preceding,
+                    &current,
+                    calibration.as_ref(),
+                    &refuse,
+                )?
             }
             _ if ty.encoding.context_calibrators().is_empty() => Vec::new(),
             // Past a data-dependent width there are no literal offsets to compare against.
@@ -778,6 +910,7 @@ impl<'db> Builder<'db> {
     /// the field being calibrated — and needs no dependency graph, which is what stopped this
     /// being compiled before.
     fn contexts_for(
+        db: &XtceDb,
         ty: &xtce_model::ParameterType,
         preceding: &[Field],
         current: &Guard,
@@ -807,7 +940,7 @@ impl<'db> Builder<'db> {
             let mut criteria = Vec::with_capacity(context.criteria.len());
             for criterion in &context.criteria {
                 criteria.push(Self::context_criterion(
-                    criterion, preceding, current, refuse,
+                    db, criterion, preceding, current, refuse,
                 )?);
             }
             let calibration = match &context.calibrator {
@@ -838,6 +971,7 @@ impl<'db> Builder<'db> {
 
     /// One `<ContextMatch>` child, as a criterion over fields this container has decoded.
     fn context_criterion(
+        db: &XtceDb,
         criterion: &MatchCriteria,
         preceding: &[Field],
         current: &Guard,
@@ -845,12 +979,16 @@ impl<'db> Builder<'db> {
     ) -> Result<Criterion, CodegenError> {
         match criterion {
             MatchCriteria::Comparison(comparison) => Ok(Criterion::Test(Self::context_guard(
+                db,
                 preceding,
                 current,
-                comparison.parameter,
-                comparison.use_calibrated,
-                comparison.operator,
-                &comparison.value,
+                &Test {
+                    element: "Comparison",
+                    parameter: comparison.parameter,
+                    use_calibrated: comparison.use_calibrated,
+                    operator: comparison.operator,
+                    value: &comparison.value,
+                },
                 refuse,
             )?)),
             MatchCriteria::Boolean(_) => Err(refuse(
@@ -867,17 +1005,22 @@ impl<'db> Builder<'db> {
 
     /// The one comparison a context criterion makes.
     fn context_guard(
+        db: &XtceDb,
         preceding: &[Field],
         current: &Guard,
-        parameter: ParamId,
-        use_calibrated: bool,
-        operator: CompareOp,
-        value: &ComparisonValue,
+        test: &Test<'_>,
         refuse: &impl Fn(&str, &'static str) -> CodegenError,
     ) -> Result<Guard, CodegenError> {
-        let literal = value
-            .as_int
-            .ok_or_else(|| refuse("Comparison", "the criterion's value is not an integer"))?;
+        let &Test {
+            parameter,
+            use_calibrated,
+            operator,
+            value,
+            ..
+        } = test;
+        // Read here rather than unwrapped: a criterion on an enumeration compares a label,
+        // and a label is not an integer.
+        let literal = value.as_int;
 
         // A preceding field of this container, by parameter — or, when there is none, the
         // field being calibrated, because that is what "not present in the parsed data so
@@ -899,15 +1042,19 @@ impl<'db> Builder<'db> {
                      so useCalibratedValue cannot be honoured",
                 ));
             }
-            if !current.repr.is_integral() {
+            if !current.repr.is_comparable() {
                 return Err(refuse(
                     "Comparison",
                     "only integer-valued criteria are compiled",
                 ));
             }
+            let literal = literal
+                .ok_or_else(|| refuse("Comparison", "the criterion's value is not an integer"))?;
             return Ok(Guard {
-                value: literal,
-                operator,
+                test: GuardTest::Value {
+                    operator,
+                    value: literal,
+                },
                 ..current.clone()
             });
         };
@@ -919,20 +1066,13 @@ impl<'db> Builder<'db> {
                  its offset is not known",
             )
         })?;
-        if !field.repr.is_integral() {
+        if !field.repr.is_comparable() {
             return Err(refuse(
                 "Comparison",
                 "only integer-valued criteria are compiled",
             ));
         }
         if use_calibrated {
-            if matches!(field.repr, Repr::Enumerated(_)) {
-                return Err(refuse(
-                    "Comparison",
-                    "a criterion on a calibrated enumeration compares labels, which is not \
-                     compiled",
-                ));
-            }
             if field.calibration.is_some() || !field.contexts.is_empty() {
                 return Err(refuse(
                     "Comparison",
@@ -955,8 +1095,14 @@ impl<'db> Builder<'db> {
             bit_width,
             repr: field.repr.clone(),
             swap_bytes: field.swap_bytes,
-            operator,
-            value: literal,
+            test: guard_test(
+                &field.repr,
+                use_calibrated,
+                operator,
+                db.name(value.text),
+                literal,
+                &|reason| refuse("Comparison", reason),
+            )?,
         })
     }
 
@@ -1198,6 +1344,7 @@ impl Builder<'_> {
         for criterion in &container.restriction {
             criteria.push(match criterion {
                 MatchCriteria::Comparison(comparison) => Criterion::Test(Self::guard(
+                    self.db,
                     fields,
                     &name,
                     &Test {
@@ -1208,7 +1355,7 @@ impl Builder<'_> {
                         value: &comparison.value,
                     },
                 )?),
-                MatchCriteria::Boolean(expr) => Self::boolean(expr, fields, &name)?,
+                MatchCriteria::Boolean(expr) => Self::boolean(self.db, expr, fields, &name)?,
                 MatchCriteria::Unsupported { element } => {
                     return Err(CodegenError::Unsupported {
                         element: self.db.name(*element).to_owned(),
@@ -1223,6 +1370,7 @@ impl Builder<'_> {
 
     /// A `<BooleanExpression>` as a criterion tree.
     fn boolean(
+        db: &XtceDb,
         expr: &BooleanExpr,
         fields: &[Field],
         container: &str,
@@ -1237,13 +1385,13 @@ impl Builder<'_> {
             BooleanExpr::And(children) => Criterion::All(
                 children
                     .iter()
-                    .map(|child| Self::boolean(child, fields, container))
+                    .map(|child| Self::boolean(db, child, fields, container))
                     .collect::<Result<_, _>>()?,
             ),
             BooleanExpr::Or(children) => Criterion::Any(
                 children
                     .iter()
-                    .map(|child| Self::boolean(child, fields, container))
+                    .map(|child| Self::boolean(db, child, fields, container))
                     .collect::<Result<_, _>>()?,
             ),
             BooleanExpr::Condition(condition) => {
@@ -1272,6 +1420,7 @@ impl Builder<'_> {
                     ));
                 };
                 Criterion::Test(Self::guard(
+                    db,
                     fields,
                     container,
                     &Test {
@@ -1290,7 +1439,12 @@ impl Builder<'_> {
     ///
     /// The two elements say the same thing in different XML, and the interpreter evaluates
     /// them through the same `test_literal`, so they compile the same way.
-    fn guard(fields: &[Field], container: &str, test: &Test<'_>) -> Result<Guard, CodegenError> {
+    fn guard(
+        db: &XtceDb,
+        fields: &[Field],
+        container: &str,
+        test: &Test<'_>,
+    ) -> Result<Guard, CodegenError> {
         let &Test {
             element,
             parameter,
@@ -1320,21 +1474,15 @@ impl Builder<'_> {
             )
         })?;
 
-        if !field.repr.is_integral() {
+        if !field.repr.is_comparable() {
             return Err(refuse("only integer-valued criteria are compiled"));
         }
 
         // `useCalibratedValue` defaults to *true*, so most criteria take this path. For a
         // plain integer the engineering value is the raw one and there is nothing to do; for
-        // anything the interpreter reports differently, the two would silently select
-        // different containers.
+        // an enumeration it is a label, which `guard_test` resolves; for anything else the
+        // interpreter reports differently, the two would silently select different containers.
         if use_calibrated {
-            if matches!(field.repr, Repr::Enumerated(_)) {
-                return Err(refuse(
-                    "a criterion on a calibrated enumeration compares labels, which is not \
-                     compiled",
-                ));
-            }
             if field.calibration.is_some() {
                 return Err(refuse(
                     "the criterion asks for the calibrated value of a calibrated parameter, \
@@ -1349,18 +1497,20 @@ impl Builder<'_> {
             }
         }
 
-        let literal = value
-            .as_int
-            .ok_or_else(|| refuse("the criterion's value is not an integer"))?;
-
         Ok(Guard {
             xtce_name: field.xtce_name.clone(),
             bit_offset,
             bit_width,
             repr: field.repr.clone(),
             swap_bytes: field.swap_bytes,
-            operator,
-            value: literal,
+            test: guard_test(
+                &field.repr,
+                use_calibrated,
+                operator,
+                db.name(value.text),
+                value.as_int,
+                &refuse,
+            )?,
         })
     }
 

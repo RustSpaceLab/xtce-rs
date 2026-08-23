@@ -35,8 +35,14 @@
     told apart. It is a plain integer on purpose: `argumentValue` is a calibrated value, so an
     assignment on an *enumerated* argument would compare labels, which is refused rather than
     compiled.
-  * SetGain's arguments are a byte and a float, so the two commands differ in length as well
-    as in content.
+  * SetGain's arguments are a byte and a float, so the commands differ in length as well as in
+    content.
+  * POWER is an *enumerated* argument, and PowerOn and PowerOff are told apart by assignments
+    on it — `POWER = "ON"` against `POWER = "OFF"`, sharing an opcode. That is the pattern real
+    command sets are built from, and it is the awkward one: `argumentValue` is a calibrated
+    value, and an enumeration's calibrated value is a label. The labels satisfying each
+    comparison are resolved to raw values when the code is generated, so the dispatcher tests
+    membership of a set and never compares text.
 
   The telemetry half is here for the collisions it makes. MODE is both a telemetry parameter
   and an argument of `SetMode`; `TM_U8` is both a telemetry parameter type and an argument
@@ -93,18 +99,28 @@
       <FloatArgumentType name="F32_A">
         <FloatDataEncoding sizeInBits="32" encoding="IEEE754"/>
       </FloatArgumentType>
+      <EnumeratedArgumentType name="POWER_A">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+        <EnumerationList>
+          <Enumeration value="0" label="OFF"/>
+          <Enumeration value="1" label="ON"/>
+          <Enumeration value="2" label="STANDBY"/>
+        </EnumerationList>
+      </EnumeratedArgumentType>
     </ArgumentTypeSet>
 
     <MetaCommandSet>
       <MetaCommand name="CmdBase" abstract="true" shortDescription="Everything a command carries">
         <ArgumentList>
           <Argument name="OPCODE" argumentTypeRef="U8_A"/>
+          <Argument name="POWER" argumentTypeRef="POWER_A"/>
         </ArgumentList>
         <CommandContainer name="CmdBaseContainer">
           <EntryList>
             <FixedValueEntry name="SYNC" binaryValue="1ACFFC1D" sizeInBits="32"/>
             <ParameterRefEntry parameterRef="SEQ_COUNT"/>
             <ArgumentRefEntry argumentRef="OPCODE"/>
+            <ArgumentRefEntry argumentRef="POWER"/>
           </EntryList>
         </CommandContainer>
       </MetaCommand>
@@ -149,6 +165,43 @@
             <ArgumentRefEntry argumentRef="TRIM"/>
             <!-- Four bytes given for sixteen bits: the low half is what goes on the wire. -->
             <FixedValueEntry name="TRAILER" binaryValue="DEADBEEF" sizeInBits="16"/>
+          </EntryList>
+          <BaseContainer containerRef="CmdBaseContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+
+      <!--
+        Two commands sharing an opcode, told apart by a label. Neither adds anything to the
+        packet but its own argument, so the criteria are all there is to choose between them.
+      -->
+      <MetaCommand name="PowerOn">
+        <BaseMetaCommand metaCommandRef="CmdBase">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="OPCODE" argumentValue="3"/>
+            <ArgumentAssignment argumentName="POWER" argumentValue="ON"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="DURATION" argumentTypeRef="U8_A"/>
+        </ArgumentList>
+        <CommandContainer name="PowerOnContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="DURATION"/>
+          </EntryList>
+          <BaseContainer containerRef="CmdBaseContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+
+      <MetaCommand name="PowerOff">
+        <BaseMetaCommand metaCommandRef="CmdBase">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="OPCODE" argumentValue="3"/>
+            <ArgumentAssignment argumentName="POWER" argumentValue="OFF"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <CommandContainer name="PowerOffContainer">
+          <EntryList>
+            <FixedValueEntry name="PAD" binaryValue="00" sizeInBits="8"/>
           </EntryList>
           <BaseContainer containerRef="CmdBaseContainer"/>
         </CommandContainer>

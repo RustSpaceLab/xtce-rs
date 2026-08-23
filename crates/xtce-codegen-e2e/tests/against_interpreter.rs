@@ -1011,20 +1011,26 @@ fn context_calibrators_match_the_interpreter() {
 /// No Python rung at all here — the reference has no command support of any kind, so this
 /// pair is all the checking there is, as it is for arrays and aggregates. And as there, the
 /// comparison cannot see a misreading both sides inherit from the same lowering. What it can
-/// prove is the part that is specific to commands: that the argument assignment picks the
+/// prove is the part that is specific to commands: that the argument assignments pick the
 /// right specialisation, that the arguments land where the fixed values leave them — SPARE is
-/// four bits, so `MODE` sits off a byte boundary — and that a packet whose opcode matches
-/// neither command is refused by both rather than decoded as the abstract base.
+/// four bits, so `MODE` sits off a byte boundary — and that a packet no command claims is
+/// refused by both rather than decoded as the abstract base.
+///
+/// Two of the commands share an opcode and are told apart by an assignment on an *enumerated*
+/// argument, which is a comparison against a label. The generated dispatcher never sees the
+/// label: the raw values whose labels satisfy each comparison are worked out when the code is
+/// generated. Whether that resolution is right is exactly what agreeing with the interpreter
+/// here means, because the interpreter really does compare the string.
 #[test]
 fn telecommands_match_the_interpreter() {
     let db = XtceDb::from_path(testdata("commands.xml")).expect("definition loads");
     let decoder = Decoder::with_root(&db, "CmdBaseContainer").expect("root container");
 
-    // The two commands are different lengths, so every packet is built to the longer one and
-    // the shorter simply ignores the tail — which is what a real receiver does.
-    const BYTES: usize = 16;
+    // Every command is built to the longest one and the shorter ones ignore the tail, which
+    // is what a real receiver does.
+    const BYTES: usize = 24;
     let mut state = 0x1BAD_C0DE_D15E_A5E1u64;
-    let mut seen = [0usize; 2];
+    let mut seen = [0usize; 4];
 
     for round in 0..1024usize {
         let mut packet = vec![0u8; BYTES];
@@ -1038,33 +1044,56 @@ fn telecommands_match_the_interpreter() {
         // The sync pattern is not read by either decoder — a fixed value is nobody's value —
         // but a packet that does not carry it is not a command, so it goes in anyway.
         packet[0..4].copy_from_slice(&[0x1A, 0xCF, 0xFC, 0x1D]);
-        // Opcode 1 or 2, so both specialisations come up; a random byte would be neither in
-        // 254 packets out of 256.
-        let opcode = 1 + u8::try_from(round % 2).expect("0 or 1");
+        // Opcode 1, 2 or 3, so every specialisation comes up; a random byte would be none of
+        // them in 253 packets out of 256. Opcode 3 is shared, and the label chooses.
+        let opcode = u8::try_from(round % 3).expect("0, 1 or 2") + 1;
         packet[6] = opcode;
-        seen[usize::from(opcode) - 1] += 1;
+        // POWER carries a label or the packet is not decodable at all: the interpreter
+        // refuses an enumeration value it has no label for, and refuses it while decoding the
+        // *base*, before any of this is reached. Driven separately below.
+        // Cycled on a different period from the opcode, or opcode 3 would only ever meet one
+        // label and the two commands sharing it would never both come up.
+        let power = u8::try_from((round / 3) % 3).expect("0, 1 or 2");
+        packet[7] = power;
 
         let mut interpreted = decoder.new_packet(&packet);
+        if opcode == 3 && power == 2 {
+            // STANDBY: a label, but not one either command claims. Neither may answer.
+            assert!(
+                decoder.decode_into(&mut interpreted, &packet).is_err(),
+                "the interpreter accepted a label no command claims"
+            );
+            assert!(
+                commands::decode(&packet).is_err(),
+                "the generated decoder accepted a label no command claims"
+            );
+            continue;
+        }
+        seen[match (opcode, power) {
+            (3, 0) => 2,
+            (3, _) => 3,
+            (other, _) => usize::from(other) - 1,
+        }] += 1;
         assert_same_packet!(
             commands,
             db,
             decoder,
             interpreted,
             packet.as_slice(),
-            format!("packet {round}, opcode {opcode}")
+            format!("packet {round}, opcode {opcode}, power {power}")
         );
     }
 
     assert!(
-        seen.iter().all(|count| *count > 400),
-        "one of the commands went untested: {seen:?}"
+        seen.iter().all(|count| *count > 100),
+        "a command went untested: {seen:?}"
     );
 
-    // An opcode neither assignment claims is not a command. The base is abstract because the
+    // An opcode no assignment claims is not a command. The base is abstract because the
     // MetaCommand is, so neither decoder may answer with it.
     let mut packet = vec![0u8; BYTES];
     packet[0..4].copy_from_slice(&[0x1A, 0xCF, 0xFC, 0x1D]);
-    packet[6] = 3;
+    packet[6] = 9;
     let mut interpreted = decoder.new_packet(&packet);
     assert!(
         decoder.decode_into(&mut interpreted, &packet).is_err(),
@@ -1074,4 +1103,45 @@ fn telecommands_match_the_interpreter() {
         commands::decode(&packet).is_err(),
         "the generated decoder accepted an opcode no command declares"
     );
+
+    // And a value the enumeration has no label for is refused by both — by the interpreter
+    // while it decodes the base, and here because a raw value with no label satisfies no
+    // label comparison, whatever the operator. Different errors, the same refusal.
+    packet[6] = 3;
+    packet[7] = 9;
+    let mut interpreted = decoder.new_packet(&packet);
+    assert!(
+        decoder.decode_into(&mut interpreted, &packet).is_err(),
+        "the interpreter accepted an enumeration value with no label"
+    );
+    assert!(
+        commands::decode(&packet).is_err(),
+        "the generated decoder accepted an enumeration value with no label"
+    );
+}
+
+/// The two commands that share an opcode are told apart by their label, both ways round.
+///
+/// Driven deliberately: the loop above proves they agree with the interpreter, and this proves
+/// what they agree *on*. `POWER = "ON"` and `POWER = "OFF"` are the same comparison against
+/// different labels, and a resolution that lost the distinction — took the first label, or the
+/// raw value of the literal, or matched everything — would still pass a test that only asked
+/// whether the two implementations said the same thing, if both were wrong the same way.
+#[test]
+fn an_assignment_on_an_enumeration_picks_the_command_by_its_label() {
+    let mut packet = vec![0u8; 24];
+    packet[0..4].copy_from_slice(&[0x1A, 0xCF, 0xFC, 0x1D]);
+    packet[6] = 3;
+
+    packet[7] = 1; // ON
+    let commands::Packet::Poweroncontainer(_) = commands::decode(&packet).expect("ON decodes")
+    else {
+        panic!("POWER = 1 is ON, and PowerOn is the command that claims it");
+    };
+
+    packet[7] = 0; // OFF
+    let commands::Packet::Poweroffcontainer(_) = commands::decode(&packet).expect("OFF decodes")
+    else {
+        panic!("POWER = 0 is OFF, and PowerOff is the command that claims it");
+    };
 }

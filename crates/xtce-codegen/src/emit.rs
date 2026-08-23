@@ -18,7 +18,7 @@ use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 
 use crate::plan::{
-    Calibration, ContainerPlan, Criterion, Field, Guard, Node, Plan, Repr, TextCharset,
+    Calibration, ContainerPlan, Criterion, Field, Guard, GuardTest, Node, Plan, Repr, TextCharset,
     TextDelimiter, Width,
 };
 use xtce_model::{CompareOp, IntegerCoding};
@@ -1512,10 +1512,19 @@ fn guard_test(guard: &Guard, head: &Ident) -> TokenStream {
         _ => raw.into_tokens(),
     };
 
-    let operator = compare_op(guard.operator);
+    let (operator, literal) = match &guard.test {
+        GuardTest::Value { operator, value } => (*operator, *value),
+        // A comparison against a *label*, already resolved to the raw values whose labels
+        // satisfy it. What is left is a membership test, which is what the reference's string
+        // comparison amounts to over a finite enumeration — and it is decided here, so the
+        // dispatcher never handles text.
+        GuardTest::Labels { ranges, .. } => return label_membership(&value, ranges, is_signed),
+    };
+
+    let operator = compare_op(operator);
 
     if is_signed {
-        match i64::try_from(guard.value) {
+        match i64::try_from(literal) {
             Ok(literal) => {
                 let literal = Literal::i64_unsuffixed(literal);
                 quote! { #value #operator #literal }
@@ -1523,7 +1532,7 @@ fn guard_test(guard: &Guard, head: &Ident) -> TokenStream {
             Err(_) => constant_outcome(guard, true),
         }
     } else {
-        match u64::try_from(guard.value) {
+        match u64::try_from(literal) {
             Ok(literal) => {
                 let literal = Literal::u64_unsuffixed(literal);
                 quote! { #value #operator #literal }
@@ -1536,16 +1545,59 @@ fn guard_test(guard: &Guard, head: &Ident) -> TokenStream {
     }
 }
 
+/// Whether the loaded value falls in any of `ranges`.
+///
+/// One `matches!` over inclusive patterns, which is what the labels came out as. An empty set
+/// is `false`: the comparison holds for nothing the field can carry, and saying so is clearer
+/// than an empty `matches!`.
+fn label_membership(value: &TokenStream, ranges: &[(i128, i128)], is_signed: bool) -> TokenStream {
+    let patterns: Vec<TokenStream> = ranges
+        .iter()
+        .filter_map(|(low, high)| {
+            let (start, end) = if is_signed {
+                (
+                    Literal::i64_unsuffixed(i64::try_from(*low).ok()?),
+                    Literal::i64_unsuffixed(i64::try_from(*high).ok()?),
+                )
+            } else {
+                (
+                    Literal::u64_unsuffixed(u64::try_from(*low).ok()?),
+                    Literal::u64_unsuffixed(u64::try_from(*high).ok()?),
+                )
+            };
+            // One label is one value, which is the common case by a long way; a range is what
+            // a `maxValue` entry needs.
+            if low == high {
+                return Some(quote! { #start });
+            }
+            Some(quote! { #start..=#end })
+        })
+        .collect();
+
+    match patterns.as_slice() {
+        // Nothing the field can carry satisfies it.
+        [] => quote! { false },
+        // One label, one value: the same equality every other criterion emits.
+        [only] if ranges.len() == 1 && ranges[0].0 == ranges[0].1 => quote! { #value == #only },
+        _ => quote! { matches!(#value, #(#patterns)|*) },
+    }
+}
+
 /// The fixed answer to a comparison whose literal cannot fit the field's type.
 fn constant_outcome(guard: &Guard, literal_fits_signed: bool) -> TokenStream {
+    let (operator, value) = match &guard.test {
+        GuardTest::Value { operator, value } => (*operator, *value),
+        // Never reached: a label test is a membership test and has no literal to overflow.
+        GuardTest::Labels { .. } => return quote! { false },
+    };
     let literal_below = if literal_fits_signed {
-        guard.value < i128::from(i64::MIN)
+        value < i128::from(i64::MIN)
     } else {
-        guard.value < 0
+        value < 0
     };
     // The literal cannot equal any value the field can hold, so equality is decided; the
     // ordering operators depend only on which side of the range the literal falls.
-    let outcome = match guard.operator {
+    let outcome = match operator {
         CompareOp::Equal => false,
         CompareOp::NotEqual => true,
         CompareOp::Less | CompareOp::LessOrEqual => !literal_below,
