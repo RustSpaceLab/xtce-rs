@@ -37,16 +37,33 @@ nothing in reach uses.
   and for **16 561 — about 8% — at exponent 3**. Python also raises `OverflowError` where
   `powi` returns infinity.
 
-  Not fixed, and not turned into a golden, on purpose. `pow` is not required by the C standard
-  to be correctly rounded, so the reference's own answer can differ between platforms;
-  committing a golden over one would make the suite depend on the machine that produced it.
-  `powi` at least gives the same answer everywhere. `calibrators.xml` exercises exactly this
-  shape but is compared only against the interpreter, so nothing here is currently wrong —
-  the gap is that the interpreter's float polynomial has never been held to the reference and
-  would not survive being held to it.
+  **Decided on 2026-08-24: keep `powi`, and this is no longer an open question.** Three
+  measurements settle it, taken over 100 000 random finite bases at each exponent.
 
-  What it would take: decide whether bit-for-bit agreement with a platform-dependent `pow` is
-  worth having, and if so, whether `powf` is close enough on the machines that matter.
+  `powf` would buy the agreement. At exponent 3 it matches CPython on **100 %** of values,
+  against `powi`'s 74 %, because both end up in the same libm `pow`.
+
+  The generated decoder cannot call it. Generated code names nothing outside `core`, which is
+  why the emitter writes the square-and-multiply sequence out by hand in the first place —
+  `f64::powf` is `std`, exactly as `f64::powi` is. Changing the interpreter alone would break
+  the equality between the interpreted and the generated decoder, and that equality is what
+  every claim about generated code rests on: codegen is checked against the interpreter, and
+  the interpreter against the reference. Trading the inner rung for the outer one leaves the
+  ladder shorter than it was.
+
+  And at exponent 2, agreeing would mean being wrong. Rust's `x * x` and CPython's `x ** 2`
+  differ for 0.15 % of values — and where they differ, it is CPython that is a unit in the
+  last place off the correctly rounded square, which `x * x` gives by definition:
+
+      base = 0.7275253015377592
+      x * x    = 0.5292930643776075   (3fe0eff802300bda)
+      x ** 2   = 0.5292930643776074   (3fe0eff802300bd9)
+      math.pow = 0.5292930643776074
+
+  So the divergence is not one implementation being sloppy. It is two different arithmetics,
+  each correct by its own rule, and one of them is reproducible on every machine while the
+  other is a property of the libm that happens to be installed. `SUPPORTED.md` records it as a
+  deliberate divergence rather than a defect.
 
 ## Things deliberately left undone
 

@@ -121,6 +121,7 @@ covered by a test.
 | Comparing a text value against a number (`Condition` with two parameter operands) | `==` false, `!=` true, ordering raises `TypeError` | the same three outcomes, the ordering case as `DecodeError::IncomparableValue` |
 | Spline query equal to the largest raw value | raises (`list.index(True)` finds nothing) | clamps to the final segment, which XTCE's inclusive range implies |
 | Container entry lists that reference each other cyclically | recurses until the stack overflows | bounded at 64 levels and reported |
+| A polynomial calibrator over a *float* encoding | `x ** n`, a libm `pow` call | `powi`, square and multiply — 8% of values differ at exponent 3. Deliberate: generated code cannot call `pow` at all, so agreeing would cost the equality between the interpreted and the generated decoder; and at exponent 2 the reference is a ULP off the correctly rounded square that `x * x` gives. See `BLOCKERS.md` |
 | A binary16 NaN's payload | discarded — CPython's `struct` returns a canonical NaN for `"e"` while preserving the payload for `"f"` and `"d"` | preserved, as for binary32 and binary64 |
 
 None of the bundled test files exercise a divergence, so the differential tests are
