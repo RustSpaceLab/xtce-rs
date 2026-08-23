@@ -44,7 +44,7 @@ text are retained, which `testdata/spp/LICENSE.txt` does.
 
 ### Written for this project
 
-Four files here are not vendored. All exist for the same reason: an implementation path that
+Five files here are not vendored. All exist for the same reason: an implementation path that
 the real mission files never reach, and so would never be compared against anything.
 
 | File | Why |
@@ -54,6 +54,7 @@ the real mission files never reach, and so would never be compared against anyth
 | `boolean_criteria.xml` | the one mission file with a `<BooleanExpression>` has a single conjunction of equalities: no disjunction, no nesting, and no operator but `==` |
 | `byte_order.xml` + `byte_order_stream.bin` | **no mission file sets `byteOrder`** — so there is no recorded telemetry with a little-endian field, and no bytes to put in front of the reference |
 | `arrays.xml` | **no mission file has an `<ArrayParameterType>`**, and neither does the reference: it raises `NotImplementedError` and calls the feature roadmap |
+| `aggregates.xml` | the same for `<AggregateParameterType>`, plus the two nested in each other, which is where the naming can go wrong |
 
 `byte_order_stream.bin` is the only packet stream here that was not flown. It is written by
 `tools/gen_byte_order_stream.py` from a fixed seed, so regenerating it produces the same file

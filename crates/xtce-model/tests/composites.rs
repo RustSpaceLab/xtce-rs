@@ -1,19 +1,24 @@
-//! What an `<ArrayParameterType>` expands into, exactly.
+//! What `<ArrayParameterType>` and `<AggregateParameterType>` expand into, exactly.
 //!
-//! An array entry is turned into one parameter per element when the file is loaded, so that
-//! nothing downstream — the interpreter, the code generator, the flight encoder — has to know
-//! arrays exist. That makes the expansion the only place the semantics live, and these tests
-//! pin it by name and by offset rather than by "it decodes".
+//! Both are containers of other things, and both are laid out packed and in order, so both
+//! flatten the same way: an entry naming one is turned into one parameter per leaf when the
+//! file is loaded. Nothing downstream — the interpreter, the code generator, the flight
+//! encoder — has to know either exists. That makes the expansion the only place the semantics
+//! live, and these tests pin it by name rather than by "it decodes".
 //!
-//! There is no reference to check against here. `space_packet_parser` raises
-//! `NotImplementedError` for `ArrayParameterType` and says supporting it is on its roadmap,
-//! so the oracle is XTCE 1.2 itself. Two clauses of it do the work:
+//! There is no reference to check against. `space_packet_parser` raises
+//! `NotImplementedError` for both and says supporting them is on its roadmap, so the oracle is
+//! XTCE 1.2 itself. Four clauses of it do the work:
 //!
 //! * `DimensionType`: "For partial entries of an array, the starting and ending index for
 //!   each dimension … Indexes are zero based." Both ends are inclusive.
 //! * `DimensionListType`: "Array[1stDim][2ndDim][lastDim]. The last dimension is assumed to
 //!   be the least significant — that is this dimension will cycle through its combination
 //!   before the next to last dimension changes." Row-major.
+//! * `AggregateDataType`: "The data members are ordered and contiguous in the MemberList
+//!   element (packed). Each member may be addressed by the dot syntax similar to C such as
+//!   `P.voltage`."
+//! * `MemberType`: "Circular references are not allowed."
 
 use xtce_model::{EntryKind, XtceDb};
 
@@ -217,9 +222,13 @@ fn synthetic_elements_cannot_be_referenced_by_name() {
     );
 }
 
-/// The expansion has a ceiling, and says what it was asked for.
+/// The expansion has a ceiling, and the refusal names it and the entry.
+///
+/// It does not name the total. Counting the leaves of an arbitrary nesting first would mean a
+/// second traversal that has to agree with the one that builds them, and the pair drifting
+/// apart is a worse failure than a message that says "more than this".
 #[test]
-fn an_array_larger_than_the_ceiling_is_refused_with_its_size() {
+fn an_array_larger_than_the_ceiling_is_refused() {
     let xml = definition(
         &format!(
             r#"<ArrayParameterType name="ARR_T" arrayTypeRef="U8"><DimensionList>{}</DimensionList></ArrayParameterType>"#,
@@ -233,11 +242,154 @@ fn an_array_larger_than_the_ceiling_is_refused_with_its_size() {
     };
     let message = error.to_string();
     assert!(
-        message.contains("10000"),
-        "the refusal should say how many: {message}"
+        message.contains("4096"),
+        "the refusal should name the ceiling: {message}"
     );
     assert!(
-        message.contains("4096"),
-        "and what the ceiling is: {message}"
+        message.contains("ParameterRefEntry"),
+        "and the entry it gave up on: {message}"
+    );
+}
+
+/// An aggregate becomes its members, in order, under the dot syntax.
+#[test]
+fn an_aggregate_expands_into_its_members() {
+    let xml = definition(
+        r#"<AggregateParameterType name="RAIL_T"><MemberList>
+             <Member name="voltage" typeRef="U8"/>
+             <Member name="current" typeRef="U8"/>
+             <Member name="ok" typeRef="U8"/>
+           </MemberList></AggregateParameterType>"#,
+        r#"<Parameter name="RAIL" parameterTypeRef="RAIL_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="RAIL"/>"#,
+    );
+    assert_eq!(
+        expanded(&xml),
+        ["RAIL.voltage", "RAIL.current", "RAIL.ok"],
+        "members are ordered and contiguous, and addressed by the dot syntax"
+    );
+}
+
+/// An array of aggregates, and an aggregate holding an array, both compose.
+///
+/// The two nest in either direction, and the name spells the path either way. Three members
+/// and two elements rather than two and two: the counts differ so that a mix-up between the
+/// axis and the member list cannot produce the same list.
+#[test]
+fn arrays_and_aggregates_nest_in_both_directions() {
+    let outer_array = definition(
+        r#"<AggregateParameterType name="RAIL_T"><MemberList>
+             <Member name="voltage" typeRef="U8"/>
+             <Member name="current" typeRef="U8"/>
+             <Member name="ok" typeRef="U8"/>
+           </MemberList></AggregateParameterType>
+           <ArrayParameterType name="RAILS_T" arrayTypeRef="RAIL_T"><DimensionList>
+             <Dimension><StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+                        <EndingIndex><FixedValue>1</FixedValue></EndingIndex></Dimension>
+           </DimensionList></ArrayParameterType>"#,
+        r#"<Parameter name="RAILS" parameterTypeRef="RAILS_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="RAILS"/>"#,
+    );
+    assert_eq!(
+        expanded(&outer_array),
+        [
+            "RAILS[0].voltage",
+            "RAILS[0].current",
+            "RAILS[0].ok",
+            "RAILS[1].voltage",
+            "RAILS[1].current",
+            "RAILS[1].ok",
+        ]
+    );
+
+    let outer_aggregate = definition(
+        r#"<ArrayParameterType name="TRIPLE_T" arrayTypeRef="U8"><DimensionList>
+             <Dimension><StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+                        <EndingIndex><FixedValue>2</FixedValue></EndingIndex></Dimension>
+           </DimensionList></ArrayParameterType>
+           <AggregateParameterType name="STATE_T"><MemberList>
+             <Member name="mode" typeRef="U8"/>
+             <Member name="samples" typeRef="TRIPLE_T"/>
+           </MemberList></AggregateParameterType>"#,
+        r#"<Parameter name="STATE" parameterTypeRef="STATE_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="STATE"/>"#,
+    );
+    assert_eq!(
+        expanded(&outer_aggregate),
+        [
+            "STATE.mode",
+            "STATE.samples[0]",
+            "STATE.samples[1]",
+            "STATE.samples[2]",
+        ]
+    );
+}
+
+/// A type that contains itself cannot be expanded, and says so rather than not returning.
+///
+/// XTCE forbids it — `MemberType`: "Circular references are not allowed" — but a file can
+/// still say it, and following it would recurse until the stack ran out.
+#[test]
+fn a_type_that_contains_itself_is_refused() {
+    let xml = definition(
+        r#"<AggregateParameterType name="LOOP_T"><MemberList>
+             <Member name="head" typeRef="U8"/>
+             <Member name="tail" typeRef="LOOP_T"/>
+           </MemberList></AggregateParameterType>"#,
+        r#"<Parameter name="LOOP" parameterTypeRef="LOOP_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="LOOP"/>"#,
+    );
+    let Err(error) = XtceDb::from_xml(&xml) else {
+        panic!("a self-referential aggregate cannot load");
+    };
+    assert!(
+        error.to_string().contains("contains itself"),
+        "unexpected error: {error}"
+    );
+}
+
+/// An aggregate with no members has nothing to place, which is a definition error.
+#[test]
+fn an_aggregate_with_no_members_is_reported() {
+    let xml = definition(
+        r#"<AggregateParameterType name="EMPTY_T"><MemberList/></AggregateParameterType>"#,
+        r#"<Parameter name="EMPTY" parameterTypeRef="EMPTY_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="EMPTY"/>"#,
+    );
+    let db = XtceDb::from_xml(&xml).expect("the definition still loads");
+    assert!(
+        db.unsupported()
+            .iter()
+            .any(|item| item.element.contains("AggregateParameterType")),
+        "an empty aggregate should be reported as represented but not decodable"
+    );
+}
+
+/// The ceiling counts leaves, not one array's elements.
+///
+/// An aggregate of arrays of aggregates reaches large numbers without any single dimension
+/// looking unreasonable, which is why the limit is where it is.
+#[test]
+fn the_ceiling_counts_leaves_across_the_whole_nesting() {
+    let xml = definition(
+        r#"<AggregateParameterType name="PAIR_T"><MemberList>
+             <Member name="a" typeRef="U8"/>
+             <Member name="b" typeRef="U8"/>
+           </MemberList></AggregateParameterType>
+           <ArrayParameterType name="MANY_T" arrayTypeRef="PAIR_T"><DimensionList>
+             <Dimension><StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+                        <EndingIndex><FixedValue>2999</FixedValue></EndingIndex></Dimension>
+           </DimensionList></ArrayParameterType>"#,
+        r#"<Parameter name="MANY" parameterTypeRef="MANY_T"/>"#,
+        r#"<ParameterRefEntry parameterRef="MANY"/>"#,
+    );
+    // Three thousand pairs is six thousand leaves, from a dimension that on its own is under
+    // the limit.
+    let Err(error) = XtceDb::from_xml(&xml) else {
+        panic!("six thousand leaves is too many");
+    };
+    assert!(
+        error.to_string().contains("4096"),
+        "the refusal should name the ceiling: {error}"
     );
 }

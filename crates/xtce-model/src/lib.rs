@@ -61,8 +61,8 @@ pub use error::{RefKind, XtceError};
 pub use ids::{ContainerId, ParamId, SpaceSystemId, Span, TypeId};
 pub use intern::{Interner, NameId};
 pub use types::{
-    ArrayDimension, BinaryEncoding, ByteOrder, Calibrator, Charset, ContextCalibrator,
-    DataEncoding, DiscreteLookup, Enumeration, EnumerationList, FloatCoding, FloatEncoding,
-    IntegerCoding, IntegerEncoding, LinearAdjustment, Parameter, ParameterType, PolynomialTerm,
-    SizeSpec, Spline, SplinePoint, StringDelimiter, StringEncoding, TypeKind,
+    AggregateMember, ArrayDimension, BinaryEncoding, ByteOrder, Calibrator, Charset,
+    ContextCalibrator, DataEncoding, DiscreteLookup, Enumeration, EnumerationList, FloatCoding,
+    FloatEncoding, IntegerCoding, IntegerEncoding, LinearAdjustment, Parameter, ParameterType,
+    PolynomialTerm, SizeSpec, Spline, SplinePoint, StringDelimiter, StringEncoding, TypeKind,
 };

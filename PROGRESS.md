@@ -245,6 +245,53 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — aggregates, and the expansion generalised
+
+`AggregateParameterType` decodes. Sixteen of sixteen bundled definitions compile, and there
+is nothing left in `testdata/spp` that `xtce-codegen` refuses.
+
+**It is the same expansion arrays got, and that is the whole design.** An array and an
+aggregate are both containers of other things, both laid out packed and in order, so both
+flatten the same way: an entry naming one becomes one entry per leaf, each pointing at a
+synthetic parameter carrying the leaf's own type and a name that spells the path to it. What
+changed in `lower.rs` is that the walk is recursive now — `expand_array` became
+`expand_composite` plus a `collect_leaves` that descends through either. An array repeats one
+type under `[i]`, an aggregate lists named members under `.name`, and either may hold the
+other:
+
+    RAIL.voltage        an aggregate
+    RAILS[0].voltage    an array of aggregates
+    STATE.samples[2]    an aggregate holding an array
+
+Nothing below `xtce-model` changed at all. Not the interpreter, not the emitter, not the
+flight encoder.
+
+**The naming is XTCE's, quoted rather than chosen.** `AggregateDataType`: "analogous to a
+C-struct … The data members are ordered and contiguous in the MemberList element (packed).
+Each member may be addressed by the dot syntax similar to C such as `P.voltage`."
+`MemberListType` adds that when the aggregate is referenced from a container the members "are
+assumed to be added sequentially (in the order listed here)", which is exactly this case.
+
+**Cycles are refused rather than followed.** `MemberType` says "Circular references are not
+allowed", but a file can still contain one and following it would not terminate. The walk
+carries the composite types on its current path and refuses to enter one twice.
+
+**The ceiling counts leaves now, not one array's elements.** An aggregate of arrays of
+aggregates reaches large numbers without any single dimension looking unreasonable: three
+thousand two-member pairs is six thousand fields from a dimension well under the old limit.
+The refusal names the ceiling and the entry but not the total, deliberately — counting first
+would mean a second traversal that has to agree with the one that builds the names, and the
+two drifting apart is a worse failure than a message that says "more than this".
+
+**The same evidence gap as arrays, and the same answer.** The reference refuses aggregates
+too. So the fixture gives its members *different widths from each other*, for the same reason
+`arrays.xml`'s two-dimensional array is two by three and not square: over equal-width members
+a reordered expansion produces the same fields over the same bits. Confirmed by reversing the
+member list — the tests that check names fail, and `aggregates_match_the_interpreter` still
+passes, because both implementations read the same expansion. `STATE` also ends on a four-bit
+member, so nothing after it is byte-aligned until the pad; an expansion that rounded a member
+up to a byte would show up there and nowhere else.
+
 ## 2026-08-23 — arrays, expanded before anything sees them
 
 `ArrayParameterType` decodes. Fifteen of fifteen bundled definitions compile.

@@ -65,6 +65,16 @@ pub enum TypeKind {
     },
     /// `RelativeTimeParameterType`.
     RelativeTime,
+    /// `AggregateParameterType`: a record, "analogous to a C-struct".
+    ///
+    /// Like an array, a parameter of this type never reaches a decoder: the container entry
+    /// naming it is expanded at load time into one synthetic parameter per member. XTCE says
+    /// the members are "ordered and contiguous … (packed)" and addressed "by the dot syntax
+    /// similar to C such as `P.voltage`", so that is what the expansion produces.
+    Aggregate {
+        /// Members in document order, which is the order they occupy in the packet.
+        members: Vec<AggregateMember>,
+    },
     /// `ArrayParameterType`: a repetition of one element type.
     ///
     /// A parameter of this type never reaches a decoder. The container entry that names it is
@@ -102,9 +112,19 @@ impl TypeKind {
             Self::AbsoluteTime { .. } => "absolute-time",
             Self::RelativeTime => "relative-time",
             Self::Array { .. } => "array",
+            Self::Aggregate { .. } => "aggregate",
             Self::Unsupported { .. } => "unsupported",
         }
     }
+}
+
+/// One `<xtce:Member>` of an aggregate.
+#[derive(Clone, Copy, Debug)]
+pub struct AggregateMember {
+    /// The member's name, which becomes the part after the dot.
+    pub name: NameId,
+    /// The type the member has.
+    pub type_id: TypeId,
 }
 
 /// One `<xtce:Dimension>` of an array, as a pair of inclusive zero-based indices.

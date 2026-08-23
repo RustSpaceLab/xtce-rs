@@ -660,10 +660,11 @@ impl<'db> Builder<'db> {
             // An entry naming an array is expanded into one entry per element when the file
             // is loaded, so a field of this type is a parameter referenced some other way —
             // as a criterion's operand, say — and there is no single value to give it.
-            TypeKind::Array { .. } => {
+            TypeKind::Array { .. } | TypeKind::Aggregate { .. } => {
                 return Err(refuse(
-                    "ArrayParameterType",
-                    "an array is expanded into its elements; the array itself has no value",
+                    ty.kind.label(),
+                    "an array or an aggregate is expanded into its leaves; the whole of it \
+                     has no single value",
                 ));
             }
             TypeKind::Enumerated(list) => {

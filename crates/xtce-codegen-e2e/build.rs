@@ -37,6 +37,8 @@ const CASES: &[(&str, &str, Option<&str>)] = &[
     // reference raises NotImplementedError for them, so this pair is all the checking there
     // is.
     ("arrays", "arrays.xml", None),
+    // Aggregates, and the two nested in both directions. The reference refuses these too.
+    ("aggregates", "aggregates.xml", None),
 ];
 
 fn main() {

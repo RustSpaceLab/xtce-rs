@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Written for this project. No bundled mission definition has an `<AggregateParameterType>`,
+  and neither does the reference: `space_packet_parser` raises `NotImplementedError` for one,
+  as it does for arrays, and calls both roadmap items. So this pair has no Python rung either
+  and sits in `SUPPORTED.md`'s divergence table beside them.
+
+  What replaces the rung is that XTCE states the semantics outright, in the schema this
+  repository already ships:
+
+  * `AggregateDataType` — "analogous to a C-struct … The data members are ordered and
+    contiguous in the MemberList element (packed). Each member may be addressed by the dot
+    syntax similar to C such as `P.voltage`."
+  * `MemberListType` — "Order is important … the members are assumed to be added sequentially
+    (in the order listed here) into the Container."
+  * `MemberType` — "Circular references are not allowed."
+
+  The file exists for the nesting rather than for the flat case. An aggregate on its own is a
+  handful of adjacent fields and would be hard to get wrong:
+
+  * RAILS is an array *of* aggregates, so the name is an index then a dot.
+  * STATE is an aggregate *holding* an array, so it is a dot then an index. Two of its three
+    members have different widths from each other, so a member list read in the wrong order
+    moves everything after it.
+  * STATE ends on a four-bit member, so the aggregate is not a whole number of bytes and
+    nothing after it is byte-aligned until the pad. An expansion that quietly rounded a
+    member up to a byte would show up here and nowhere else.
+  * LEAD and TAIL either side are the control: an entry expanded into the wrong number of
+    fields moves them.
+-->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="Aggregates">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U8">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U4">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="S16">
+        <IntegerDataEncoding sizeInBits="16" encoding="twosComplement"/>
+      </IntegerParameterType>
+      <FloatParameterType name="F32">
+        <FloatDataEncoding sizeInBits="32" encoding="IEEE754"/>
+      </FloatParameterType>
+
+      <!-- Nine bytes: two floats and a byte. -->
+      <AggregateParameterType name="RAIL_T">
+        <MemberList>
+          <Member name="voltage" typeRef="F32"/>
+          <Member name="current" typeRef="F32"/>
+          <Member name="ok" typeRef="U8"/>
+        </MemberList>
+      </AggregateParameterType>
+
+      <!-- An array of aggregates: index, then dot. -->
+      <ArrayParameterType name="RAILS_T" arrayTypeRef="RAIL_T">
+        <DimensionList>
+          <Dimension>
+            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+            <EndingIndex><FixedValue>1</FixedValue></EndingIndex>
+          </Dimension>
+        </DimensionList>
+      </ArrayParameterType>
+
+      <ArrayParameterType name="SAMPLES_T" arrayTypeRef="S16">
+        <DimensionList>
+          <Dimension>
+            <StartingIndex><FixedValue>0</FixedValue></StartingIndex>
+            <EndingIndex><FixedValue>2</FixedValue></EndingIndex>
+          </Dimension>
+        </DimensionList>
+      </ArrayParameterType>
+
+      <!-- An aggregate holding an array: dot, then index. Ends on a nibble. -->
+      <AggregateParameterType name="STATE_T">
+        <MemberList>
+          <Member name="mode" typeRef="U8"/>
+          <Member name="samples" typeRef="SAMPLES_T"/>
+          <Member name="flags" typeRef="U4"/>
+        </MemberList>
+      </AggregateParameterType>
+    </ParameterTypeSet>
+
+    <ParameterSet>
+      <Parameter name="LEAD" parameterTypeRef="U8"/>
+      <Parameter name="RAIL" parameterTypeRef="RAIL_T"/>
+      <Parameter name="RAILS" parameterTypeRef="RAILS_T"/>
+      <Parameter name="STATE" parameterTypeRef="STATE_T"/>
+      <Parameter name="PAD_4" parameterTypeRef="U4"/>
+      <Parameter name="TAIL" parameterTypeRef="U8"/>
+    </ParameterSet>
+
+    <ContainerSet>
+      <SequenceContainer name="Telemetry">
+        <EntryList>
+          <ParameterRefEntry parameterRef="LEAD"/>
+          <ParameterRefEntry parameterRef="RAIL"/>
+          <ParameterRefEntry parameterRef="RAILS"/>
+          <ParameterRefEntry parameterRef="STATE"/>
+          <!-- STATE ends four bits into a byte; this puts TAIL back on one. -->
+          <ParameterRefEntry parameterRef="PAD_4"/>
+          <ParameterRefEntry parameterRef="TAIL"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

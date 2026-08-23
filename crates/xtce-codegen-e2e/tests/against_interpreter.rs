@@ -20,7 +20,7 @@ use xtce_model::XtceDb;
 // `udp` is absent on purpose: it has no packet stream, so compiling it in the library above
 // is the whole of its check.
 use xtce_codegen_e2e::{
-    arrays, boolean_criteria, byte_order, calibrators, ctim, idex, numeric_edges, suda,
+    aggregates, arrays, boolean_criteria, byte_order, calibrators, ctim, idex, numeric_edges, suda,
 };
 
 fn testdata(relative: &str) -> PathBuf {
@@ -766,6 +766,87 @@ fn the_expanded_field_names_are_the_ones_xtce_describes() {
             "FLOATS[0]",
             "FLOATS[1]",
             "FLOATS[2]",
+            "TAIL",
+        ]
+    );
+}
+
+/// Aggregates, and the two nested in each other, against the interpreter.
+///
+/// Like arrays, this has no Python rung — the reference refuses aggregates too. And like
+/// arrays, the comparison cannot see a misreading the two implementations share, because both
+/// read the same expansion. It is here for what it *can* prove: that seventeen fields whose
+/// offsets came out of a nesting are read the same way as seventeen written out by hand,
+/// including the four-bit member that leaves everything after it off a byte boundary.
+#[test]
+fn aggregates_match_the_interpreter() {
+    const BYTES: usize = 37;
+
+    let db = XtceDb::from_path(testdata("aggregates.xml")).expect("definition loads");
+    let decoder = Decoder::new(&db).expect("root container");
+
+    let mut packets: Vec<Vec<u8>> = (0..=255u8).map(|byte| vec![byte; BYTES]).collect();
+    let mut state = 0x6C8E_9CF5_7037_1B01u64;
+    for _ in 0..2048 {
+        let mut packet = vec![0u8; BYTES];
+        for chunk in packet.chunks_mut(8) {
+            state ^= state >> 12;
+            state ^= state << 25;
+            state ^= state >> 27;
+            let bytes = state.wrapping_mul(0x2545_F491_4F6C_DD1D).to_be_bytes();
+            chunk.copy_from_slice(&bytes[..chunk.len()]);
+        }
+        packets.push(packet);
+    }
+
+    for (index, packet) in packets.iter().enumerate() {
+        let mut interpreted = decoder.new_packet(packet);
+        assert_same_packet!(
+            aggregates,
+            db,
+            decoder,
+            interpreted,
+            packet.as_slice(),
+            format!("packet {index}")
+        );
+    }
+}
+
+/// The nested names reach the generated decoder, in order.
+///
+/// Checked against the XTCE text rather than against the interpreter, for the same reason as
+/// the array version: the interpreter derives its names from the same expansion, so a shared
+/// misreading would pass a comparison between them.
+#[test]
+fn the_nested_field_names_are_the_ones_xtce_describes() {
+    let packet = vec![0u8; 37];
+    let aggregates::Packet::Telemetry(decoded) =
+        aggregates::decode(&packet).expect("an all-zero packet decodes");
+
+    let mut names = Vec::new();
+    decoded.for_each_value(|name, _, _| names.push(name));
+    assert_eq!(
+        names,
+        [
+            "LEAD",
+            // A plain aggregate: the dot syntax, members in document order.
+            "RAIL.voltage",
+            "RAIL.current",
+            "RAIL.ok",
+            // An array of aggregates: index, then dot.
+            "RAILS[0].voltage",
+            "RAILS[0].current",
+            "RAILS[0].ok",
+            "RAILS[1].voltage",
+            "RAILS[1].current",
+            "RAILS[1].ok",
+            // An aggregate holding an array: dot, then index.
+            "STATE.mode",
+            "STATE.samples[0]",
+            "STATE.samples[1]",
+            "STATE.samples[2]",
+            "STATE.flags",
+            "PAD_4",
             "TAIL",
         ]
     );

@@ -22,10 +22,10 @@ use crate::error::{RefKind, XtceError};
 use crate::ids::{ContainerId, ParamId, SpaceSystemId, Span, TypeId};
 use crate::intern::{FxHashMap, Interner, NameId};
 use crate::types::{
-    ArrayDimension, BinaryEncoding, ByteOrder, Calibrator, Charset, ContextCalibrator,
-    DataEncoding, DiscreteLookup, Enumeration, EnumerationList, FloatCoding, FloatEncoding,
-    IntegerCoding, IntegerEncoding, LinearAdjustment, Parameter, ParameterType, PolynomialTerm,
-    SizeSpec, Spline, SplinePoint, StringDelimiter, StringEncoding, TypeKind,
+    AggregateMember, ArrayDimension, BinaryEncoding, ByteOrder, Calibrator, Charset,
+    ContextCalibrator, DataEncoding, DiscreteLookup, Enumeration, EnumerationList, FloatCoding,
+    FloatEncoding, IntegerCoding, IntegerEncoding, LinearAdjustment, Parameter, ParameterType,
+    PolynomialTerm, SizeSpec, Spline, SplinePoint, StringDelimiter, StringEncoding, TypeKind,
 };
 use crate::xml::{AttrKey, Dom, Element, Tag};
 
@@ -336,6 +336,7 @@ impl<'d> Lowering<'d> {
             },
             Tag::RelativeTimeParameterType => TypeKind::RelativeTime,
             Tag::ArrayParameterType => self.lower_array_type(element, pending.space_system),
+            Tag::AggregateParameterType => self.lower_aggregate_type(element, pending.space_system),
             other => {
                 let element_name = element.name().to_owned();
                 self.note_unsupported(
@@ -436,6 +437,50 @@ impl<'d> Lowering<'d> {
             element: TypeId::new(element_type),
             dimensions,
         }
+    }
+
+    /// `<AggregateParameterType>`: an ordered, packed list of named members.
+    fn lower_aggregate_type(
+        &mut self,
+        element: Element<'d>,
+        space_system: SpaceSystemId,
+    ) -> TypeKind {
+        let unsupported = |lower: &mut Self, reason: &'static str| {
+            let name = element.name().to_owned();
+            lower.note_unsupported(&name, &element.path(), reason);
+            TypeKind::Unsupported {
+                element: lower.interner.intern(&name),
+            }
+        };
+
+        let Some(list) = element.child(Tag::MemberList) else {
+            return unsupported(self, "an aggregate with no MemberList has no members");
+        };
+
+        let mut members = Vec::new();
+        for member in list.children_with(Tag::Member) {
+            let Some(name) = member.attr(AttrKey::Name) else {
+                return unsupported(self, "a Member with no name cannot be addressed");
+            };
+            let Some(reference) = member.attr(AttrKey::TypeRef) else {
+                return unsupported(self, "a Member with no typeRef has no width");
+            };
+            let name = self.interner.intern(name);
+            let Some(type_id) = self.resolve(reference, space_system, RefKind::ParameterType)
+            else {
+                return unsupported(self, "a Member's typeRef does not resolve");
+            };
+            members.push(AggregateMember {
+                name,
+                type_id: TypeId::new(type_id),
+            });
+        }
+
+        if members.is_empty() {
+            return unsupported(self, "an aggregate with no Member has no members");
+        }
+
+        TypeKind::Aggregate { members }
     }
 
     fn lower_enumeration(&mut self, element: Element<'d>) -> TypeKind {
@@ -875,7 +920,7 @@ impl<'d> Lowering<'d> {
                 // here means the interpreter, the code generator and the flight encoder all
                 // see ordinary fields and none of them has to know arrays exist.
                 if let Some(expanded) =
-                    self.expand_array(element, ParamId::new(id), types, parameters)?
+                    self.expand_composite(element, ParamId::new(id), types, parameters)?
                 {
                     out.extend(expanded);
                     return Ok(());
@@ -937,22 +982,19 @@ impl<'d> Lowering<'d> {
         Ok(())
     }
 
-    /// Turns an entry that names an array into one entry per element, or `None` if it does
-    /// not name one.
+    /// Turns an entry that names an array or an aggregate into one entry per leaf field, or
+    /// `None` if it names neither.
     ///
-    /// Each element becomes a synthetic parameter carrying the array's element type and a
-    /// name of the form `ARR[2]`, or `ARR[1][2]` for two dimensions. The indices are the
-    /// array's own, so a subset entry over indices 2 to 4 produces `ARR[2]`, `ARR[3]`,
-    /// `ARR[4]` — not a fresh count from zero, which would be impossible to correlate with
-    /// anything on the ground.
+    /// Both are containers of other things, and both are laid out packed and in order, so
+    /// both flatten the same way: an array repeats one type under `[i]`, an aggregate lists
+    /// named members under `.name`, and either may hold the other. What comes out is one
+    /// synthetic parameter per leaf, carrying the leaf's own type and a name that spells the
+    /// path to it — `GRID[1][2]`, `STATE.voltage`, `SENSORS[0].reading`.
     ///
     /// The synthetic parameters go into the arena but **not** into the name-resolution index.
     /// That index is what `<Comparison parameterRef=…>`, `DynamicValue` and context
     /// calibrators all search, and a synthetic entry there could shadow a real parameter.
-    // One function because it is one decision — how many elements there are, and what each is
-    // called — and the pieces are only meaningful together.
-    #[allow(clippy::too_many_lines)]
-    fn expand_array(
+    fn expand_composite(
         &mut self,
         element: Element<'d>,
         parameter: ParamId,
@@ -962,31 +1004,27 @@ impl<'d> Lowering<'d> {
         let Some(declared) = parameters.get(parameter.index()) else {
             return Ok(None);
         };
-        let Some(ty) = types.get(declared.type_id.index()) else {
+        let type_id = declared.type_id;
+        let Some(ty) = types.get(type_id.index()) else {
             return Ok(None);
         };
-        let TypeKind::Array {
-            element: element_type,
-            dimensions,
-        } = &ty.kind
-        else {
+        if !matches!(ty.kind, TypeKind::Array { .. } | TypeKind::Aggregate { .. }) {
             return Ok(None);
-        };
+        }
 
-        let element_type = *element_type;
-        let declared_dimensions = dimensions.clone();
         let base_name = self.interner.resolve(declared.name).to_owned();
         let qualified = declared.qualified_name;
         let space_system = declared.space_system;
         let path = element.path();
 
-        // A `<DimensionList>` on the *entry* subsets the array; the type carries the full
-        // size. XTCE 1.2 §4.3.5.2.4: "Only used for subsetting an array. The array's maximum
-        // dimension sizes are set in the type."
-        let spans = match element.child(Tag::DimensionList) {
-            None => declared_dimensions.clone(),
+        // A `<DimensionList>` on the *entry* subsets the outermost array; the type carries
+        // the full size. XTCE: "Only used for subsetting an array. The array's maximum
+        // dimension sizes are set in the type." It says nothing about subsetting anything
+        // nested, so nothing nested is subset.
+        let subset = match element.child(Tag::DimensionList) {
+            None => None,
             Some(list) => {
-                let mut subset = Vec::new();
+                let mut chosen = Vec::new();
                 for dimension in list.children_with(Tag::Dimension) {
                     let (Some(start), Some(end)) = (
                         fixed_index(dimension.child(Tag::StartingIndex)),
@@ -999,62 +1037,28 @@ impl<'d> Lowering<'d> {
                             path,
                         });
                     };
-                    subset.push(ArrayDimension { start, end });
+                    chosen.push(ArrayDimension { start, end });
                 }
-                if subset.len() != declared_dimensions.len() {
-                    return Err(XtceError::ArrayNotExpanded {
-                        reason: format!(
-                            "the type has {} dimension(s) and the subset gives {}",
-                            declared_dimensions.len(),
-                            subset.len()
-                        ),
-                        path,
-                    });
-                }
-                for (chosen, whole) in subset.iter().zip(&declared_dimensions) {
-                    if chosen.start < whole.start || chosen.end > whole.end || chosen.is_empty() {
-                        return Err(XtceError::ArrayNotExpanded {
-                            reason: format!(
-                                "the subset {}..={} lies outside the declared {}..={}",
-                                chosen.start, chosen.end, whole.start, whole.end
-                            ),
-                            path,
-                        });
-                    }
-                }
-                subset
+                Some(chosen)
             }
         };
 
-        let count = spans
-            .iter()
-            .try_fold(1usize, |total, span| total.checked_mul(span.len()?));
-        let Some(count) = count else {
-            return Err(XtceError::ArrayNotExpanded {
-                reason: "the element count overflows a usize".to_owned(),
-                path,
-            });
-        };
-        if count > MAX_ARRAY_ELEMENTS {
-            return Err(XtceError::ArrayNotExpanded {
-                reason: format!(
-                    "{count} elements is past the {MAX_ARRAY_ELEMENTS} this expands, and each \
-                     one becomes a parameter and a struct field"
-                ),
-                path,
-            });
-        }
+        let mut leaves = Vec::new();
+        let mut visiting = Vec::new();
+        self.collect_leaves(
+            type_id,
+            &base_name,
+            subset.as_deref(),
+            &mut Walk {
+                types,
+                out: &mut leaves,
+                visiting: &mut visiting,
+                path: &path,
+            },
+        )?;
 
-        // Row-major, because XTCE says so: "the last dimension is assumed to be the least
-        // significant — that is this dimension will cycle through its combination before the
-        // next to last dimension changes."
-        let mut indices: Vec<i64> = spans.iter().map(|span| span.start).collect();
-        let mut out = Vec::with_capacity(count);
-        for _ in 0..count {
-            let mut name = base_name.clone();
-            for index in &indices {
-                let _ = std::fmt::Write::write_fmt(&mut name, format_args!("[{index}]"));
-            }
+        let mut out = Vec::with_capacity(leaves.len());
+        for (name, leaf) in leaves {
             let Ok(id) = u32::try_from(parameters.len()) else {
                 return Err(XtceError::ArrayNotExpanded {
                     reason: "the parameter arena is full".to_owned(),
@@ -1065,7 +1069,7 @@ impl<'d> Lowering<'d> {
                 name: self.interner.intern(&name),
                 qualified_name: qualified,
                 space_system,
-                type_id: element_type,
+                type_id: leaf,
                 short_description: None,
                 long_description: None,
                 initial_value: None,
@@ -1075,17 +1079,133 @@ impl<'d> Lowering<'d> {
                 location: None,
                 repeat: None,
             });
-
-            // Advance the odometer, last axis first.
-            for (axis, index) in indices.iter_mut().enumerate().rev() {
-                *index += 1;
-                if *index <= spans[axis].end {
-                    break;
-                }
-                *index = spans[axis].start;
-            }
         }
         Ok(Some(out))
+    }
+
+    /// Walks a type, appending `(name, type)` for every leaf it eventually contains.
+    ///
+    /// `visiting` holds the composite types on the current path. XTCE says circular member
+    /// references are not allowed, but a file can still contain one, and following it would
+    /// not terminate.
+    fn collect_leaves(
+        &mut self,
+        type_id: TypeId,
+        prefix: &str,
+        subset: Option<&[ArrayDimension]>,
+        walk: &mut Walk<'_>,
+    ) -> Result<(), XtceError> {
+        let Some(ty) = walk.types.get(type_id.index()) else {
+            return Err(XtceError::ArrayNotExpanded {
+                reason: "a member or element type does not resolve".to_owned(),
+                path: walk.path.to_owned(),
+            });
+        };
+
+        match &ty.kind {
+            TypeKind::Array {
+                element,
+                dimensions,
+            } => {
+                let element = *element;
+                let declared = dimensions.clone();
+                let spans = match subset {
+                    None => declared,
+                    Some(chosen) => {
+                        if chosen.len() != declared.len() {
+                            return Err(XtceError::ArrayNotExpanded {
+                                reason: format!(
+                                    "the type has {} dimension(s) and the subset gives {}",
+                                    declared.len(),
+                                    chosen.len()
+                                ),
+                                path: walk.path.to_owned(),
+                            });
+                        }
+                        for (one, whole) in chosen.iter().zip(&declared) {
+                            if one.start < whole.start || one.end > whole.end || one.is_empty() {
+                                return Err(XtceError::ArrayNotExpanded {
+                                    reason: format!(
+                                        "the subset {}..={} lies outside the declared {}..={}",
+                                        one.start, one.end, whole.start, whole.end
+                                    ),
+                                    path: walk.path.to_owned(),
+                                });
+                            }
+                        }
+                        chosen.to_vec()
+                    }
+                };
+
+                Self::enter(type_id, walk.visiting, walk.path)?;
+                // Row-major, because XTCE says so: "the last dimension is assumed to be the
+                // least significant — that is this dimension will cycle through its
+                // combination before the next to last dimension changes."
+                let count = spans
+                    .iter()
+                    .try_fold(1usize, |total, span| total.checked_mul(span.len()?));
+                let Some(count) = count else {
+                    return Err(XtceError::ArrayNotExpanded {
+                        reason: "the element count overflows a usize".to_owned(),
+                        path: walk.path.to_owned(),
+                    });
+                };
+                let mut indices: Vec<i64> = spans.iter().map(|span| span.start).collect();
+                for _ in 0..count {
+                    let mut name = prefix.to_owned();
+                    for index in &indices {
+                        let _ = std::fmt::Write::write_fmt(&mut name, format_args!("[{index}]"));
+                    }
+                    self.collect_leaves(element, &name, None, walk)?;
+                    for (axis, index) in indices.iter_mut().enumerate().rev() {
+                        *index += 1;
+                        if *index <= spans[axis].end {
+                            break;
+                        }
+                        *index = spans[axis].start;
+                    }
+                }
+                walk.visiting.pop();
+            }
+
+            TypeKind::Aggregate { members } => {
+                let members = members.clone();
+                Self::enter(type_id, walk.visiting, walk.path)?;
+                for member in &members {
+                    // "Each member may be addressed by the dot syntax similar to C such as
+                    // P.voltage."
+                    let name = format!("{prefix}.{}", self.interner.resolve(member.name));
+                    self.collect_leaves(member.type_id, &name, None, walk)?;
+                }
+                walk.visiting.pop();
+            }
+
+            _ => {
+                if walk.out.len() >= MAX_EXPANDED_FIELDS {
+                    return Err(XtceError::ArrayNotExpanded {
+                        reason: format!(
+                            "more than {MAX_EXPANDED_FIELDS} fields, and each one becomes a \
+                             parameter and a struct field"
+                        ),
+                        path: walk.path.to_owned(),
+                    });
+                }
+                walk.out.push((prefix.to_owned(), type_id));
+            }
+        }
+        Ok(())
+    }
+
+    /// Records that the expansion has descended into a composite type, refusing a cycle.
+    fn enter(type_id: TypeId, visiting: &mut Vec<TypeId>, path: &str) -> Result<(), XtceError> {
+        if visiting.contains(&type_id) {
+            return Err(XtceError::ArrayNotExpanded {
+                reason: "the type contains itself, so expanding it would not terminate".to_owned(),
+                path: path.to_owned(),
+            });
+        }
+        visiting.push(type_id);
+        Ok(())
     }
 
     // --------------------------------------------------------------- match criteria
@@ -1490,13 +1610,25 @@ fn float_coding(text: &str) -> FloatCoding {
     }
 }
 
-/// How many elements one entry may expand into.
+/// The state a leaf walk carries, which does not change as it descends.
 ///
-/// Every element becomes a parameter in the arena and a field in any generated decoder, so a
+/// Grouped because it is four things that travel together through a recursion, and passing
+/// them one by one made the signature longer than the function.
+struct Walk<'a> {
+    types: &'a [ParameterType],
+    out: &'a mut Vec<(String, TypeId)>,
+    visiting: &'a mut Vec<TypeId>,
+    path: &'a str,
+}
+
+/// How many leaf fields one entry may expand into.
+///
+/// Every leaf becomes a parameter in the arena and a field in any generated decoder, so a
 /// definition asking for a million of them would produce something no compiler will finish.
-/// The limit is arbitrary but named: nothing in a real database comes close, and the refusal
-/// says how many were asked for.
-const MAX_ARRAY_ELEMENTS: usize = 4096;
+/// An aggregate of arrays of aggregates reaches large numbers quickly, which is why the limit
+/// counts leaves rather than one array's elements. It is arbitrary but named: nothing in a
+/// real database comes close, and the refusal says what it was asked for.
+const MAX_EXPANDED_FIELDS: usize = 4096;
 
 /// A `<StartingIndex>` or `<EndingIndex>` that is a plain `<FixedValue>`.
 ///

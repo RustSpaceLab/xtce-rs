@@ -31,13 +31,6 @@ nothing in reach uses.
   refuses it by name. Its criteria range over other parameters, which may themselves be
   calibrated and may sit later in the container, so compiling it means resolving a dependency
   graph. No definition in reach uses one, so there is nothing to validate a guess against.
-* **`AggregateParameterType`.** Represented in the IR and reported by `xtce info`, refused
-  at decode with the element named. It shared this line with arrays until 2026-08-23 and is
-  not the same problem: an array is a repetition, so it expands into indexed copies of one
-  element type, while an aggregate is a record whose members have their own names and types.
-  The reference refuses both, so neither has an oracle — but XTCE states the array's index
-  convention and layout order outright, and there is correspondingly less to state about a
-  record.
 * **Publishing to crates.io.** `CONTRIBUTING.md` rule 7 forbids it without being asked. The names
   `xtce`, `xtce-model` and `xtce-decode` were free on crates.io as of writing.
 

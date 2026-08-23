@@ -89,3 +89,9 @@ pub mod byte_order {
 pub mod arrays {
     include!(concat!(env!("OUT_DIR"), "/arrays.rs"));
 }
+
+/// Aggregates, and arrays and aggregates nested in each other.
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+pub mod aggregates {
+    include!(concat!(env!("OUT_DIR"), "/aggregates.rs"));
+}
