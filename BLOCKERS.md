@@ -8,10 +8,17 @@ nothing in reach uses.
 
 ## Where a next session should start
 
-1. **Give the differential harness a `--full` mode.** The golden files hold full detail for
-   the first 64 packets of each stream and a digest over all of them. A digest mismatch
-   currently tells you *that* something differs past packet 64, not *which* packet. A mode
-   that regenerates full detail on demand would close that.
+1. **Localising a digest mismatch needs the goldens regenerated.** `cargo xtask diff` now
+   tells you what to run when the digest differs but the detail window is clean — the window
+   is 64 packets and a SHA-256 does not localise, so widening it and regenerating is the
+   answer, and the report prints the exact command. What it cannot do is find the packet on
+   its own.
+
+   The real fix is a per-packet or per-window digest in the golden files, which means
+   regenerating them with the pinned reference. That is `space_packet_parser` at commit
+   `6de220ff` — **not** the 6.0.1 on PyPI — and regenerating ground truth changes what the
+   whole project is measured against, so it wants a deliberate decision rather than a
+   drive-by.
 
 2. **Talk to `greglucas/space-data-toolkit`.** Section 7 of the specification suggests it,
    and the benchmark it asked for now exists.

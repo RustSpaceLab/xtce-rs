@@ -6,9 +6,13 @@
 //!   the packet, the parameter and both values.
 //! * **Digest.** A SHA-256 over the canonical encoding of *every* packet in the stream. The
 //!   detail section is truncated for size; without the digest, a divergence in packet 5000
-//!   of 7200 would go unnoticed. A digest mismatch with a clean detail section is still a
-//!   failure — it just means the first differing packet is past the detail window, and
-//!   `--detail-scan` will find it.
+//!   of 7200 would go unnoticed.
+//!
+//! A digest mismatch with a clean detail section is still a failure. It means the first
+//! differing packet is past the detail window, and the harness cannot say which one: the
+//! golden holds no per-packet reference beyond the window, and a SHA-256 does not localise.
+//! Widening the window and regenerating is the way to find it, and the report says so with
+//! the command already filled in.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -46,6 +50,8 @@ pub struct CaseReport {
     pub trailing: usize,
     pub differences: Vec<String>,
     pub digest_matches: bool,
+    /// How many packets the golden holds full detail for.
+    pub detail_window: usize,
     pub load_seconds: f64,
     pub decode_seconds: f64,
     pub reference_load_seconds: f64,
@@ -283,6 +289,7 @@ fn run_case(
         trailing,
         differences,
         digest_matches: digest == golden.digest,
+        detail_window: golden.detail.len(),
         load_seconds,
         decode_seconds,
         reference_load_seconds: golden.reference_load_seconds,
@@ -388,6 +395,49 @@ pub fn format_report(report: &CaseReport) -> String {
         report.decode_seconds * 1e3,
         report.reference_parse_seconds * 1e3,
     );
+    // A mismatch the detail section cannot see is the awkward case: something differs, and
+    // the harness knows only that the value comparison did not find it. Rather than leave
+    // the reader to work out what to do, say which of the two situations it is.
+    if !report.digest_matches && report.differences.is_empty() {
+        if report.detail_window >= report.packets {
+            // Every packet was compared value by value and agreed, yet the digests differ.
+            // The digest covers more than the values: which parameters are present, and the
+            // order they are in. So the difference is in the shape of the packet, not in a
+            // number.
+            let _ = writeln!(
+                out,
+                "  every one of the {} packets was compared and agreed, so the difference is \
+                 not in a value.",
+                report.packets
+            );
+            let _ = writeln!(
+                out,
+                "  the digest also covers which parameters are present and their order; \
+                 look there."
+            );
+        } else {
+            let _ = writeln!(
+                out,
+                "  every packet in the detail window agrees, so the first difference is past \
+                 packet {}.",
+                report.detail_window
+            );
+            let _ = writeln!(
+                out,
+                "  a SHA-256 does not localise and the golden holds no reference past the \
+                 window, so widen it:"
+            );
+            let _ = writeln!(
+                out,
+                "    .venv/bin/python tools/gen_goldens.py --only {} --detail {}",
+                report.case, report.packets
+            );
+            let _ = writeln!(
+                out,
+                "  then re-run; the difference will name its packet and parameter."
+            );
+        }
+    }
     if report.trailing > 0 {
         // The reference only warns about this, and the golden generator suppresses warnings,
         // so without reporting it here a definition that does not cover its own packets is

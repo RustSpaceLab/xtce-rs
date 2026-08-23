@@ -245,6 +245,38 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — the generated code is checked for `core`, not just claimed to be
+
+Two smaller things, both about a claim that was not a check.
+
+**`crates/xtce-codegen-e2e` is a `#![no_std]` library now.** The generated decoders used to
+be `include!`d separately by each test; they live in the crate's library instead, which the
+tests import. Same compilation, same cost — but the library carries `#![no_std]`, so a
+generated decoder that names anything outside `core` is a build failure rather than a
+surprise in somebody else's cross-compile.
+
+That gap was not hypothetical. A day earlier the calibration emitter reached `main` calling
+`f64::powi`, which is a `std` method: every test passed and the output would not have built
+for a Cortex-M. It was caught by the bare-metal probe in a *different repository*. Verified
+non-vacuous the same way as the panic gate — putting `.powi` back makes
+`cargo test -p xtce-codegen-e2e` fail to compile, naming the generated file and line.
+
+This closes half of the claim. The other half is that the code also *cross-compiles*, which
+needs a target this repository's CI does not build for, and still rests on `xtce-flight`'s
+probe.
+
+**A digest mismatch says what to do about it.** The golden files hold full detail for the
+first 64 packets and one SHA-256 over all of them, so a mismatch past the window told you
+only that something differed. The report now distinguishes the two cases it can be: if the
+window covers the whole stream, every value agreed and the difference is in *which*
+parameters are present or their order, because the digest covers that too; otherwise it
+prints the `gen_goldens.py --detail` invocation that would widen the window, with the case
+and packet count filled in.
+
+That is as far as it goes without regenerating the goldens, which needs the pinned reference
+from git rather than PyPI and changes what the project is measured against. `BLOCKERS.md`
+records why that is a decision rather than a task.
+
 ## 2026-08-23 — BooleanExpression, and every bundled definition compiles
 
 `contrived_inheritance_structure.xml` was the last one `xtce-codegen` refused. It compiles

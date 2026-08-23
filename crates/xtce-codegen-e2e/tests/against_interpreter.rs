@@ -13,40 +13,13 @@ use std::path::{Path, PathBuf};
 use xtce_decode::{Decoder, EngValue, PacketIter, RawValue};
 use xtce_model::XtceDb;
 
-#[allow(dead_code, clippy::all, clippy::pedantic)]
-mod ctim {
-    include!(concat!(env!("OUT_DIR"), "/ctim.rs"));
-}
-
-#[allow(dead_code, clippy::all, clippy::pedantic)]
-mod idex {
-    include!(concat!(env!("OUT_DIR"), "/idex.rs"));
-}
-
-#[allow(dead_code, clippy::all, clippy::pedantic)]
-mod suda {
-    include!(concat!(env!("OUT_DIR"), "/suda.rs"));
-}
-
-#[allow(dead_code, clippy::all, clippy::pedantic)]
-mod udp {
-    include!(concat!(env!("OUT_DIR"), "/udp.rs"));
-}
-
-#[allow(dead_code, clippy::all, clippy::pedantic)]
-mod numeric_edges {
-    include!(concat!(env!("OUT_DIR"), "/numeric_edges.rs"));
-}
-
-#[allow(dead_code, clippy::all, clippy::pedantic)]
-mod calibrators {
-    include!(concat!(env!("OUT_DIR"), "/calibrators.rs"));
-}
-
-#[allow(dead_code, clippy::all, clippy::pedantic)]
-mod boolean_criteria {
-    include!(concat!(env!("OUT_DIR"), "/boolean_criteria.rs"));
-}
+// The generated modules live in this crate's library rather than being included here,
+// because the library is `#![no_std]` and these tests are not. Compiling them there is what
+// makes "generated code names nothing outside `core`" a build failure when it stops being
+// true, rather than a sentence in a README.
+// `udp` is absent on purpose: it has no packet stream, so compiling it in the library above
+// is the whole of its check.
+use xtce_codegen_e2e::{boolean_criteria, calibrators, ctim, idex, numeric_edges, suda};
 
 fn testdata(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
