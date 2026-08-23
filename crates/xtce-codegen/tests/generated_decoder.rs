@@ -375,3 +375,124 @@ fn constructs_outside_the_compilable_subset_are_refused() {
         }
     }
 }
+
+/// A criterion the generator would evaluate differently from the interpreter is refused.
+///
+/// `useCalibratedValue` defaults to **true**, so most criteria in a real definition ask for
+/// the engineering value. For a plain integer that is the raw value and there is nothing to
+/// do. For anything the interpreter reports differently — a calibrated parameter, whose
+/// engineering value is a float, or a boolean, whose engineering value is 0 or 1 rather than
+/// its raw bits — comparing the raw bits would select a different container. Silently.
+///
+/// The first of those became reachable the day calibrators started compiling: before then a
+/// calibrated field was refused outright, so a criterion could not name one.
+#[test]
+fn criteria_the_generator_would_evaluate_differently_are_refused() {
+    fn definition(types: &str, parameters: &str, criteria: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="T">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      {types}
+      <IntegerParameterType name="U8"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      {parameters}
+      <Parameter name="BODY" parameterTypeRef="U8"/>
+    </ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="Base" abstract="true">
+        <EntryList><ParameterRefEntry parameterRef="SEL"/></EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="Child">
+        <EntryList><ParameterRefEntry parameterRef="BODY"/></EntryList>
+        <BaseContainer containerRef="Base">
+          <RestrictionCriteria>{criteria}</RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>"#
+        )
+    }
+
+    let calibrated = r#"<IntegerParameterType name="SEL_T"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"><DefaultCalibrator><PolynomialCalibrator><Term coefficient="2.0" exponent="1"/></PolynomialCalibrator></DefaultCalibrator></IntegerDataEncoding></IntegerParameterType>"#;
+    let boolean = r#"<BooleanParameterType name="SEL_T"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></BooleanParameterType>"#;
+    let plain = r#"<IntegerParameterType name="SEL_T"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>"#;
+    let parameter = r#"<Parameter name="SEL" parameterTypeRef="SEL_T"/>"#;
+
+    let cases: [(&str, String, bool); 5] = [
+        (
+            // The interpreter compares 2 * raw against 4.0; raw bits against 4 would pick
+            // this container for a packet the interpreter reads as a different one.
+            "calibrated parameter, calibrated comparison",
+            definition(
+                calibrated,
+                parameter,
+                r#"<Comparison parameterRef="SEL" value="4" useCalibratedValue="true"/>"#,
+            ),
+            false,
+        ),
+        (
+            // The same parameter, asked for its raw value: nothing to disagree about.
+            "calibrated parameter, raw comparison",
+            definition(
+                calibrated,
+                parameter,
+                r#"<Comparison parameterRef="SEL" value="4" useCalibratedValue="false"/>"#,
+            ),
+            true,
+        ),
+        (
+            // Eight bits wide, so a raw value of 4 has an engineering value of 1.
+            "boolean parameter, calibrated comparison",
+            definition(
+                boolean,
+                parameter,
+                r#"<Comparison parameterRef="SEL" value="1" useCalibratedValue="true"/>"#,
+            ),
+            false,
+        ),
+        (
+            "boolean parameter, raw comparison",
+            definition(
+                boolean,
+                parameter,
+                r#"<Comparison parameterRef="SEL" value="1" useCalibratedValue="false"/>"#,
+            ),
+            true,
+        ),
+        (
+            // The control, and the shape almost every real definition uses: no attribute at
+            // all, which XTCE reads as `true`, over a parameter with no calibrator.
+            "plain integer, no attribute",
+            definition(
+                plain,
+                parameter,
+                r#"<Comparison parameterRef="SEL" value="4"/>"#,
+            ),
+            true,
+        ),
+    ];
+
+    for (what, xml, should_compile) in cases {
+        let db = XtceDb::from_xml(&xml).unwrap_or_else(|error| panic!("{what}: {error}"));
+        let result = xtce_codegen::generate(&db, &xtce_codegen::Options::default());
+        assert_eq!(
+            result.is_ok(),
+            should_compile,
+            "{what}: expected compile={should_compile}, got {result:?}"
+        );
+        if !should_compile {
+            assert!(
+                matches!(
+                    result,
+                    Err(xtce_codegen::CodegenError::Unsupported { ref element, .. })
+                        if element == "Comparison"
+                ),
+                "{what}: refused the wrong element: {result:?}"
+            );
+        }
+    }
+}

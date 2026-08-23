@@ -245,6 +245,33 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — a criterion that would have picked the wrong container
+
+Compiling calibrators opened a hole one commit earlier, and this closes it.
+
+`useCalibratedValue` defaults to **true** in XTCE, so most restriction criteria in a real
+definition ask for the engineering value. Before calibrators compiled, a criterion could not
+name a calibrated parameter — the whole field was refused — so "engineering value" and "raw
+value" were always the same number and the dispatcher could compare raw bits. The moment
+calibrated fields started compiling, that stopped being true, and nothing said so: the
+generated dispatcher compared the raw bits while the interpreter compared the calibrated
+float. A definition with `2 * x` on its discriminator would have had the two implementations
+select *different containers* for the same packet, in silence.
+
+Confirmed before fixing, on a six-line definition: the emitted dispatcher tested
+`head[0] == 4` where the interpreter tests `2.0 * raw == 4.0`, so the two disagreed for every
+packet with a discriminator of 2 or 4.
+
+Refused by name now, along with one that was already latent: a criterion asking for the
+calibrated value of a **boolean**, whose engineering value is 0 or 1 rather than its raw
+bits. Eight bits of boolean holding 4 reads as `true`, which is 1, and comparing 4 would have
+been wrong the same way. Nothing in the bundled definitions reaches either — all eleven that
+compiled before still compile — but a mission file easily could.
+
+Both are refused rather than compiled. Comparing floats in a dispatcher that runs before any
+field is decoded means NaN ordering and literal coercion in the one place where being wrong
+selects the wrong parser for the whole packet, and no definition in reach asks for it.
+
 ## 2026-08-23 — calibrators in the code generator
 
 `xtce-codegen` compiles `DefaultCalibrator` now, both kinds: `PolynomialCalibrator` and

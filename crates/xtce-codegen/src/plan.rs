@@ -797,13 +797,36 @@ impl Builder<'_> {
                             reason: "only integer-valued criteria are compiled",
                         });
                     }
-                    if comparison.use_calibrated && matches!(field.repr, Repr::Enumerated(_)) {
-                        return Err(CodegenError::Unsupported {
-                            element: "Comparison".to_owned(),
-                            container: name.clone(),
-                            reason: "a criterion on a calibrated enumeration compares labels, \
-                                     which is not compiled",
-                        });
+                    // `useCalibratedValue` defaults to *true*, so most criteria take this
+                    // path. For a plain integer the engineering value is the raw one and
+                    // there is nothing to do; for anything the interpreter reports
+                    // differently, the two would silently select different containers.
+                    if comparison.use_calibrated {
+                        if matches!(field.repr, Repr::Enumerated(_)) {
+                            return Err(CodegenError::Unsupported {
+                                element: "Comparison".to_owned(),
+                                container: name.clone(),
+                                reason: "a criterion on a calibrated enumeration compares \
+                                         labels, which is not compiled",
+                            });
+                        }
+                        if field.calibration.is_some() {
+                            return Err(CodegenError::Unsupported {
+                                element: "Comparison".to_owned(),
+                                container: name.clone(),
+                                reason: "the criterion asks for the calibrated value of a \
+                                         calibrated parameter, which is a float; comparing \
+                                         floats in the dispatcher is not compiled",
+                            });
+                        }
+                        if matches!(field.repr, Repr::Bool) {
+                            return Err(CodegenError::Unsupported {
+                                element: "Comparison".to_owned(),
+                                container: name.clone(),
+                                reason: "a boolean's engineering value is 0 or 1, not its raw \
+                                         bits, and comparing it is not compiled",
+                            });
+                        }
                     }
                     let value =
                         comparison

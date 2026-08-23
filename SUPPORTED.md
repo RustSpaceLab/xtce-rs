@@ -121,6 +121,8 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | `leastSignificantByteFirst` | Refused | |
 | `DefaultCalibrator` / `PolynomialCalibrator` | Yes | terms summed in document order; an integral raw value is raised to its power exactly in `i128` and converted once, a float raw by `powi` — the same two paths the interpreter takes |
 | `DefaultCalibrator` / `SplineCalibrator` | Yes | orders 0 and 1; out of range without extrapolation is `DecodeError::Calibration` |
+| A criterion asking for the calibrated value of a calibrated parameter | Refused | the interpreter compares a float there, and the dispatcher runs before anything is decoded |
+| A criterion asking for the calibrated value of a boolean | Refused | its engineering value is 0 or 1, not its raw bits |
 | A calibrator on an enumeration or a boolean | Ignored | XTCE looks both up from the *raw* value; the reference returns before it reaches a calibrator, so applying one would be wrong |
 | `ContextCalibrator` | Refused | selected by criteria over other parameters, which may themselves be calibrated — a dependency graph rather than an expression, and nothing in reach uses one |
 | A spline above first order, or with no points | Refused | settled while planning, not once per packet |
