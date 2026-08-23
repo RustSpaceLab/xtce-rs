@@ -292,6 +292,35 @@ pub fn twos_complement(value: u64, width: u32) -> i64 {
     ((value << shift) as i64) >> shift
 }
 
+/// Sign extension for the one case where the value can be wider than the field it came from.
+///
+/// After a `leastSignificantByteFirst` swap of a field whose width is not a whole number of
+/// bytes, the value carries bits above `width`: a twelve-bit `0x0AB` comes back as `0xAB00`.
+/// The reference does not mask those away. It tests bit `width - 1` and subtracts `2^width`
+/// if it is set, leaving the high bits in place — so a twelve-bit field can report 43274.
+///
+/// [`twos_complement`] masks, and for every value that fits its width the two agree exactly.
+/// This is a separate function rather than a change to that one because the masking form is
+/// the right answer everywhere else, and because it is branchless.
+///
+/// Returns `None` when the reference's answer does not fit an `i64`. That needs a width
+/// between 57 and 63 bits, not a whole number of bytes, whose swap widened it past `2^63` —
+/// where the reference's arbitrary-precision integers can hold a number this cannot.
+#[must_use]
+pub fn twos_complement_unmasked(value: u64, width: u32) -> Option<i64> {
+    // At 64 bits, and above, the swap cannot widen anything: the value already fills its
+    // field, and the two forms coincide.
+    if width == 0 || width >= 64 {
+        return Some(value as i64);
+    }
+    if value & (1u64 << (width - 1)) == 0 {
+        return i64::try_from(value).ok();
+    }
+    // In `i128` so that the range check is exact rather than a wrap that happens to be
+    // caught. `value` is at most `2^64 - 1` and the subtrahend at most `2^63`.
+    i64::try_from(i128::from(value) - (1i128 << width)).ok()
+}
+
 /// Reinterprets an unsigned field as sign-magnitude: top bit is the sign, rest the
 /// magnitude.
 #[must_use]
@@ -562,6 +591,41 @@ mod tests {
                 i128::from(twos_complement(value, width)),
                 naive_twos_complement(value, width),
                 "value {} width {}", value, width
+            );
+        }
+
+        /// The unmasked form agrees with the masking one wherever the value fits its field,
+        /// and follows the reference wherever it does not.
+        #[test]
+        fn unmasked_sign_extension_agrees_within_the_field(
+            bits in proptest::num::u64::ANY,
+            width in 1u32..=64,
+        ) {
+            let mask = if width == 64 { u64::MAX } else { (1u64 << width) - 1 };
+            let value = bits & mask;
+            proptest::prop_assert_eq!(
+                twos_complement_unmasked(value, width),
+                Some(twos_complement(value, width)),
+                "value {} width {}", value, width
+            );
+        }
+
+        /// Above the field's width the two part company, and the unmasked one is right.
+        #[test]
+        fn unmasked_sign_extension_keeps_the_high_bits(
+            bits in proptest::num::u64::ANY,
+            width in 1u32..=56,
+        ) {
+            // What the reference computes, in arbitrary precision.
+            let expected = if bits & (1u64 << (width - 1)) == 0 {
+                i128::from(bits)
+            } else {
+                i128::from(bits) - (1i128 << width)
+            };
+            proptest::prop_assert_eq!(
+                twos_complement_unmasked(bits, width).map(i128::from),
+                i64::try_from(expected).ok().map(i128::from),
+                "value {} width {}", bits, width
             );
         }
 

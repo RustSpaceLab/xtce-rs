@@ -52,6 +52,14 @@ the real mission files never reach, and so would never be compared against anyth
 | `numeric_edges.xml` | the mission files contain one 32-bit float, no 16-bit float, and no numeric field spanning nine bytes |
 | `calibrators.xml` | **no mission file has a calibrator at all** — grepping all five returns nothing |
 | `boolean_criteria.xml` | the one mission file with a `<BooleanExpression>` has a single conjunction of equalities: no disjunction, no nesting, and no operator but `==` |
+| `byte_order.xml` + `byte_order_stream.bin` | **no mission file sets `byteOrder`** — so there is no recorded telemetry with a little-endian field, and no bytes to put in front of the reference |
+
+`byte_order_stream.bin` is the only packet stream here that was not flown. It is written by
+`tools/gen_byte_order_stream.py` from a fixed seed, so regenerating it produces the same file
+and the golden taken over it stays meaningful. It is a golden case like the six real ones,
+which makes little-endian the only feature whose interpreted path is checked against
+`space_packet_parser` directly. Doing that found two divergences the first time it ran; see
+`SUPPORTED.md`.
 
 Neither is a substitute for a real sample; they are a supplement to one. `calibrators.xml` in
 particular is built around a difference that only shows up in the last bit: the reference

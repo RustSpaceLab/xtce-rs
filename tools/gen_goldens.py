@@ -103,6 +103,16 @@ CASES: tuple[Case, ...] = (
         xtce="idex/idex_combined_science_definition.xml",
         packets="idex/sciData_2023_052_14_45_05",
     ),
+    # The only case whose packets were not flown. No mission definition in reach sets
+    # `byteOrder`, so there is no recorded telemetry with a little-endian field in it, and
+    # without bytes there is nothing to put in front of the reference. The stream is written
+    # by `tools/gen_byte_order_stream.py` from a fixed seed. One packet in four carries an
+    # APID the definition does not describe, so the refusal path is covered too.
+    Case(
+        name="byte_order",
+        xtce="byte_order.xml",
+        packets="byte_order_stream.bin",
+    ),
     # A definition pointed at a stream it does not describe. Every packet reaches the
     # abstract root and finds no inheritor whose restriction criteria hold, so the reference
     # raises UnrecognizedPacketTypeError for all of them. Without this case the rejection
@@ -276,7 +286,18 @@ def main() -> int:
             }
         )
 
-    (args.out / "reference_timings.json").write_text(json.dumps(summary, indent=1) + "\n")
+    # Merge rather than replace. A `--only` run used to rewrite this file with the one case
+    # it regenerated, silently dropping the timings for every other — which are the baseline
+    # `cargo bench` reports against, and which cannot be recovered without rerunning
+    # everything on the same machine.
+    timings = args.out / "reference_timings.json"
+    existing: list[dict[str, Any]] = []
+    if timings.exists():
+        existing = json.loads(timings.read_text())
+    regenerated = {entry["case"] for entry in summary}
+    merged = [entry for entry in existing if entry["case"] not in regenerated] + summary
+    merged.sort(key=lambda entry: entry["case"])
+    timings.write_text(json.dumps(merged, indent=1) + "\n")
     return 0
 
 

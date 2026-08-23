@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Written for this project. No bundled mission definition sets `byteOrder` at all — grepping
+  every one of them for `leastSignificantByteFirst` finds only the schema — so neither the
+  interpreter's little-endian path nor the generator's had ever been compared against
+  anything. The generator simply refused it.
+
+  What `leastSignificantByteFirst` means in XTCE is narrower than "read the field
+  little-endian". The reference reads the field big-endian and *then* reverses
+  `ceil(size_in_bits / 8)` bytes of the resulting integer:
+
+      val = int.from_bytes(val.to_bytes((size_in_bits + 7) // 8, "little"), "big")
+
+  For a field that starts on a byte and occupies whole ones the two descriptions coincide.
+  For anything else they do not, and this file has both:
+
+  * U16_LE_ODD starts four bits into a byte. Reversing the *load* would be wrong; the
+    reversal has to happen after the read, on the value.
+  * U12_LE and S12_LE are twelve bits, so the reversal moves the top nibble into the high
+    byte and the result is *wider than the field* — 0x0AB comes back as 0xAB00. That is not
+    a mistake to be corrected: it is what the reference computes. An unsigned field keeps the
+    excess and a signed one discards it when it sign-extends, so both are here.
+  * U8_LE is one byte, where the reversal is the identity and every implementation returns
+    early.
+
+  SEL is little-endian and a restriction criterion tests it, so the dispatcher has to apply
+  the swap too: a criterion compares the value the reference reports, not the bits.
+
+  The big-endian controls at the end are not decoration. A generator that swapped every field,
+  or none, would agree on half this file; it has to agree on all of it.
+
+  The packet stream beside it is generated rather than flown — see `SOURCES.md`. It is the
+  only way to put these bytes in front of the Python reference, and doing so makes this the
+  one feature whose *interpreted* path is pinned to the reference directly rather than to
+  hand-computed values.
+-->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="ByteOrder">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U1">
+        <IntegerDataEncoding sizeInBits="1" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U2">
+        <IntegerDataEncoding sizeInBits="2" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U3">
+        <IntegerDataEncoding sizeInBits="3" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U4">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U11">
+        <IntegerDataEncoding sizeInBits="11" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U14">
+        <IntegerDataEncoding sizeInBits="14" encoding="unsigned"/>
+      </IntegerParameterType>
+
+      <IntegerParameterType name="U16_LE_T">
+        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"
+                             byteOrder="leastSignificantByteFirst"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U24_LE_T">
+        <IntegerDataEncoding sizeInBits="24" encoding="unsigned"
+                             byteOrder="leastSignificantByteFirst"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U32_LE_T">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"
+                             byteOrder="leastSignificantByteFirst"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U64_LE_T">
+        <IntegerDataEncoding sizeInBits="64" encoding="unsigned"
+                             byteOrder="leastSignificantByteFirst"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="S16_LE_T">
+        <IntegerDataEncoding sizeInBits="16" encoding="twosComplement"
+                             byteOrder="leastSignificantByteFirst"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="S32_LE_T">
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement"
+                             byteOrder="leastSignificantByteFirst"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U8_LE_T">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"
+                             byteOrder="leastSignificantByteFirst"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U12_LE_T">
+        <IntegerDataEncoding sizeInBits="12" encoding="unsigned"
+                             byteOrder="leastSignificantByteFirst"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="S12_LE_T">
+        <IntegerDataEncoding sizeInBits="12" encoding="twosComplement"
+                             byteOrder="leastSignificantByteFirst"/>
+      </IntegerParameterType>
+
+      <FloatParameterType name="F16_LE_T">
+        <FloatDataEncoding sizeInBits="16" encoding="IEEE754"
+                           byteOrder="leastSignificantByteFirst"/>
+      </FloatParameterType>
+      <FloatParameterType name="F32_LE_T">
+        <FloatDataEncoding sizeInBits="32" encoding="IEEE754"
+                           byteOrder="leastSignificantByteFirst"/>
+      </FloatParameterType>
+      <FloatParameterType name="F64_LE_T">
+        <FloatDataEncoding sizeInBits="64" encoding="IEEE754"
+                           byteOrder="leastSignificantByteFirst"/>
+      </FloatParameterType>
+
+      <IntegerParameterType name="U16_BE_T">
+        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
+      </IntegerParameterType>
+      <FloatParameterType name="F32_BE_T">
+        <FloatDataEncoding sizeInBits="32" encoding="IEEE754"/>
+      </FloatParameterType>
+    </ParameterTypeSet>
+
+    <ParameterSet>
+      <Parameter name="VERSION" parameterTypeRef="U3"/>
+      <Parameter name="TYPE" parameterTypeRef="U1"/>
+      <Parameter name="SEC_HDR_FLAG" parameterTypeRef="U1"/>
+      <Parameter name="PKT_APID" parameterTypeRef="U11"/>
+      <Parameter name="SEQ_FLGS" parameterTypeRef="U2"/>
+      <Parameter name="SEQ_CTR" parameterTypeRef="U14"/>
+      <Parameter name="PKT_LEN" parameterTypeRef="U16_BE_T"/>
+
+      <Parameter name="SEL" parameterTypeRef="U16_LE_T"/>
+      <Parameter name="U16_LE" parameterTypeRef="U16_LE_T"/>
+      <Parameter name="U24_LE" parameterTypeRef="U24_LE_T"/>
+      <Parameter name="U32_LE" parameterTypeRef="U32_LE_T"/>
+      <Parameter name="U64_LE" parameterTypeRef="U64_LE_T"/>
+      <Parameter name="S16_LE" parameterTypeRef="S16_LE_T"/>
+      <Parameter name="S32_LE" parameterTypeRef="S32_LE_T"/>
+      <Parameter name="F16_LE" parameterTypeRef="F16_LE_T"/>
+      <Parameter name="F32_LE" parameterTypeRef="F32_LE_T"/>
+      <Parameter name="F64_LE" parameterTypeRef="F64_LE_T"/>
+      <Parameter name="U8_LE" parameterTypeRef="U8_LE_T"/>
+      <Parameter name="U12_LE" parameterTypeRef="U12_LE_T"/>
+      <Parameter name="S12_LE" parameterTypeRef="S12_LE_T"/>
+      <Parameter name="NIB" parameterTypeRef="U4"/>
+      <Parameter name="U16_LE_ODD" parameterTypeRef="U16_LE_T"/>
+      <Parameter name="PAD_4" parameterTypeRef="U4"/>
+      <Parameter name="U16_BE" parameterTypeRef="U16_BE_T"/>
+      <Parameter name="F32_BE" parameterTypeRef="F32_BE_T"/>
+    </ParameterSet>
+
+    <ContainerSet>
+      <SequenceContainer name="CCSDSPacket" abstract="true">
+        <EntryList>
+          <ParameterRefEntry parameterRef="VERSION"/>
+          <ParameterRefEntry parameterRef="TYPE"/>
+          <ParameterRefEntry parameterRef="SEC_HDR_FLAG"/>
+          <ParameterRefEntry parameterRef="PKT_APID"/>
+          <ParameterRefEntry parameterRef="SEQ_FLGS"/>
+          <ParameterRefEntry parameterRef="SEQ_CTR"/>
+          <ParameterRefEntry parameterRef="PKT_LEN"/>
+          <ParameterRefEntry parameterRef="SEL"/>
+        </EntryList>
+      </SequenceContainer>
+
+      <!-- SEL's wire bytes 0x01 0x02 read big-endian are 0x0102; reversed they are 0x0201,
+           which is 513. The criterion compares the reversed value, which is what the
+           reference reports. -->
+      <SequenceContainer name="Payload">
+        <EntryList>
+          <ParameterRefEntry parameterRef="U16_LE"/>
+          <ParameterRefEntry parameterRef="U24_LE"/>
+          <ParameterRefEntry parameterRef="U32_LE"/>
+          <ParameterRefEntry parameterRef="U64_LE"/>
+          <ParameterRefEntry parameterRef="S16_LE"/>
+          <ParameterRefEntry parameterRef="S32_LE"/>
+          <ParameterRefEntry parameterRef="F16_LE"/>
+          <ParameterRefEntry parameterRef="F32_LE"/>
+          <ParameterRefEntry parameterRef="F64_LE"/>
+          <ParameterRefEntry parameterRef="U8_LE"/>
+          <ParameterRefEntry parameterRef="U12_LE"/>
+          <ParameterRefEntry parameterRef="S12_LE"/>
+          <!-- Four bits, so the next field starts four bits into a byte. -->
+          <ParameterRefEntry parameterRef="NIB"/>
+          <ParameterRefEntry parameterRef="U16_LE_ODD"/>
+          <ParameterRefEntry parameterRef="PAD_4"/>
+          <ParameterRefEntry parameterRef="U16_BE"/>
+          <ParameterRefEntry parameterRef="F32_BE"/>
+        </EntryList>
+        <BaseContainer containerRef="CCSDSPacket">
+          <RestrictionCriteria>
+            <ComparisonList>
+              <Comparison parameterRef="PKT_APID" value="100" useCalibratedValue="false"/>
+              <Comparison parameterRef="SEL" value="513" useCalibratedValue="false"/>
+            </ComparisonList>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

@@ -31,6 +31,8 @@ const CASES: &[(&str, &str, Option<&str>)] = &[
     // inheritors whose branches overlap. The one bundled mission file with a
     // <BooleanExpression> has a single conjunction of equalities and nothing else.
     ("boolean_criteria", "boolean_criteria.xml", Some("Root")),
+    // `leastSignificantByteFirst`, which no mission definition in reach sets at all.
+    ("byte_order", "byte_order.xml", None),
 ];
 
 fn main() {

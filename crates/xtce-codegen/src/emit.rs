@@ -659,7 +659,15 @@ fn runtime_field(
         }
         repr => {
             let bits = Literal::u32_unsuffixed(field.width.fixed().unwrap_or(0));
-            let value = numeric_from_u64(repr, &Expr::atom(quote! { __raw }), field.width);
+            // Past the cursor the offset is a run-time value, so the reversed-load shortcut
+            // is not available and the swap happens where the interpreter puts it.
+            let raw = if field.swap_bytes && field.width.fixed().unwrap_or(0) > 8 {
+                let width = Literal::u32_unsuffixed(field.width.fixed().unwrap_or(0));
+                Expr::atom(quote! { swap_byte_order(__raw, #width) })
+            } else {
+                Expr::atom(quote! { __raw })
+            };
+            let value = numeric_from_u64(repr, &raw, field.width, unmasked_sign(field));
             out.push(quote! {
                 let #name = {
                     let __raw = read_at(data, at, #bits, #xtce_name)?;
@@ -901,18 +909,79 @@ fn read_field(field: &Field, packet: &Ident) -> TokenStream {
             compile_error!("xtce-codegen: a literal read of a field with no fixed span")
         };
     };
-    let raw = read_bits(offset, width, packet);
-    numeric_from_u64(&field.repr, &raw, field.width)
+    let raw = read_field_bits(field, offset, width, packet);
+    numeric_from_u64(&field.repr, &raw, field.width, unmasked_sign(field))
+}
+
+/// Whether a field's sign extension has to keep the bits above its width.
+///
+/// Only a byte swap can put any there, and only when the width is not a whole number of
+/// bytes. See `xtce_decode::bits::twos_complement_unmasked`.
+fn unmasked_sign(field: &Field) -> bool {
+    field.swap_bytes && field.width.fixed().is_some_and(|width| width % 8 != 0)
+}
+
+/// A field's raw bits, with its byte order applied.
+///
+/// `leastSignificantByteFirst` means the reference reads the field big-endian and then
+/// reverses `ceil(width / 8)` bytes of the result — not that it reads it differently. For a
+/// field that starts on a byte and occupies whole ones the two descriptions coincide and a
+/// reversed load says it in one instruction; for anything else they do not, and the reversal
+/// has to happen after the read, exactly where the interpreter does it.
+fn read_field_bits(field: &Field, offset: usize, width: u32, packet: &Ident) -> Expr {
+    if !field.swap_bytes {
+        return read_bits(offset, width, packet);
+    }
+    swap_bytes_of(read_bits(offset, width, packet), offset, width, packet)
+}
+
+/// The same, given the read already built — the cursor path has its own.
+fn swap_bytes_of(raw: Expr, offset: usize, width: u32, packet: &Ident) -> Expr {
+    let bytes = (width as usize).div_ceil(8);
+    if bytes <= 1 {
+        // One byte reversed is one byte. The interpreter returns early here too.
+        return raw;
+    }
+
+    // Byte-aligned and a whole number of bytes: reversing the load is the reversal.
+    if offset % 8 == 0 && width % 8 == 0 {
+        let first = offset / 8;
+        let slots = match bytes {
+            2 => 2usize,
+            3..=4 => 4,
+            5..=8 => 8,
+            _ => 16,
+        };
+        let ty = match slots {
+            2 => quote!(u16),
+            4 => quote!(u32),
+            8 => quote!(u64),
+            _ => quote!(u128),
+        };
+        // Zero padding goes at the *end* for a little-endian load: those are the high bytes.
+        let loaded = (first..first + bytes)
+            .map(|index| {
+                let index = Literal::usize_unsuffixed(index);
+                quote! { #packet[#index] }
+            })
+            .chain((bytes..slots).map(|_| quote!(0)));
+        let load = quote!(#ty::from_le_bytes([#(#loaded),*]));
+        return Expr::of_width(load, (slots * 8) as u32);
+    }
+
+    let value = raw.widened(64).into_tokens();
+    let width = Literal::u32_unsuffixed(width);
+    Expr::atom(quote!(swap_byte_order(#value, #width)))
 }
 
 /// Turns a `u64` of raw bits into the field's value.
 ///
 /// Shared by the literal-offset path and the cursor path, so a signed field or a float is
 /// converted identically whichever side of a data-dependent width it falls on.
-fn numeric_from_u64(repr: &Repr, raw: &Expr, width: Width) -> TokenStream {
+fn numeric_from_u64(repr: &Repr, raw: &Expr, width: Width, unmasked: bool) -> TokenStream {
     let bits = width.fixed().unwrap_or(64);
     match repr {
-        Repr::Signed(coding) => signed(raw, bits, *coding),
+        Repr::Signed(coding) => signed(raw, bits, *coding, unmasked),
         // These three sit in argument position, where parentheses would only trip
         // `unused_parens`.
         Repr::Float16 => {
@@ -931,7 +1000,7 @@ fn numeric_from_u64(repr: &Repr, raw: &Expr, width: Width) -> TokenStream {
     }
 }
 
-fn signed(raw: &Expr, width: u32, coding: IntegerCoding) -> TokenStream {
+fn signed(raw: &Expr, width: u32, coding: IntegerCoding, unmasked: bool) -> TokenStream {
     let widened = raw.widened(64);
     // Two forms, because the same value is spliced in front of an operator in some arms and
     // stands alone as the value of a `let` in others.
@@ -939,6 +1008,21 @@ fn signed(raw: &Expr, width: u32, coding: IntegerCoding) -> TokenStream {
     let alone = widened.bare();
     match coding {
         IntegerCoding::Unsigned => quote! { #value as i64 },
+        IntegerCoding::TwosComplement if unmasked => {
+            // After a byte swap of a field that is not a whole number of bytes the value
+            // carries bits above `width`, and the reference sign-extends without masking
+            // them away — so shifting, which masks, would give a different number. The plan
+            // refuses the widths where this cannot fit an `i64`, so the subtraction is safe
+            // here even though it would not be in general.
+            let sign = Literal::u64_unsuffixed(1u64 << (width - 1));
+            let magnitude = Literal::i64_unsuffixed(1i64 << width);
+            quote! {
+                {
+                    let raw = #alone;
+                    if raw & #sign == 0 { raw as i64 } else { (raw as i64) - #magnitude }
+                }
+            }
+        }
         IntegerCoding::TwosComplement => {
             // Sign-extend by shifting. Subtracting `2 ^ width` overflows at width 63.
             let shift = Literal::u32_unsuffixed(64 - width);
@@ -1380,12 +1464,24 @@ fn nested_condition(criterion: &Criterion) -> TokenStream {
 fn guard_test(guard: &Guard) -> TokenStream {
     let head = ident("head");
     let raw = read_bits(guard.bit_offset, guard.bit_width, &head);
+    // A criterion on a little-endian field tests the swapped value, because that is the
+    // value the interpreter compares.
+    let raw = if guard.swap_bytes {
+        swap_bytes_of(raw, guard.bit_offset, guard.bit_width, &head)
+    } else {
+        raw
+    };
 
     // Narrow the comparison to the value's own type where the literal allows it, so the
     // dispatcher compares machine words rather than 128-bit integers.
     let is_signed = matches!(guard.repr, Repr::Signed(_));
     let value = match guard.repr {
-        Repr::Signed(coding) => signed(&raw, guard.bit_width, coding),
+        Repr::Signed(coding) => signed(
+            &raw,
+            guard.bit_width,
+            coding,
+            guard.swap_bytes && guard.bit_width % 8 != 0,
+        ),
         // `&` binds tighter than `==`, so a masked load compares correctly unparenthesised.
         _ => raw.into_tokens(),
     };
@@ -1509,6 +1605,19 @@ fn helpers(plan: &Plan) -> TokenStream {
     let needs_powi = needs_power;
     let needs_spline = calibrations().any(|c| matches!(c, Calibration::Spline(_)));
 
+    // Only where a swap survives the reversed-load shortcut: a field off a byte boundary, or
+    // one whose width is not a whole number of bytes, or one past a cursor.
+    let needs_swap = plan.containers.iter().flat_map(|c| &c.fields).any(|field| {
+        field.swap_bytes
+            && field.width.fixed().is_none_or(|width| {
+                width > 8 && (field.bit_offset.is_none_or(|at| at % 8 != 0) || width % 8 != 0)
+            })
+    }) || guards_of(plan).any(|guard| {
+        guard.swap_bytes
+            && guard.bit_width > 8
+            && (guard.bit_offset % 8 != 0 || guard.bit_width % 8 != 0)
+    });
+
     let needs_cursor = plan.containers.iter().any(ContainerPlan::is_dynamic);
     let cursor = if needs_cursor {
         cursor_helpers()
@@ -1527,6 +1636,7 @@ fn helpers(plan: &Plan) -> TokenStream {
     } else {
         quote!()
     };
+    let swap = if needs_swap { swap_helper() } else { quote!() };
 
     // Only where a polynomial over an integral encoding actually appears: the helper is only
     // reachable from that path, and an unused function in generated code is noise a reviewer
@@ -1549,6 +1659,7 @@ fn helpers(plan: &Plan) -> TokenStream {
         #text
         #terminated
         #leading
+        #swap
         #powi
         #power
         #spline
@@ -1574,6 +1685,55 @@ fn integer_power_helper() -> TokenStream {
                 Some(exact) => exact as f64,
                 None => powi(base as f64, exponent),
             }
+        }
+    }
+}
+
+/// Every guard anywhere in the tree.
+fn guards_of(plan: &Plan) -> impl Iterator<Item = &Guard> {
+    fn collect<'a>(criterion: &'a Criterion, out: &mut Vec<&'a Guard>) {
+        match criterion {
+            Criterion::Test(guard) => out.push(guard),
+            Criterion::All(children) | Criterion::Any(children) => {
+                for child in children {
+                    collect(child, out);
+                }
+            }
+        }
+    }
+    fn walk<'a>(node: &'a Node, out: &mut Vec<&'a Guard>) {
+        for (criteria, child) in &node.children {
+            collect(criteria, out);
+            walk(child, out);
+        }
+    }
+    let mut out = Vec::new();
+    walk(&plan.root, &mut out);
+    out.into_iter()
+}
+
+/// Reverses a field's bytes, as `leastSignificantByteFirst` means it.
+///
+/// Line for line what `xtce_decode::bits::swap_byte_order` does, which in turn is what the
+/// reference does: `int.from_bytes(val.to_bytes(ceil(width / 8), "little"), "big")`. Note
+/// that for a width which is not a whole number of bytes the result can be *wider* than the
+/// field — a twelve-bit `0x0AB` comes back as `0xAB00`. That is not a mistake to be fixed
+/// here; it is what the reference computes, and a signed coding then discards the excess
+/// while an unsigned one does not.
+fn swap_helper() -> TokenStream {
+    quote! {
+        fn swap_byte_order(value: u64, width: u32) -> u64 {
+            let bytes = (width as usize).div_ceil(8);
+            if bytes <= 1 {
+                return value;
+            }
+            let mut out = 0u64;
+            let mut remaining = value;
+            for _ in 0..bytes {
+                out = (out << 8) | (remaining & 0xFF);
+                remaining >>= 8;
+            }
+            out
         }
     }
 }

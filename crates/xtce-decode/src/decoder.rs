@@ -8,7 +8,10 @@ use xtce_model::{
     MatchCriteria, Operand, ParamId, ParameterType, SizeSpec, StringDelimiter, TypeKind, XtceDb,
 };
 
-use crate::bits::{BitCursor, ones_complement, sign_magnitude, swap_byte_order, twos_complement};
+use crate::bits::{
+    BitCursor, ones_complement, sign_magnitude, swap_byte_order, twos_complement,
+    twos_complement_unmasked,
+};
 use crate::calibrate::{self, CalibrationInput};
 use crate::charset;
 use crate::error::DecodeError;
@@ -439,11 +442,27 @@ impl<'db> Decoder<'db> {
                         parameter: name.to_owned(),
                         source,
                     })?;
-                if encoding.byte_order == xtce_model::ByteOrder::LeastSignificantFirst {
+                let swapped = encoding.byte_order == xtce_model::ByteOrder::LeastSignificantFirst;
+                if swapped {
                     bits = swap_byte_order(bits, width);
                 }
                 Ok(match encoding.coding {
                     IntegerCoding::Unsigned => RawValue::Unsigned(bits),
+                    // A swap of a field that is not a whole number of bytes leaves bits above
+                    // `width`, and the reference keeps them. Masking them away, which is what
+                    // `twos_complement` does, gives a different number — see
+                    // `twos_complement_unmasked`. Everywhere else the two agree.
+                    IntegerCoding::TwosComplement if swapped => {
+                        RawValue::Signed(twos_complement_unmasked(bits, width).ok_or_else(
+                            || DecodeError::Unsupported {
+                                element: "IntegerDataEncoding".to_owned(),
+                                context: format!(
+                                    "{name}: a {width}-bit little-endian two's-complement \
+                                     field can hold a value wider than an i64"
+                                ),
+                            },
+                        )?)
+                    }
                     IntegerCoding::TwosComplement => RawValue::Signed(twos_complement(bits, width)),
                     IntegerCoding::SignMagnitude => RawValue::Signed(sign_magnitude(bits, width)),
                     IntegerCoding::OnesComplement => RawValue::Signed(ones_complement(bits, width)),

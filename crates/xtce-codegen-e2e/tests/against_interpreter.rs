@@ -19,7 +19,9 @@ use xtce_model::XtceDb;
 // true, rather than a sentence in a README.
 // `udp` is absent on purpose: it has no packet stream, so compiling it in the library above
 // is the whole of its check.
-use xtce_codegen_e2e::{boolean_criteria, calibrators, ctim, idex, numeric_edges, suda};
+use xtce_codegen_e2e::{
+    boolean_criteria, byte_order, calibrators, ctim, idex, numeric_edges, suda,
+};
 
 fn testdata(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -597,4 +599,78 @@ fn a_boolean_expression_tree_matches_the_interpreter() {
         "every SEL = 2 packet should have matched both Alpha and Beta"
     );
     assert_eq!(unrecognised, 12 + 5 + 275, "wrong number matched nothing");
+}
+
+/// `leastSignificantByteFirst`, against the interpreter, over the whole stream.
+///
+/// No bundled mission definition sets `byteOrder`, so before `byte_order.xml` neither
+/// implementation's little-endian path had been compared against anything. Its stream is the
+/// only one here that was not flown — there is no recorded telemetry with a little-endian
+/// field in it — and it is also the only case where the *interpreter* is pinned to the Python
+/// reference directly rather than to hand-computed values, through `cargo xtask diff`.
+///
+/// What the element means is narrower than "read the field little-endian": the reference
+/// reads it big-endian and then reverses `ceil(width / 8)` bytes of the *value*. Where the
+/// field starts on a byte and fills whole ones the two coincide and the generator emits a
+/// reversed load; where they do not, the reversal has to happen after the read, and for a
+/// twelve-bit field it produces a value wider than the field it came from.
+///
+/// One packet in four carries an APID the definition does not describe, so both
+/// implementations have to refuse the same packets as well as decode the same ones.
+#[test]
+fn byte_order_matches_the_interpreter() {
+    let db = XtceDb::from_path(testdata("byte_order.xml")).expect("definition loads");
+    let decoder = Decoder::new(&db).expect("root container");
+    let (same_raw, same_eng) = comparators!(byte_order);
+
+    let stream = std::fs::read(testdata("byte_order_stream.bin")).expect("the stream is present");
+    let mut compared = 0usize;
+    let mut refused = 0usize;
+
+    for (index, framed) in PacketIter::new(&stream, 0).enumerate() {
+        let packet = framed.expect("the stream is well framed");
+        let bytes = packet.bytes();
+
+        let mut interpreted = decoder.new_packet(bytes);
+        let by_interpreter = decoder.decode_into(&mut interpreted, bytes);
+        let by_generator = byte_order::decode(bytes);
+
+        match (by_interpreter, by_generator) {
+            (Err(_), Err(_)) => refused += 1,
+            (Ok(()), Ok(compiled)) => {
+                let mut fields = Vec::new();
+                compiled.for_each_value(|name, raw, eng| fields.push((name, raw, eng)));
+                assert_eq!(
+                    fields.len(),
+                    interpreted.len(),
+                    "packet {index}: field counts"
+                );
+                for ((name, raw, eng), value) in fields.iter().zip(interpreted.values()) {
+                    assert!(
+                        same_raw(raw, &value.raw),
+                        "packet {index}: {name}: raw differs — generated {raw:?}, \
+                         interpreted {:?}",
+                        value.raw
+                    );
+                    assert!(
+                        same_eng(eng, &value.eng),
+                        "packet {index}: {name}: engineering differs — generated {eng:?}, \
+                         interpreted {:?}",
+                        value.eng
+                    );
+                }
+                compared += 1;
+            }
+            (interpreted_result, generated_result) => panic!(
+                "packet {index}: the two disagree about whether it decodes — interpreter \
+                 {:?}, generated {:?}",
+                interpreted_result.err(),
+                generated_result.err()
+            ),
+        }
+    }
+
+    // 512 packets, one in four with an APID nothing describes.
+    assert_eq!(compared, 384);
+    assert_eq!(refused, 128);
 }

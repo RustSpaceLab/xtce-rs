@@ -77,3 +77,9 @@ pub mod calibrators {
 pub mod boolean_criteria {
     include!(concat!(env!("OUT_DIR"), "/boolean_criteria.rs"));
 }
+
+/// `leastSignificantByteFirst`, aligned, unaligned and not a whole number of bytes.
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+pub mod byte_order {
+    include!(concat!(env!("OUT_DIR"), "/byte_order.rs"));
+}

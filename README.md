@@ -92,8 +92,8 @@ committed under `testdata/golden/`.
 ### Everything, the short way
 
 ```console
-$ cargo test --workspace     # 106 tests
-$ cargo xtask diff           # the differential suite, 6 real definition/stream pairs
+$ cargo test --workspace     # 109 tests
+$ cargo xtask diff           # the differential suite, 7 definition/stream pairs
 ```
 
 `cargo xtask diff` is the one that matters. It decodes every packet of six real mission
@@ -124,7 +124,7 @@ a floor, not a benchmark; use `cargo bench` for real numbers.
 | `cargo test -p xtce-decode` | bit reading (property tests against a one-bit-at-a-time oracle), and 25 end-to-end cases over inline XML snippets |
 | `cargo test -p xtce-codegen` | the generated decoder equals the interpreted one on all 7200 JPSS packets, field by field |
 | `cargo test -p xtce-codegen-e2e` | every bundled definition compiles under `#![no_std]`, and each agrees with the interpreter |
-| `cargo xtask diff` | the interpreted decoder equals the Python reference on six real streams |
+| `cargo xtask diff` | the interpreted decoder equals the Python reference on seven streams, six of them real |
 | `pytest crates/xtce-py/tests` | the Python bindings lose nothing crossing the boundary |
 
 They are deliberately layered: codegen is checked against the interpreter, and the

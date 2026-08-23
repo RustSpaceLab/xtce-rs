@@ -161,6 +161,13 @@ pub struct Field {
     pub width: Width,
     /// How the bits become a value.
     pub repr: Repr,
+    /// Whether the field's bytes are reversed before anything else is done with them.
+    ///
+    /// `byteOrder="leastSignificantByteFirst"`. The reference reads the field big-endian and
+    /// then reverses `ceil(width / 8)` bytes of the result, so this is a property of how the
+    /// bits are *gathered* rather than of what they mean — which is why it sits beside
+    /// [`Repr`] and not inside it.
+    pub swap_bytes: bool,
 }
 
 impl Field {
@@ -209,6 +216,8 @@ pub struct Guard {
     pub bit_width: u32,
     /// How to interpret those bits.
     pub repr: Repr,
+    /// Whether the field's bytes are reversed first, as [`Field::swap_bytes`].
+    pub swap_bytes: bool,
     /// The operator.
     pub operator: CompareOp,
     /// The literal, already read as an integer.
@@ -495,7 +504,7 @@ impl<'db> Builder<'db> {
             reason,
         };
 
-        let (width, numeric) = encoding_repr(&ty.encoding, preceding, &refuse)?;
+        let (width, numeric, swap_bytes) = encoding_repr(&ty.encoding, preceding, &refuse)?;
         let repr = self.kind_repr(ty, numeric, &refuse)?;
         let calibration = Self::calibration_for(ty, &repr, &refuse)?;
 
@@ -538,6 +547,23 @@ impl<'db> Builder<'db> {
             }
         }
 
+        // A `leastSignificantByteFirst` swap of a field that is not a whole number of bytes
+        // leaves bits above the width, and the reference sign-extends without masking them
+        // away. Between 57 and 63 bits that can produce a number wider than an `i64`, which
+        // the reference's arbitrary-precision integers hold and nothing here can.
+        if swap_bytes
+            && matches!(repr, Repr::Signed(_))
+            && let Width::Fixed(bits) = width
+            && bits % 8 != 0
+            && bits > 56
+        {
+            return Err(refuse(
+                "IntegerDataEncoding",
+                "a little-endian signed field of 57 to 63 bits can decode to a value wider \
+                 than an i64 once its bytes are reversed",
+            ));
+        }
+
         Ok(Field {
             parameter,
             ident: field_ident(&xtce_name),
@@ -548,6 +574,7 @@ impl<'db> Builder<'db> {
             bit_offset,
             width,
             repr,
+            swap_bytes,
         })
     }
 
@@ -740,28 +767,21 @@ fn encoding_repr(
     encoding: &DataEncoding,
     preceding: &[Field],
     refuse: &impl Fn(&str, &'static str) -> CodegenError,
-) -> Result<(Width, Repr), CodegenError> {
+) -> Result<(Width, Repr, bool), CodegenError> {
+    let swaps = |order| order == xtce_model::ByteOrder::LeastSignificantFirst;
     Ok(match encoding {
         DataEncoding::Integer(encoding) => {
-            if encoding.byte_order != xtce_model::ByteOrder::MostSignificantFirst {
-                return Err(refuse(
-                    "IntegerDataEncoding",
-                    "leastSignificantByteFirst is not compiled yet",
-                ));
-            }
             let repr = match encoding.coding {
                 IntegerCoding::Unsigned => Repr::Unsigned,
                 other => Repr::Signed(other),
             };
-            (Width::Fixed(encoding.size_in_bits), repr)
+            (
+                Width::Fixed(encoding.size_in_bits),
+                repr,
+                swaps(encoding.byte_order),
+            )
         }
         DataEncoding::Float(encoding) => {
-            if encoding.byte_order != xtce_model::ByteOrder::MostSignificantFirst {
-                return Err(refuse(
-                    "FloatDataEncoding",
-                    "leastSignificantByteFirst is not compiled yet",
-                ));
-            }
             if encoding.coding != FloatCoding::Ieee754 {
                 return Err(refuse(
                     "FloatDataEncoding",
@@ -779,7 +799,11 @@ fn encoding_repr(
                     ));
                 }
             };
-            (Width::Fixed(encoding.size_in_bits), repr)
+            (
+                Width::Fixed(encoding.size_in_bits),
+                repr,
+                swaps(encoding.byte_order),
+            )
         }
         DataEncoding::String(encoding) => {
             let charset = match encoding.charset {
@@ -803,11 +827,15 @@ fn encoding_repr(
                 },
             };
             let width = size_width(&encoding.raw_size, "StringDataEncoding", preceding, refuse)?;
-            (width, Repr::Text { charset, delimiter })
+            // No swap: a string's byte order reaches only the UTF-16 and UTF-32 decoders,
+            // and this generator compiles neither. For UTF-8 and US-ASCII the interpreter
+            // ignores it, so there is nothing to reproduce.
+            (width, Repr::Text { charset, delimiter }, false)
         }
         DataEncoding::Binary(encoding) => {
             let width = size_width(&encoding.size, "BinaryDataEncoding", preceding, refuse)?;
-            (width, Repr::Binary)
+            // A binary field has no byte order in XTCE: it is the bytes as they lie.
+            (width, Repr::Binary, false)
         }
         DataEncoding::None => {
             return Err(refuse("DataEncoding", "the parameter type has no encoding"));
@@ -997,6 +1025,7 @@ impl Builder<'_> {
             bit_offset,
             bit_width,
             repr: field.repr.clone(),
+            swap_bytes: field.swap_bytes,
             operator,
             value: literal,
         })
