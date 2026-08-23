@@ -245,6 +245,47 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-08-23 — BooleanExpression, and every bundled definition compiles
+
+`contrived_inheritance_structure.xml` was the last one `xtce-codegen` refused. It compiles
+now, and so does everything else in `testdata/spp` — thirteen for thirteen.
+
+**The plan grew a tree.** Restriction criteria were a `Vec<Guard>`, which is exactly right
+for a `<Comparison>` or a `<ComparisonList>`: both are conjunctions, and a list is a
+conjunction. A `<BooleanExpression>` is not. `<ORedConditions>` nests inside
+`<ANDedConditions>` and the other way round, and flattening that into a list would change
+which container a packet selects. So `Node.children` now carries a `Criterion` —
+`Test`/`All`/`Any` — and the emitter walks it into a boolean expression, parenthesising a
+composite child so that `&&` binding tighter than `||` never decides anything.
+
+Empty nodes keep the interpreter's answers, which are Python's: `all([])` is true and
+`any([])` is false. The tree is simplified before it reaches the emitter — a conjunction of
+one is its own contents, and an `All` inside an `All` flattens — because the XML shape forces
+wrappers that would otherwise show up as parentheses a reader has to look through.
+
+**A `<Condition>` is a `<Comparison>` in different XML**, and the interpreter evaluates both
+through the same `test_literal`, so they compile to the same guard through the same function.
+Two shapes it admits that a `<Comparison>` cannot are refused by name: a condition between
+two *parameters* (`test_scalars` has five type-pair arms and a Python-compatibility answer
+for text against a number, and nothing in reach uses one), and a literal on the *left*, which
+the model allows because it takes operands in document order and which the interpreter then
+compares as text.
+
+**`testdata/spp/boolean_criteria.xml` had to be written.** The mission file that has a
+`<BooleanExpression>` contains one conjunction of two equalities — the shape a
+`<ComparisonList>` already expressed — so compiling it proves nothing about the element. The
+new file has a disjunction, an OR inside an AND, `>` and `!=` (every criterion in every
+bundled mission file is an equality), and a criterion on a field past the first byte.
+
+Two of its inheritors overlap deliberately. An OR is what makes an accidental ambiguity easy
+to write, and the dispatcher must keep reporting one rather than picking the first match. The
+test asserts exact counts over 400 packets — 83 decoded, 25 ambiguous, 292 matching nothing —
+rather than lower bounds, because *which* packets each expression selects is the whole point.
+
+The `unsupported_constructs_are_named_not_ignored` test had one entry and now has none, so it
+is inverted: `every_bundled_definition_compiles` walks `testdata/spp` and fails if any of the
+thirteen stops compiling.
+
 ## 2026-08-23 — a criterion that would have picked the wrong container
 
 Compiling calibrators opened a hole one commit earlier, and this closes it.

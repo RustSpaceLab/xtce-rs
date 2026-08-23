@@ -44,13 +44,14 @@ text are retained, which `testdata/spp/LICENSE.txt` does.
 
 ### Written for this project
 
-Two files here are not vendored. Both exist for the same reason: an implementation path that
+Three files here are not vendored. All exist for the same reason: an implementation path that
 the real mission files never reach, and so would never be compared against anything.
 
 | File | Why |
 |---|---|
 | `numeric_edges.xml` | the mission files contain one 32-bit float, no 16-bit float, and no numeric field spanning nine bytes |
 | `calibrators.xml` | **no mission file has a calibrator at all** — grepping all five returns nothing |
+| `boolean_criteria.xml` | the one mission file with a `<BooleanExpression>` has a single conjunction of equalities: no disjunction, no nesting, and no operator but `==` |
 
 Neither is a substitute for a real sample; they are a supplement to one. `calibrators.xml` in
 particular is built around a difference that only shows up in the last bit: the reference

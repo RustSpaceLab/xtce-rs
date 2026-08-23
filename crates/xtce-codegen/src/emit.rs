@@ -18,7 +18,8 @@ use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 
 use crate::plan::{
-    Calibration, ContainerPlan, Field, Guard, Node, Plan, Repr, TextCharset, TextDelimiter, Width,
+    Calibration, ContainerPlan, Criterion, Field, Guard, Node, Plan, Repr, TextCharset,
+    TextDelimiter, Width,
 };
 use xtce_model::{CompareOp, IntegerCoding};
 
@@ -1313,7 +1314,7 @@ fn descend(plan: &Plan, node: &Node) -> TokenStream {
         .enumerate()
         .map(|(index, (guards, _))| {
             let index = Literal::usize_unsuffixed(index);
-            let condition = guard_condition(guards);
+            let condition = criterion_condition(guards);
             quote! {
                 if #condition {
                     matched += 1;
@@ -1345,14 +1346,35 @@ fn descend(plan: &Plan, node: &Node) -> TokenStream {
 }
 
 /// The condition under which an inheritor is selected.
-fn guard_condition(guards: &[Guard]) -> TokenStream {
-    if guards.is_empty() {
-        // `all([])` is true, which is what the interpreted decoder does. It is usually a
-        // modelling mistake and shows up as an ambiguity, not as a silent choice.
-        return quote!(true);
+///
+/// A conjunction of comparisons was all this ever had to be until `<BooleanExpression>`
+/// arrived; `<ORedConditions>` nests, so it is a tree now. Empty nodes keep the
+/// interpreter's answers: `all([])` is true and `any([])` is false.
+fn criterion_condition(criterion: &Criterion) -> TokenStream {
+    match criterion {
+        Criterion::Test(guard) => guard_test(guard),
+        Criterion::All(children) if children.is_empty() => quote!(true),
+        Criterion::Any(children) if children.is_empty() => quote!(false),
+        Criterion::All(children) => {
+            let tests = children.iter().map(nested_condition);
+            quote! { #(#tests)&&* }
+        }
+        Criterion::Any(children) => {
+            let tests = children.iter().map(nested_condition);
+            quote! { #(#tests)||* }
+        }
     }
-    let tests = guards.iter().map(guard_test);
-    quote! { #(#tests)&&* }
+}
+
+/// The same, parenthesised where the precedence of `&&` over `||` would otherwise decide it.
+fn nested_condition(criterion: &Criterion) -> TokenStream {
+    let condition = criterion_condition(criterion);
+    match criterion {
+        // A comparison is already tighter than either connective.
+        Criterion::Test(_) => condition,
+        Criterion::All(children) | Criterion::Any(children) if children.is_empty() => condition,
+        _ => quote! { (#condition) },
+    }
 }
 
 fn guard_test(guard: &Guard) -> TokenStream {
@@ -1423,11 +1445,21 @@ fn compare_op(operator: CompareOp) -> TokenStream {
 
 /// Bytes the dispatcher must have before it can test any guard.
 fn head_bytes(plan: &Plan) -> usize {
-    fn walk(node: &Node, most: &mut usize) {
-        for (guards, child) in &node.children {
-            for guard in guards {
+    fn reach(criterion: &Criterion, most: &mut usize) {
+        match criterion {
+            Criterion::Test(guard) => {
                 *most = (*most).max(guard.bit_offset + guard.bit_width as usize);
             }
+            Criterion::All(children) | Criterion::Any(children) => {
+                for child in children {
+                    reach(child, most);
+                }
+            }
+        }
+    }
+    fn walk(node: &Node, most: &mut usize) {
+        for (criteria, child) in &node.children {
+            reach(criteria, most);
             walk(child, most);
         }
     }

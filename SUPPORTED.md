@@ -136,10 +136,12 @@ and would make a generated-versus-interpreted benchmark meaningless.
 | A *numeric* field of variable width | Refused | a number's width picks its Rust type, which cannot vary per packet |
 | A dynamic width landing off a byte boundary | Refused at run time | `DecodeError::Unaligned`, since only the packet says where it lands |
 | `LocationInContainerInBits`, `RepeatEntry` | Refused | |
-| `BooleanExpression` criteria | Refused | |
+| `BooleanExpression`: `Condition`, `ANDedConditions`, `ORedConditions` | Yes | nested, against a literal; two inheritors that both match are still `Ambiguous` |
+| A `Condition` between two parameters | Refused | five type-pair cases and a Python-compatibility answer for text against a number; nothing in reach uses one |
+| A `Condition` with a literal on the left | Refused | the interpreter compares it as text there |
 | MIL-STD-1750A floats | Refused | |
 
-Eleven of the twelve bundled definitions compile completely, including CTIM — 9493 parameters
+Every one of the thirteen bundled definitions compiles, including CTIM — 9493 parameters
 and 38 concrete containers — and IDEX and SUDA, whose science packets carry a binary blob
 whose length comes from `PKT_LEN`. Each is checked against the interpreter on its real packet
 stream by `xtce-codegen-e2e`, and the interpreter is checked against `space_packet_parser`,
@@ -163,8 +165,15 @@ other test in this repository. It is compared over 4352 generated packets, of wh
 hundred are ones both implementations must *refuse* — a spline that may not extrapolate,
 asked for a point outside itself.
 
-The twelfth, `contrived_inheritance_structure.xml`, is refused by name on its
-`BooleanExpression`, and decodes fine through the interpreter.
+`boolean_criteria.xml` is the third written-for-this-project file. The one bundled mission
+definition with a `<BooleanExpression>`, `contrived_inheritance_structure.xml`, contains a
+single conjunction of two equalities — the same thing a `<ComparisonList>` already expressed.
+What is actually new about the element is that it *nests* and that it can be a disjunction,
+and both change which container a packet selects. So the file has an `<ORedConditions>`, an
+OR inside an AND, the `>` and `!=` operators that no mission file uses, a criterion past the
+first byte, and two inheritors whose branches overlap — because an OR makes an accidental
+ambiguity much easier to write, and the dispatcher has to keep reporting one rather than
+picking the first match.
 
 ## Python bindings
 

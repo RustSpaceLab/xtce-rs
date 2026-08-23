@@ -9,9 +9,9 @@
 use std::collections::HashMap;
 
 use xtce_model::{
-    Calibrator, Charset, CompareOp, ContainerId, DataEncoding, EntryKind, FloatCoding,
-    IntegerCoding, LinearAdjustment, MatchCriteria, ParamId, PolynomialTerm, SizeSpec, Spline,
-    StringDelimiter, TypeKind, XtceDb,
+    BooleanExpr, Calibrator, Charset, CompareOp, ComparisonValue, ContainerId, DataEncoding,
+    EntryKind, FloatCoding, IntegerCoding, LinearAdjustment, MatchCriteria, Operand, ParamId,
+    PolynomialTerm, SizeSpec, Spline, StringDelimiter, TypeKind, XtceDb,
 };
 
 use crate::CodegenError;
@@ -215,6 +215,61 @@ pub struct Guard {
     pub value: i128,
 }
 
+/// One inheritor's restriction criteria, as a tree the dispatcher can evaluate.
+///
+/// A `<Comparison>` or `<ComparisonList>` is a conjunction and could have stayed a flat list.
+/// A `<BooleanExpression>` cannot: `<ORedConditions>` nests, and flattening it would change
+/// which container a packet selects.
+#[derive(Clone, Debug)]
+pub enum Criterion {
+    /// One field against one literal.
+    Test(Guard),
+    /// Every child holds. An empty one is true, which is what `all([])` means and what the
+    /// interpreter computes.
+    All(Vec<Criterion>),
+    /// Some child holds. An empty one is false, for the same reason in reverse.
+    Any(Vec<Criterion>),
+}
+
+impl Criterion {
+    /// Collapses the wrappers the XML shape forces on, without changing what holds.
+    ///
+    /// A single `<Comparison>` arrives as a conjunction of one, and a `<BooleanExpression>`
+    /// as a conjunction of one containing whatever it was. Both are true exactly when their
+    /// contents are, so keeping them would only put parentheses in the generated dispatcher
+    /// that a reader then has to look through.
+    fn simplified(self) -> Self {
+        match self {
+            Self::Test(_) => self,
+            Self::All(children) => Self::flatten(children, true),
+            Self::Any(children) => Self::flatten(children, false),
+        }
+    }
+
+    fn flatten(children: Vec<Self>, conjunction: bool) -> Self {
+        let mut out = Vec::with_capacity(children.len());
+        for child in children {
+            match child.simplified() {
+                // `a && (b && c)` is `a && b && c`, and likewise for `||`. Mixing the two
+                // does not flatten: that is what the parentheses are for.
+                Self::All(inner) if conjunction => out.extend(inner),
+                Self::Any(inner) if !conjunction => out.extend(inner),
+                other => out.push(other),
+            }
+        }
+        if out.len() == 1 {
+            if let Some(only) = out.pop() {
+                return only;
+            }
+        }
+        if conjunction {
+            Self::All(out)
+        } else {
+            Self::Any(out)
+        }
+    }
+}
+
 /// A node of the container inheritance tree, as the dispatcher will walk it.
 #[derive(Clone, Debug)]
 pub struct Node {
@@ -225,7 +280,7 @@ pub struct Node {
     /// Index into [`Plan::containers`] when a packet may stop here.
     pub plan: Option<usize>,
     /// Inheritors, each with the criteria that select it.
-    pub children: Vec<(Vec<Guard>, Node)>,
+    pub children: Vec<(Criterion, Node)>,
 }
 
 /// Everything the emitter needs.
@@ -346,8 +401,8 @@ impl<'db> Builder<'db> {
 
         let mut children = Vec::new();
         for &inheritor in &container.inheritors {
-            let guards = self.guards(inheritor, &fields)?;
-            children.push((guards, self.node(inheritor, &fields, offset, depth + 1)?));
+            let criteria = self.criteria(inheritor, &fields)?;
+            children.push((criteria, self.node(inheritor, &fields, offset, depth + 1)?));
         }
 
         Ok(Node {
@@ -760,99 +815,39 @@ fn encoding_repr(
     })
 }
 
+/// The four things a `<Comparison>` and a `<Condition>` both say, and the name of whichever
+/// one said them.
+struct Test<'a> {
+    element: &'static str,
+    parameter: ParamId,
+    use_calibrated: bool,
+    operator: CompareOp,
+    value: &'a ComparisonValue,
+}
+
 impl Builder<'_> {
-    /// Turns an inheritor's restriction criteria into static guards.
-    fn guards(&self, id: ContainerId, fields: &[Field]) -> Result<Vec<Guard>, CodegenError> {
+    /// Turns an inheritor's restriction criteria into a tree the dispatcher can evaluate.
+    fn criteria(&self, id: ContainerId, fields: &[Field]) -> Result<Criterion, CodegenError> {
         let container = self.db.container(id).ok_or(CodegenError::DanglingIndex)?;
         let name = self.db.name(container.name).to_owned();
-        let mut guards = Vec::new();
+        let mut criteria = Vec::new();
 
-        for criteria in &container.restriction {
-            match criteria {
-                MatchCriteria::Comparison(comparison) => {
-                    let field = fields
-                        .iter()
-                        .find(|field| field.parameter == comparison.parameter)
-                        .ok_or_else(|| CodegenError::Unsupported {
-                            element: "Comparison".to_owned(),
-                            container: name.clone(),
-                            reason: "the criterion tests a parameter this container's \
-                                     ancestors do not decode",
-                        })?;
-                    // The dispatcher tests criteria before decoding anything, so it can only
-                    // reach fields whose offset is a literal.
-                    let (bit_offset, bit_width) =
-                        field
-                            .static_span()
-                            .ok_or_else(|| CodegenError::Unsupported {
-                                element: "Comparison".to_owned(),
-                                container: name.clone(),
-                                reason: "the criterion tests a parameter that sits after a \
-                                     data-dependent width, so its offset is not known",
-                            })?;
-                    if !field.repr.is_integral() {
-                        return Err(CodegenError::Unsupported {
-                            element: "Comparison".to_owned(),
-                            container: name.clone(),
-                            reason: "only integer-valued criteria are compiled",
-                        });
-                    }
-                    // `useCalibratedValue` defaults to *true*, so most criteria take this
-                    // path. For a plain integer the engineering value is the raw one and
-                    // there is nothing to do; for anything the interpreter reports
-                    // differently, the two would silently select different containers.
-                    if comparison.use_calibrated {
-                        if matches!(field.repr, Repr::Enumerated(_)) {
-                            return Err(CodegenError::Unsupported {
-                                element: "Comparison".to_owned(),
-                                container: name.clone(),
-                                reason: "a criterion on a calibrated enumeration compares \
-                                         labels, which is not compiled",
-                            });
-                        }
-                        if field.calibration.is_some() {
-                            return Err(CodegenError::Unsupported {
-                                element: "Comparison".to_owned(),
-                                container: name.clone(),
-                                reason: "the criterion asks for the calibrated value of a \
-                                         calibrated parameter, which is a float; comparing \
-                                         floats in the dispatcher is not compiled",
-                            });
-                        }
-                        if matches!(field.repr, Repr::Bool) {
-                            return Err(CodegenError::Unsupported {
-                                element: "Comparison".to_owned(),
-                                container: name.clone(),
-                                reason: "a boolean's engineering value is 0 or 1, not its raw \
-                                         bits, and comparing it is not compiled",
-                            });
-                        }
-                    }
-                    let value =
-                        comparison
-                            .value
-                            .as_int
-                            .ok_or_else(|| CodegenError::Unsupported {
-                                element: "Comparison".to_owned(),
-                                container: name.clone(),
-                                reason: "the criterion's value is not an integer",
-                            })?;
-                    guards.push(Guard {
-                        xtce_name: field.xtce_name.clone(),
-                        bit_offset,
-                        bit_width,
-                        repr: field.repr.clone(),
+        // Several `<RestrictionCriteria>` children are a conjunction, as are the entries of a
+        // `<ComparisonList>`; the model has already flattened the latter into this list.
+        for criterion in &container.restriction {
+            criteria.push(match criterion {
+                MatchCriteria::Comparison(comparison) => Criterion::Test(Self::guard(
+                    fields,
+                    &name,
+                    &Test {
+                        element: "Comparison",
+                        parameter: comparison.parameter,
+                        use_calibrated: comparison.use_calibrated,
                         operator: comparison.operator,
-                        value,
-                    });
-                }
-                MatchCriteria::Boolean(_) => {
-                    return Err(CodegenError::Unsupported {
-                        element: "BooleanExpression".to_owned(),
-                        container: name,
-                        reason: "only Comparison and ComparisonList criteria are compiled",
-                    });
-                }
+                        value: &comparison.value,
+                    },
+                )?),
+                MatchCriteria::Boolean(expr) => Self::boolean(expr, fields, &name)?,
                 MatchCriteria::Unsupported { element } => {
                     return Err(CodegenError::Unsupported {
                         element: self.db.name(*element).to_owned(),
@@ -860,9 +855,151 @@ impl Builder<'_> {
                         reason: "the criterion kind is outside the modelled subset",
                     });
                 }
+            });
+        }
+        Ok(Criterion::All(criteria).simplified())
+    }
+
+    /// A `<BooleanExpression>` as a criterion tree.
+    fn boolean(
+        expr: &BooleanExpr,
+        fields: &[Field],
+        container: &str,
+    ) -> Result<Criterion, CodegenError> {
+        let refuse = |reason: &'static str| CodegenError::Unsupported {
+            element: "Condition".to_owned(),
+            container: container.to_owned(),
+            reason,
+        };
+
+        Ok(match expr {
+            BooleanExpr::And(children) => Criterion::All(
+                children
+                    .iter()
+                    .map(|child| Self::boolean(child, fields, container))
+                    .collect::<Result<_, _>>()?,
+            ),
+            BooleanExpr::Or(children) => Criterion::Any(
+                children
+                    .iter()
+                    .map(|child| Self::boolean(child, fields, container))
+                    .collect::<Result<_, _>>()?,
+            ),
+            BooleanExpr::Condition(condition) => {
+                let Operand::Parameter {
+                    parameter,
+                    use_calibrated,
+                } = condition.left
+                else {
+                    // The model takes the first two operands in document order, so a
+                    // `<Value>` written before the `<ParameterInstanceRef>` lands here. The
+                    // interpreter compares it as *text* against whatever the right-hand side
+                    // is, which is a defined behaviour rather than an error — and one this
+                    // generator does not reproduce.
+                    return Err(refuse(
+                        "a literal on the left of a condition is compared as text, which is \
+                         not compiled",
+                    ));
+                };
+                let Operand::Literal(value) = condition.right else {
+                    // Comparing two decoded parameters has five type-pair cases and a
+                    // Python-compatibility answer for text against a number. Nothing in
+                    // reach uses one, so there would be nothing to check a guess against.
+                    return Err(refuse(
+                        "a condition between two parameters is not compiled; only a \
+                         parameter against a literal is",
+                    ));
+                };
+                Criterion::Test(Self::guard(
+                    fields,
+                    container,
+                    &Test {
+                        element: "Condition",
+                        parameter,
+                        use_calibrated,
+                        operator: condition.operator,
+                        value: &value,
+                    },
+                )?)
+            }
+        })
+    }
+
+    /// One field-against-literal test, from either a `<Comparison>` or a `<Condition>`.
+    ///
+    /// The two elements say the same thing in different XML, and the interpreter evaluates
+    /// them through the same `test_literal`, so they compile the same way.
+    fn guard(fields: &[Field], container: &str, test: &Test<'_>) -> Result<Guard, CodegenError> {
+        let &Test {
+            element,
+            parameter,
+            use_calibrated,
+            operator,
+            value,
+        } = test;
+        let refuse = |reason: &'static str| CodegenError::Unsupported {
+            element: element.to_owned(),
+            container: container.to_owned(),
+            reason,
+        };
+
+        let field = fields
+            .iter()
+            .find(|field| field.parameter == parameter)
+            .ok_or_else(|| {
+                refuse("the criterion tests a parameter this container's ancestors do not decode")
+            })?;
+
+        // The dispatcher tests criteria before decoding anything, so it can only reach
+        // fields whose offset is a literal.
+        let (bit_offset, bit_width) = field.static_span().ok_or_else(|| {
+            refuse(
+                "the criterion tests a parameter that sits after a data-dependent width, so \
+                 its offset is not known",
+            )
+        })?;
+
+        if !field.repr.is_integral() {
+            return Err(refuse("only integer-valued criteria are compiled"));
+        }
+
+        // `useCalibratedValue` defaults to *true*, so most criteria take this path. For a
+        // plain integer the engineering value is the raw one and there is nothing to do; for
+        // anything the interpreter reports differently, the two would silently select
+        // different containers.
+        if use_calibrated {
+            if matches!(field.repr, Repr::Enumerated(_)) {
+                return Err(refuse(
+                    "a criterion on a calibrated enumeration compares labels, which is not \
+                     compiled",
+                ));
+            }
+            if field.calibration.is_some() {
+                return Err(refuse(
+                    "the criterion asks for the calibrated value of a calibrated parameter, \
+                     which is a float; comparing floats in the dispatcher is not compiled",
+                ));
+            }
+            if matches!(field.repr, Repr::Bool) {
+                return Err(refuse(
+                    "a boolean's engineering value is 0 or 1, not its raw bits, and comparing \
+                     it is not compiled",
+                ));
             }
         }
-        Ok(guards)
+
+        let literal = value
+            .as_int
+            .ok_or_else(|| refuse("the criterion's value is not an integer"))?;
+
+        Ok(Guard {
+            xtce_name: field.xtce_name.clone(),
+            bit_offset,
+            bit_width,
+            repr: field.repr.clone(),
+            operator,
+            value: literal,
+        })
     }
 
     fn unique_type_ident(&mut self, xtce_name: &str) -> String {

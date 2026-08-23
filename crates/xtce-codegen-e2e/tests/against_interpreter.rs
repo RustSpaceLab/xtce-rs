@@ -43,6 +43,11 @@ mod calibrators {
     include!(concat!(env!("OUT_DIR"), "/calibrators.rs"));
 }
 
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+mod boolean_criteria {
+    include!(concat!(env!("OUT_DIR"), "/boolean_criteria.rs"));
+}
+
 fn testdata(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../testdata/spp")
@@ -508,4 +513,115 @@ fn a_calibrator_on_an_enumeration_or_boolean_is_ignored() {
     assert_eq!(labelled.len(), 2);
     assert!(labelled[0].1.contains("ARMED"), "{:?}", labelled[0]);
     assert!(labelled[1].1.contains("true"), "{:?}", labelled[1]);
+}
+
+/// A boolean expression that is a tree, against the interpreter, over every packet shape.
+///
+/// The one bundled mission file with a `<BooleanExpression>` has a single conjunction of two
+/// equalities — the same thing a `<ComparisonList>` already expressed — so compiling it
+/// proves almost nothing about the element. What is new is that it nests and that it can be
+/// a disjunction, and both change which container a packet selects.
+///
+/// The loop below has to tolerate failure on both sides, and for two different reasons: a
+/// packet may match nothing, or it may match two inheritors at once. `boolean_criteria.xml`
+/// gives Alpha and Beta overlapping branches so that the second case is common, because an
+/// OR is exactly what makes it easy to write by accident.
+#[test]
+fn a_boolean_expression_tree_matches_the_interpreter() {
+    let db = XtceDb::from_path(testdata("boolean_criteria.xml")).expect("definition loads");
+    let decoder = Decoder::with_root(&db, "Root").expect("root container");
+    let (same_raw, same_eng) = comparators!(boolean_criteria);
+
+    // Every nibble of SEL against a spread of LEVEL and CODE, so each branch of every
+    // expression is reached from both sides.
+    let mut packets: Vec<Vec<u8>> = Vec::new();
+    for sel in 0..16u8 {
+        for level in [0u8, 1, 200, 201, 255] {
+            for code in [0u16, 4659, 4660, 4661, 0xFFFF] {
+                let mut packet = vec![sel << 4, level, 0, 0, 0x5A];
+                packet[2..4].copy_from_slice(&code.to_be_bytes());
+                packets.push(packet);
+            }
+        }
+    }
+
+    let mut decoded = 0usize;
+    let mut ambiguous = 0usize;
+    let mut unrecognised = 0usize;
+
+    for (index, packet) in packets.iter().enumerate() {
+        let mut interpreted = decoder.new_packet(packet);
+        let by_interpreter = decoder.decode_into(&mut interpreted, packet);
+        let by_generator = boolean_criteria::decode(packet);
+
+        let sel = packet[0] >> 4;
+        match (by_interpreter, by_generator) {
+            (Err(_), Err(_)) => {
+                // SEL 2 is in both Alpha's and Beta's disjunction, so it is the ambiguous
+                // one and every other refusal is a packet nothing describes.
+                if sel == 2 {
+                    ambiguous += 1;
+                } else {
+                    unrecognised += 1;
+                }
+            }
+            (Ok(()), Ok(compiled)) => {
+                let container = db
+                    .container(interpreted.container())
+                    .map(|container| db.name(container.name))
+                    .expect("container resolves");
+                assert_eq!(
+                    compiled.container_name(),
+                    container,
+                    "packet {index} (SEL {sel}): the two decoders chose different containers"
+                );
+
+                let mut fields = Vec::new();
+                compiled.for_each_value(|name, raw, eng| fields.push((name, raw, eng)));
+                assert_eq!(
+                    fields.len(),
+                    interpreted.len(),
+                    "packet {index}: field counts"
+                );
+                for ((name, raw, eng), value) in fields.iter().zip(interpreted.values()) {
+                    assert!(
+                        same_raw(raw, &value.raw),
+                        "packet {index}: {name}: raw differs"
+                    );
+                    assert!(
+                        same_eng(eng, &value.eng),
+                        "packet {index}: {name}: engineering differs"
+                    );
+                }
+                decoded += 1;
+            }
+            (interpreted_result, generated_result) => panic!(
+                "packet {index} (SEL {sel}): the two disagree about whether it decodes — \
+                 interpreter {:?}, generated {:?}",
+                interpreted_result.err(),
+                generated_result.err()
+            ),
+        }
+    }
+
+    // Exact counts rather than lower bounds, because the point of the file is *which*
+    // packets each expression selects. Of 400 packets, over 16 values of SEL and 5 each of
+    // LEVEL and CODE:
+    //
+    //   SEL 1  -> Alpha, all 25
+    //   SEL 2  -> Alpha and Beta both, all 25 ambiguous
+    //   SEL 3  -> Beta, all 25
+    //   SEL 4  -> Gamma when LEVEL > 200 (2 of 5) or CODE == 4660 (1 of 5): 25 - 3*4 = 13
+    //   SEL 5  -> Delta when LEVEL != 0: 4 of 5, so 20
+    //   the other 11 values of SEL describe nothing: 275
+    assert_eq!(
+        decoded,
+        25 + 25 + 13 + 20,
+        "wrong number of packets decoded"
+    );
+    assert_eq!(
+        ambiguous, 25,
+        "every SEL = 2 packet should have matched both Alpha and Beta"
+    );
+    assert_eq!(unrecognised, 12 + 5 + 275, "wrong number matched nothing");
 }

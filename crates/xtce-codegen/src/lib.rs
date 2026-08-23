@@ -46,7 +46,7 @@ pub mod plan;
 
 use xtce_model::XtceDb;
 
-pub use plan::{Calibration, ContainerPlan, Field, Guard, Node, Plan, Repr};
+pub use plan::{Calibration, ContainerPlan, Criterion, Field, Guard, Node, Plan, Repr};
 
 /// What to generate.
 #[derive(Clone, Debug, Default)]

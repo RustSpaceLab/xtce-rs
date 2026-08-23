@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Written for this project. `contrived_inheritance_structure.xml` is the only bundled file
+  with a `<BooleanExpression>` at all, and it contains exactly one shape: two equalities
+  ANDed together. That is the shape a `<ComparisonList>` already had, so compiling it proves
+  almost nothing about the rest of the element.
+
+  What is actually new about a boolean expression is that it *nests* and that it can be a
+  disjunction. So:
+
+  * Alpha is a plain `<ORedConditions>`.
+  * Beta is another, overlapping Alpha at SEL = 2 — because an OR makes it much easier to
+    write a definition where two inheritors both match, and the dispatcher has to keep
+    calling that ambiguous rather than picking the first. Both implementations must refuse
+    the same packets.
+  * Gamma is an AND with an OR inside it, which is the case flattening a tree into a list
+    would silently get wrong.
+  * Delta uses `!=`, and Gamma `&gt;`. Every criterion in every bundled mission file is an
+    equality, so the ordering operators had no coverage either.
+
+  CODE sits at bit 16, so the dispatcher has to read past the first byte to test it. LEVEL is
+  a byte and SEL a nibble, so a random packet reaches all four inheritors, the ambiguity, and
+  the no-match case in useful proportions.
+-->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="BooleanCriteria">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U4">
+        <IntegerDataEncoding sizeInBits="4" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U8">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U16">
+        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
+      </IntegerParameterType>
+    </ParameterTypeSet>
+
+    <ParameterSet>
+      <Parameter name="SEL" parameterTypeRef="U4"/>
+      <Parameter name="PAD" parameterTypeRef="U4"/>
+      <Parameter name="LEVEL" parameterTypeRef="U8"/>
+      <Parameter name="CODE" parameterTypeRef="U16"/>
+      <Parameter name="ALPHA_BODY" parameterTypeRef="U8"/>
+      <Parameter name="BETA_BODY" parameterTypeRef="U8"/>
+      <Parameter name="GAMMA_BODY" parameterTypeRef="U8"/>
+      <Parameter name="DELTA_BODY" parameterTypeRef="U8"/>
+    </ParameterSet>
+
+    <ContainerSet>
+      <SequenceContainer name="Root" abstract="true">
+        <EntryList>
+          <ParameterRefEntry parameterRef="SEL"/>
+          <ParameterRefEntry parameterRef="PAD"/>
+          <ParameterRefEntry parameterRef="LEVEL"/>
+          <ParameterRefEntry parameterRef="CODE"/>
+        </EntryList>
+      </SequenceContainer>
+
+      <!-- A disjunction, and nothing else. -->
+      <SequenceContainer name="Alpha">
+        <EntryList><ParameterRefEntry parameterRef="ALPHA_BODY"/></EntryList>
+        <BaseContainer containerRef="Root">
+          <RestrictionCriteria>
+            <BooleanExpression>
+              <ORedConditions>
+                <Condition>
+                  <ParameterInstanceRef parameterRef="SEL" useCalibratedValue="false"/>
+                  <ComparisonOperator>==</ComparisonOperator>
+                  <Value>1</Value>
+                </Condition>
+                <Condition>
+                  <ParameterInstanceRef parameterRef="SEL" useCalibratedValue="false"/>
+                  <ComparisonOperator>==</ComparisonOperator>
+                  <Value>2</Value>
+                </Condition>
+              </ORedConditions>
+            </BooleanExpression>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+
+      <!-- Overlaps Alpha at SEL = 2, on purpose. -->
+      <SequenceContainer name="Beta">
+        <EntryList><ParameterRefEntry parameterRef="BETA_BODY"/></EntryList>
+        <BaseContainer containerRef="Root">
+          <RestrictionCriteria>
+            <BooleanExpression>
+              <ORedConditions>
+                <Condition>
+                  <ParameterInstanceRef parameterRef="SEL" useCalibratedValue="false"/>
+                  <ComparisonOperator>==</ComparisonOperator>
+                  <Value>2</Value>
+                </Condition>
+                <Condition>
+                  <ParameterInstanceRef parameterRef="SEL" useCalibratedValue="false"/>
+                  <ComparisonOperator>==</ComparisonOperator>
+                  <Value>3</Value>
+                </Condition>
+              </ORedConditions>
+            </BooleanExpression>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+
+      <!-- An OR inside an AND: true for SEL = 4 and either a high LEVEL or one exact CODE. -->
+      <SequenceContainer name="Gamma">
+        <EntryList><ParameterRefEntry parameterRef="GAMMA_BODY"/></EntryList>
+        <BaseContainer containerRef="Root">
+          <RestrictionCriteria>
+            <BooleanExpression>
+              <ANDedConditions>
+                <Condition>
+                  <ParameterInstanceRef parameterRef="SEL" useCalibratedValue="false"/>
+                  <ComparisonOperator>==</ComparisonOperator>
+                  <Value>4</Value>
+                </Condition>
+                <ORedConditions>
+                  <Condition>
+                    <ParameterInstanceRef parameterRef="LEVEL" useCalibratedValue="false"/>
+                    <ComparisonOperator>&gt;</ComparisonOperator>
+                    <Value>200</Value>
+                  </Condition>
+                  <Condition>
+                    <ParameterInstanceRef parameterRef="CODE" useCalibratedValue="false"/>
+                    <ComparisonOperator>==</ComparisonOperator>
+                    <Value>4660</Value>
+                  </Condition>
+                </ORedConditions>
+              </ANDedConditions>
+            </BooleanExpression>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+
+      <!-- `!=`, which no mission file uses. -->
+      <SequenceContainer name="Delta">
+        <EntryList><ParameterRefEntry parameterRef="DELTA_BODY"/></EntryList>
+        <BaseContainer containerRef="Root">
+          <RestrictionCriteria>
+            <BooleanExpression>
+              <ANDedConditions>
+                <Condition>
+                  <ParameterInstanceRef parameterRef="SEL" useCalibratedValue="false"/>
+                  <ComparisonOperator>==</ComparisonOperator>
+                  <Value>5</Value>
+                </Condition>
+                <Condition>
+                  <ParameterInstanceRef parameterRef="LEVEL" useCalibratedValue="false"/>
+                  <ComparisonOperator>!=</ComparisonOperator>
+                  <Value>0</Value>
+                </Condition>
+              </ANDedConditions>
+            </BooleanExpression>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

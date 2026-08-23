@@ -1,25 +1,19 @@
 # Blockers
 
 Nothing outstanding. Every milestone in `xtce-rs-spec.md` (M0 through M7) is done and
-verified; see `PROGRESS.md` for what each one produced and what it measured.
+verified; see `PROGRESS.md` for what each one produced and what it measured. As of
+2026-08-23 every bundled definition compiles through `xtce-codegen`, so the generator's
+subset is no longer narrower than the data on hand — the remaining refusals are constructs
+nothing in reach uses.
 
 ## Where a next session should start
 
-1. **`BooleanExpression` restriction criteria in `xtce-codegen`.** Eleven of the twelve
-   bundled definitions compile now — strings, binaries, data-dependent widths and calibrators
-   have all landed; see `PROGRESS.md`. `contrived_inheritance_structure.xml` is the twelfth,
-   and `BooleanExpression` is the only thing stopping it.
-
-   Worth knowing before starting: every emitter path added so far needed a definition written
-   to reach it. `numeric_edges.xml` caught two real bugs; `calibrators.xml` exists because no
-   mission file has a calibrator at all. Assume the same here.
-
-2. **Give the differential harness a `--full` mode.** The golden files hold full detail for
+1. **Give the differential harness a `--full` mode.** The golden files hold full detail for
    the first 64 packets of each stream and a digest over all of them. A digest mismatch
    currently tells you *that* something differs past packet 64, not *which* packet. A mode
    that regenerates full detail on demand would close that.
 
-3. **Talk to `greglucas/space-data-toolkit`.** Section 7 of the specification suggests it,
+2. **Talk to `greglucas/space-data-toolkit`.** Section 7 of the specification suggests it,
    and the benchmark it asked for now exists.
 
 ## Things deliberately left undone

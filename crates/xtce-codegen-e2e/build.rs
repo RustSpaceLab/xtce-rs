@@ -27,6 +27,10 @@ const CASES: &[(&str, &str, Option<&str>)] = &[
     // calibration path — polynomial summation order, exact integer powers, spline
     // interpolation — would be generated and never compared against anything.
     ("calibrators", "calibrators.xml", Some("Calibrated")),
+    // A boolean expression that is actually a tree: an OR, an OR inside an AND, and two
+    // inheritors whose branches overlap. The one bundled mission file with a
+    // <BooleanExpression> has a single conjunction of equalities and nothing else.
+    ("boolean_criteria", "boolean_criteria.xml", Some("Root")),
 ];
 
 fn main() {

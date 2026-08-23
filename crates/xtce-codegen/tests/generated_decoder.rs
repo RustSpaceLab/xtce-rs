@@ -192,36 +192,42 @@ fn a_packet_of_another_type_is_refused() {
     }
 }
 
-/// Out-of-scope constructs must be refused by name, never silently interpreted.
+/// Every bundled definition compiles.
+///
+/// It was not always so, and the list this test used to hold was the point of it: whatever
+/// could not be compiled had to be refused *by name*, never quietly turned into a partial
+/// decoder. The list is empty now — `contrived_inheritance_structure.xml` was the last one,
+/// and its `<BooleanExpression>` compiles.
+///
+/// So the assertion is inverted. If one of these ever stops compiling, that is either a
+/// regression or a definition that grew a construct outside the subset, and either way it
+/// should be noticed here rather than in whatever downstream build goes quiet.
 #[test]
-fn unsupported_constructs_are_named_not_ignored() {
-    // Eleven of the twelve bundled definitions compile now; `xtce-codegen-e2e` checks each
-    // against the interpreter. This one still does not, and the point of the test is that it
-    // says why rather than quietly producing a partial decoder.
-    let cases = [("jpss/contrived_inheritance_structure.xml", None)];
-
-    for (file, root) in cases {
-        let db = XtceDb::from_path(testdata(file)).unwrap_or_else(|e| panic!("{file}: {e}"));
-        let options = xtce_codegen::Options {
-            root: root.map(str::to_owned),
-            source_label: None,
-        };
-        match xtce_codegen::generate(&db, &options) {
-            Err(xtce_codegen::CodegenError::Unsupported {
-                element, reason, ..
-            }) => {
-                assert!(
-                    !element.is_empty(),
-                    "{file}: the refusal must name an element"
-                );
-                assert!(!reason.is_empty(), "{file}: the refusal must give a reason");
+fn every_bundled_definition_compiles() {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/spp");
+    let mut definitions = Vec::new();
+    let mut stack = vec![directory];
+    while let Some(path) = stack.pop() {
+        for entry in std::fs::read_dir(&path).expect("testdata is readable") {
+            let entry = entry.expect("directory entry").path();
+            if entry.is_dir() {
+                stack.push(entry);
+            } else if entry
+                .extension()
+                .is_some_and(|extension| extension == "xml")
+            {
+                definitions.push(entry);
             }
-            Err(other) => panic!("{file}: expected an Unsupported refusal, got {other}"),
-            Ok(_) => panic!(
-                "{file}: this definition uses constructs the generator cannot compile, so \
-                 generating must fail rather than silently produce a partial decoder"
-            ),
         }
+    }
+    definitions.sort();
+    assert_eq!(definitions.len(), 13, "the bundled definitions changed");
+
+    for path in definitions {
+        let name = path.display().to_string();
+        let db = XtceDb::from_path(&path).unwrap_or_else(|error| panic!("{name}: {error}"));
+        let result = xtce_codegen::generate(&db, &xtce_codegen::Options::default());
+        assert!(result.is_ok(), "{name}: no longer compiles: {result:?}");
     }
 }
 
@@ -422,7 +428,45 @@ fn criteria_the_generator_would_evaluate_differently_are_refused() {
     let plain = r#"<IntegerParameterType name="SEL_T"><IntegerDataEncoding sizeInBits="8" encoding="unsigned"/></IntegerParameterType>"#;
     let parameter = r#"<Parameter name="SEL" parameterTypeRef="SEL_T"/>"#;
 
-    let cases: [(&str, String, bool); 5] = [
+    // A `<Condition>` says the same thing as a `<Comparison>` in different XML, and the
+    // interpreter evaluates both through the same `test_literal` — but it also admits two
+    // shapes a `<Comparison>` cannot express.
+    let condition = |body: &str| {
+        definition(
+            plain,
+            parameter,
+            &format!("<BooleanExpression><Condition>{body}</Condition></BooleanExpression>"),
+        )
+    };
+
+    let cases: [(&str, String, bool); 8] = [
+        (
+            // The ordinary shape, and the one boolean_criteria.xml is built from.
+            "condition against a literal",
+            condition(
+                r#"<ParameterInstanceRef parameterRef="SEL" useCalibratedValue="false"/><ComparisonOperator>&gt;=</ComparisonOperator><Value>4</Value>"#,
+            ),
+            true,
+        ),
+        (
+            // Two decoded parameters. `test_scalars` has five type-pair arms and a
+            // Python-compatibility answer for text against a number; nothing in reach uses
+            // one, so there is nothing to check a guess against.
+            "condition between two parameters",
+            condition(
+                r#"<ParameterInstanceRef parameterRef="SEL" useCalibratedValue="false"/><ComparisonOperator>==</ComparisonOperator><ParameterInstanceRef parameterRef="BODY" useCalibratedValue="false"/>"#,
+            ),
+            false,
+        ),
+        (
+            // The model takes the operands in document order, so a `<Value>` written first
+            // lands on the left — where the interpreter compares it as *text*.
+            "literal on the left of a condition",
+            condition(
+                r#"<Value>4</Value><ComparisonOperator>==</ComparisonOperator><ParameterInstanceRef parameterRef="SEL" useCalibratedValue="false"/>"#,
+            ),
+            false,
+        ),
         (
             // The interpreter compares 2 * raw against 4.0; raw bits against 4 would pick
             // this container for a packet the interpreter reads as a different one.
@@ -489,7 +533,7 @@ fn criteria_the_generator_would_evaluate_differently_are_refused() {
                 matches!(
                     result,
                     Err(xtce_codegen::CodegenError::Unsupported { ref element, .. })
-                        if element == "Comparison"
+                        if element == "Comparison" || element == "Condition"
                 ),
                 "{what}: refused the wrong element: {result:?}"
             );
