@@ -37,6 +37,14 @@ struct Golden {
     packet_count: usize,
     unrecognized_count: usize,
     digest: String,
+    /// Packets per window digest, and one digest per window.
+    ///
+    /// The whole-stream digest says *whether* the two implementations diverge and the detail
+    /// section only covers the first 64 packets, so a divergence past it had nowhere to be
+    /// pointed at. These narrow it to a window without regenerating anything. Zero and empty
+    /// for a golden written before they existed.
+    window_size: usize,
+    window_digests: Vec<String>,
     detail: Vec<Option<PacketMap>>,
     reference_load_seconds: f64,
     reference_parse_seconds: f64,
@@ -50,6 +58,12 @@ pub struct CaseReport {
     pub trailing: usize,
     pub differences: Vec<String>,
     pub digest_matches: bool,
+    /// The first window of packets whose digest differs, when the goldens carry windows.
+    ///
+    /// `(first packet, last packet)`, inclusive. `None` when the digests match, when the
+    /// golden predates windows, or when the difference is in the packet count rather than in
+    /// any window.
+    pub diverging_window: Option<(usize, usize)>,
     /// How many packets the golden holds full detail for.
     pub detail_window: usize,
     pub load_seconds: f64,
@@ -148,6 +162,17 @@ fn load_golden(path: &Path) -> Result<Golden, String> {
         packet_count: usize::try_from(number("packet_count")?).unwrap_or(0),
         unrecognized_count: usize::try_from(number("unrecognized_count").unwrap_or(0)).unwrap_or(0),
         digest: string("digest_sha256")?,
+        window_size: usize::try_from(number("window_size").unwrap_or(0)).unwrap_or(0),
+        window_digests: value
+            .get("window_digests")
+            .and_then(serde_json::Value::as_array)
+            .map(|entries| {
+                entries
+                    .iter()
+                    .filter_map(|entry| entry.as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default(),
         detail,
         reference_load_seconds: seconds("load_seconds"),
         reference_parse_seconds: seconds("parse_seconds"),
@@ -205,6 +230,7 @@ fn run_case(
 
     let mut differences = Vec::new();
     let mut hasher = Sha256::new();
+    let mut windows = WindowDigests::new(golden.window_size);
     let mut canonical = Vec::with_capacity(4096);
     let mut count = 0usize;
     let mut unrecognized = 0usize;
@@ -246,6 +272,7 @@ fn run_case(
                 let mut framed_digest = Vec::new();
                 write_blob(&mut framed_digest, &canonical);
                 hasher.update(&framed_digest);
+                windows.update(&framed_digest);
                 continue;
             }
         };
@@ -254,6 +281,7 @@ fn run_case(
         let mut framed_digest = Vec::with_capacity(canonical.len() + 8);
         write_blob(&mut framed_digest, &canonical);
         hasher.update(&framed_digest);
+        windows.update(&framed_digest);
 
         if let Some(expected) = golden.detail.get(index) {
             compare_packet(
@@ -282,6 +310,11 @@ fn run_case(
     }
 
     let digest = to_hex(&hasher.finalize());
+    let diverging_window = if digest == golden.digest {
+        None
+    } else {
+        windows.first_difference(&golden.window_digests)
+    };
     Ok(CaseReport {
         case: golden.case.clone(),
         packets: count,
@@ -289,12 +322,68 @@ fn run_case(
         trailing,
         differences,
         digest_matches: digest == golden.digest,
+        diverging_window,
         detail_window: golden.detail.len(),
         load_seconds,
         decode_seconds,
         reference_load_seconds: golden.reference_load_seconds,
         reference_parse_seconds: golden.reference_parse_seconds,
     })
+}
+
+/// One digest per window of packets, mirroring `WINDOW` in `tools/gen_goldens.py`.
+struct WindowDigests {
+    size: usize,
+    hasher: Sha256,
+    seen: usize,
+    digests: Vec<String>,
+}
+
+impl WindowDigests {
+    fn new(size: usize) -> Self {
+        Self {
+            size,
+            hasher: Sha256::new(),
+            seen: 0,
+            digests: Vec::new(),
+        }
+    }
+
+    fn update(&mut self, framed: &[u8]) {
+        if self.size == 0 {
+            return;
+        }
+        self.hasher.update(framed);
+        self.seen += 1;
+        if self.seen % self.size == 0 {
+            let finished = std::mem::take(&mut self.hasher);
+            self.digests.push(to_hex(&finished.finalize()));
+        }
+    }
+
+    /// The packets covered by the first window that differs from `expected`.
+    ///
+    /// A window that exists on one side and not the other counts as a difference, which is
+    /// what a stream of a different length looks like from here.
+    fn first_difference(mut self, expected: &[String]) -> Option<(usize, usize)> {
+        if self.size == 0 || expected.is_empty() {
+            return None;
+        }
+        if self.seen % self.size != 0 {
+            let finished = std::mem::take(&mut self.hasher);
+            self.digests.push(to_hex(&finished.finalize()));
+        }
+        let at = self
+            .digests
+            .iter()
+            .zip(expected)
+            .position(|(ours, theirs)| ours != theirs)
+            .or_else(|| {
+                (self.digests.len() != expected.len())
+                    .then(|| self.digests.len().min(expected.len()))
+            })?;
+        Some((at * self.size, (at + 1) * self.size - 1))
+    }
 }
 
 /// Mirrors `canonical_packet` in `tools/gen_goldens.py`.
@@ -422,15 +511,30 @@ pub fn format_report(report: &CaseReport) -> String {
                  packet {}.",
                 report.detail_window
             );
+            // A SHA-256 does not localise, but the golden carries one per window of packets,
+            // and that narrows it to a few hundred without regenerating anything.
+            let detail = match report.diverging_window {
+                Some((first, last)) => {
+                    let _ = writeln!(
+                        out,
+                        "  the window digests put it between packet {first} and packet {last}."
+                    );
+                    last + 1
+                }
+                None => {
+                    let _ = writeln!(
+                        out,
+                        "  this golden carries no window digests, so all that is known is \
+                         that it is somewhere past the window."
+                    );
+                    report.packets
+                }
+            };
+            let _ = writeln!(out, "  widen the detail far enough to reach it and re-run:");
             let _ = writeln!(
                 out,
-                "  a SHA-256 does not localise and the golden holds no reference past the \
-                 window, so widen it:"
-            );
-            let _ = writeln!(
-                out,
-                "    .venv/bin/python tools/gen_goldens.py --only {} --detail {}",
-                report.case, report.packets
+                "    .venv/bin/python tools/gen_goldens.py --only {} --detail {detail}",
+                report.case
             );
             let _ = writeln!(
                 out,
@@ -460,4 +564,84 @@ pub fn format_report(report: &CaseReport) -> String {
         );
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Sha256, WindowDigests, to_hex};
+
+    /// The digest of `count` packets, as the generator would write them.
+    fn expected(count: usize, size: usize, corrupt: Option<usize>) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut hasher = Sha256::new();
+        for index in 0..count {
+            hasher.update(format!("packet {index}").as_bytes());
+            if (index + 1) % size == 0 {
+                let done = std::mem::take(&mut hasher);
+                out.push(to_hex(&done.finalize()));
+            }
+        }
+        if count % size != 0 {
+            out.push(to_hex(&hasher.finalize()));
+        }
+        if let Some(at) = corrupt {
+            out[at] = "0".repeat(64);
+        }
+        out
+    }
+
+    fn observed(count: usize, size: usize) -> WindowDigests {
+        let mut windows = WindowDigests::new(size);
+        for index in 0..count {
+            windows.update(format!("packet {index}").as_bytes());
+        }
+        windows
+    }
+
+    #[test]
+    fn identical_streams_have_no_diverging_window() {
+        let windows = observed(1000, 256);
+        assert_eq!(windows.first_difference(&expected(1000, 256, None)), None);
+    }
+
+    /// The window is reported as the packets it covers, not as its index.
+    #[test]
+    fn a_differing_window_is_reported_as_a_packet_range() {
+        let windows = observed(1000, 256);
+        assert_eq!(
+            windows.first_difference(&expected(1000, 256, Some(2))),
+            Some((512, 767))
+        );
+    }
+
+    /// The last window is short unless the stream divides evenly, and still has to be checked.
+    ///
+    /// Without finishing it, a divergence in the final packets would be the one case the
+    /// windows could not localise — and a stream whose length is a multiple of the window is
+    /// the exception rather than the rule.
+    #[test]
+    fn the_short_final_window_is_compared_too() {
+        let windows = observed(700, 256);
+        let mut theirs = expected(700, 256, None);
+        assert_eq!(theirs.len(), 3, "two full windows and 188 packets");
+        theirs[2] = "0".repeat(64);
+        assert_eq!(windows.first_difference(&theirs), Some((512, 767)));
+    }
+
+    /// A stream of a different length differs at the first window one side does not have.
+    #[test]
+    fn a_shorter_stream_differs_at_the_window_it_runs_out_on() {
+        let windows = observed(512, 256);
+        assert_eq!(
+            windows.first_difference(&expected(1000, 256, None)),
+            Some((512, 767))
+        );
+    }
+
+    /// A golden written before window digests existed localises nothing, and says nothing.
+    #[test]
+    fn a_golden_without_windows_reports_none() {
+        let windows = observed(1000, 0);
+        assert_eq!(windows.first_difference(&[]), None);
+    }
 }

@@ -13,17 +13,21 @@ nothing in reach uses.
    reference has no command support to compare against. The first real one this meets will
    find something.
 
-1. **Localising a digest mismatch needs the goldens regenerated.** `cargo xtask diff` now
-   tells you what to run when the digest differs but the detail window is clean — the window
-   is 64 packets and a SHA-256 does not localise, so widening it and regenerating is the
-   answer, and the report prints the exact command. What it cannot do is find the packet on
-   its own.
+1. ~~**Localising a digest mismatch needs the goldens regenerated.**~~ **Done, 2026-08-24.**
+   The golden files carry a digest per 256 packets alongside the whole-stream one, so a
+   mismatch past the detail window now names the range it is in:
 
-   The real fix is a per-packet or per-window digest in the golden files, which means
-   regenerating them with the pinned reference. That is `space_packet_parser` at commit
-   `6de220ff` — **not** the 6.0.1 on PyPI — and regenerating ground truth changes what the
-   whole project is measured against, so it wants a deliberate decision rather than a
-   drive-by.
+       every packet in the detail window agrees, so the first difference is past packet 64.
+       the window digests put it between packet 2560 and packet 2815.
+       widen the detail far enough to reach it and re-run:
+         .venv/bin/python tools/gen_goldens.py --only jpss_geolocation --detail 2816
+
+   Regenerating ground truth is the part that wanted care, so it was gated rather than
+   trusted: every case green before, then regenerated, then every `digest_sha256`,
+   `packet_count`, `unrecognized_count` and detail packet compared byte for byte against the
+   copy taken beforehand. All nine identical, the two new fields the only difference. Had any
+   digest moved, the regeneration would have been wrong and the answer would have been to stop
+   rather than to accept the new value.
 
 2. **Talk to `greglucas/space-data-toolkit`.** Section 7 of the specification suggests it,
    and the benchmark it asked for now exists.

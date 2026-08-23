@@ -9120,11 +9120,15 @@
  "packets": "idex/sciData_2023_052_14_45_05",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.021094,
-  "parse_seconds": 0.019548
+  "load_seconds": 0.061576,
+  "parse_seconds": 0.072196
  },
  "root_container": null,
  "skip_header_bytes": 0,
  "unrecognized_count": 0,
+ "window_digests": [
+  "0cb19a7f02642805c081868a14e6434a81ba7f9aed4620c3d0a0cbf513c66784"
+ ],
+ "window_size": 256,
  "xtce": "idex/idex_combined_science_definition.xml"
 }

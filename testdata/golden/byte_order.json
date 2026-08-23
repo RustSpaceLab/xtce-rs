@@ -5720,11 +5720,16 @@
  "packets": "byte_order_stream.bin",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.007109,
-  "parse_seconds": 0.064644
+  "load_seconds": 0.005395,
+  "parse_seconds": 0.23156
  },
  "root_container": null,
  "skip_header_bytes": 0,
  "unrecognized_count": 128,
+ "window_digests": [
+  "47b28d831f035cbf4a30b685266bdddd49017f4bcc7ad8cd44063a0bca9c852d",
+  "df4ab847a0aca280dbbbe11aac801b224f2ecc59c75b7debcf1d59ee01cc7f4c"
+ ],
+ "window_size": 256,
  "xtce": "byte_order.xml"
 }

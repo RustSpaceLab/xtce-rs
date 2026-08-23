@@ -2,55 +2,55 @@
  {
   "case": "byte_order",
   "packet_count": 512,
-  "load_seconds": 0.007109,
-  "parse_seconds": 0.064644
+  "load_seconds": 0.005395,
+  "parse_seconds": 0.23156
  },
  {
   "case": "context_calibrators",
   "packet_count": 512,
-  "load_seconds": 0.005983,
-  "parse_seconds": 0.036828
+  "load_seconds": 0.005157,
+  "parse_seconds": 0.19101
  },
  {
   "case": "ctim",
   "packet_count": 1499,
-  "load_seconds": 0.119682,
-  "parse_seconds": 5.109016
+  "load_seconds": 0.374608,
+  "parse_seconds": 22.534184
  },
  {
   "case": "idex",
   "packet_count": 78,
-  "load_seconds": 0.021094,
-  "parse_seconds": 0.019548
+  "load_seconds": 0.061576,
+  "parse_seconds": 0.072196
  },
  {
   "case": "jpss_contrived_inheritance",
   "packet_count": 7200,
-  "load_seconds": 0.002752,
-  "parse_seconds": 1.058907
+  "load_seconds": 0.006127,
+  "parse_seconds": 4.337276
  },
  {
   "case": "jpss_definition_over_ctim_stream",
   "packet_count": 1499,
-  "load_seconds": 0.004809,
-  "parse_seconds": 0.038867
+  "load_seconds": 0.011732,
+  "parse_seconds": 0.158047
  },
  {
   "case": "jpss_geolocation",
   "packet_count": 7200,
-  "load_seconds": 0.010236,
-  "parse_seconds": 0.953711
+  "load_seconds": 0.007034,
+  "parse_seconds": 3.85035
  },
  {
   "case": "mil_1750a",
   "packet_count": 512,
-  "load_seconds": 0.005853,
-  "parse_seconds": 0.045225
+  "load_seconds": 0.003274,
+  "parse_seconds": 0.147013
  },
  {
   "case": "suda",
   "packet_count": 13,
-  "load_seconds": 0.019747,
-  "parse_seconds": 0.003971
+  "load_seconds": 0.074173,
+  "parse_seconds": 0.009344
  }
 ]

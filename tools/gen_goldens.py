@@ -63,6 +63,15 @@ TESTDATA = REPO_ROOT / "testdata" / "spp"
 #: Marker recorded for a packet the reference itself refuses to decode.
 UNRECOGNIZED = "__unrecognized__"
 
+#: Packets per window digest.
+#:
+#: The whole-stream digest says *whether* the two implementations diverge; it cannot say
+#: where, and the detail section only holds the first 64 packets. A digest per window turns
+#: "somewhere in seventeen thousand packets" into "somewhere in these 256", which is a range
+#: small enough to regenerate the detail over. Cheap: one more `sha256` update per packet and
+#: about seventy hex strings per case.
+WINDOW = 256
+
 
 @dataclass(frozen=True)
 class Case:
@@ -226,6 +235,8 @@ def run_case(case: Case, detail: int) -> dict[str, Any]:
 
     detail_packets: list[Any] = []
     digest = hashlib.sha256()
+    window = hashlib.sha256()
+    window_digests: list[str] = []
     count = 0
     errors = 0
 
@@ -241,12 +252,21 @@ def run_case(case: Case, detail: int) -> dict[str, Any]:
                 # recorded rather than skipped — our decoder must reject them too.
                 parsed = UNRECOGNIZED
                 errors += 1
-            digest.update(blob(canonical_packet(parsed)))
+            framed = blob(canonical_packet(parsed))
+            digest.update(framed)
+            window.update(framed)
             if count < detail:
                 detail_packets.append(
                     {UNRECOGNIZED: True} if parsed is UNRECOGNIZED else encode_packet(parsed)
                 )
             count += 1
+            if count % WINDOW == 0:
+                window_digests.append(window.hexdigest())
+                window = hashlib.sha256()
+    # The last window is short unless the stream divides evenly, and it still has to be
+    # recorded or the packets in it would be the only ones a mismatch could not localise.
+    if count % WINDOW != 0:
+        window_digests.append(window.hexdigest())
     parse_seconds = time.perf_counter() - parse_start
 
     return {
@@ -259,6 +279,8 @@ def run_case(case: Case, detail: int) -> dict[str, Any]:
         "unrecognized_count": errors,
         "detail_count": len(detail_packets),
         "digest_sha256": digest.hexdigest(),
+        "window_size": WINDOW,
+        "window_digests": window_digests,
         "reference": {
             "implementation": "lasp/space_packet_parser",
             "load_seconds": round(load_seconds, 6),

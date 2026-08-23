@@ -3800,11 +3800,16 @@
  "packets": "mil_1750a_stream.bin",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.005853,
-  "parse_seconds": 0.045225
+  "load_seconds": 0.003274,
+  "parse_seconds": 0.147013
  },
  "root_container": null,
  "skip_header_bytes": 0,
  "unrecognized_count": 128,
+ "window_digests": [
+  "c67b2c0e131047c3553b8a2d0259fa18718c4c48bf9bfccee60ccf1d7b0b5ec8",
+  "c8edd2400004428e88c30aad279a4284a5fc8a4a79d15807d1dc6d5216c6851d"
+ ],
+ "window_size": 256,
  "xtce": "mil_1750a.xml"
 }

@@ -1854,11 +1854,15 @@
  "packets": "suda/sciData_2022_130_17_41_53.spl",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.019747,
-  "parse_seconds": 0.003971
+  "load_seconds": 0.074173,
+  "parse_seconds": 0.009344
  },
  "root_container": null,
  "skip_header_bytes": 4,
  "unrecognized_count": 0,
+ "window_digests": [
+  "48f639ea31042d73b2e6cb6ca028bab3237e195afedde7428891f80ea69d3c28"
+ ],
+ "window_size": 256,
  "xtce": "suda/suda_combined_science_definition.xml"
 }

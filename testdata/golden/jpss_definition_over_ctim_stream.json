@@ -200,11 +200,20 @@
  "packets": "ctim/ccsds_2021_155_14_39_51",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.004809,
-  "parse_seconds": 0.038867
+  "load_seconds": 0.011732,
+  "parse_seconds": 0.158047
  },
  "root_container": null,
  "skip_header_bytes": 0,
  "unrecognized_count": 1499,
+ "window_digests": [
+  "c0c1de099c2c4375aaaf4103fcda97d8ba44c22481ce13161cd5f0da80ac5eb7",
+  "c0c1de099c2c4375aaaf4103fcda97d8ba44c22481ce13161cd5f0da80ac5eb7",
+  "c0c1de099c2c4375aaaf4103fcda97d8ba44c22481ce13161cd5f0da80ac5eb7",
+  "c0c1de099c2c4375aaaf4103fcda97d8ba44c22481ce13161cd5f0da80ac5eb7",
+  "c0c1de099c2c4375aaaf4103fcda97d8ba44c22481ce13161cd5f0da80ac5eb7",
+  "b985c373fc2355596128b595043c6bfd82fa166e10bef22d85e4507aa74315ad"
+ ],
+ "window_size": 256,
  "xtce": "jpss/jpss1_geolocation_xtce_v1.xml"
 }

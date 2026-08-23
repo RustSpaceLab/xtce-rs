@@ -38,7 +38,8 @@ definition/packet pairs, and `cargo xtask diff` re-derives all of it:
 
 * every raw and engineering value of the first 64 packets, compared field by field;
 * a SHA-256 over a canonical encoding of **all** ~17 000 packets, so a divergence past the
-  detail window cannot hide;
+  detail window cannot hide — and one per 256 packets besides, so it cannot hide *where* it is
+  either;
 * one case is a definition pointed at a stream it does not describe, so the "both refuse this
   packet" half of the contract is tested too.
 
@@ -120,6 +121,10 @@ compared field by field, so a failure names the packet, the parameter and both v
 SHA-256 over a canonical encoding of **all** ~17 000 packets is compared against the digest
 the reference produced — so a divergence past the detail window cannot hide. `digest ok` and a
 clean detail section together mean the two implementations agree on every packet.
+
+A digest alone says *whether*, not *where*. So the goldens carry one per 256 packets as well,
+and a mismatch reports the range it falls in and the command that widens the detail to reach
+it — turning "somewhere in seventeen thousand packets" into "somewhere in these 256".
 
 The `load`/`decode` multipliers in that output include the harness's own bookkeeping. They are
 a floor, not a benchmark; use `cargo bench` for real numbers.

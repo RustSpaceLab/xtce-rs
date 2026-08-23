@@ -3224,11 +3224,16 @@
  "packets": "context_calibrators_stream.bin",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.005983,
-  "parse_seconds": 0.036828
+  "load_seconds": 0.005157,
+  "parse_seconds": 0.19101
  },
  "root_container": null,
  "skip_header_bytes": 0,
  "unrecognized_count": 128,
+ "window_digests": [
+  "11ac20369a810dd0d06d9bee49c3fc59ba76f32513f06ebc8a5fe8ebdf4c0198",
+  "8d31d6fe337baca98dfbeb76eab62126aae41f6de06454aefef8e2bbe1f572b7"
+ ],
+ "window_size": 256,
  "xtce": "context_calibrators.xml"
 }

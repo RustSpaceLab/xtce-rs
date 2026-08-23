@@ -12324,11 +12324,20 @@
  "packets": "ctim/ccsds_2021_155_14_39_51",
  "reference": {
   "implementation": "lasp/space_packet_parser",
-  "load_seconds": 0.119682,
-  "parse_seconds": 5.109016
+  "load_seconds": 0.374608,
+  "parse_seconds": 22.534184
  },
  "root_container": "CCSDSTelemetryPacket",
  "skip_header_bytes": 0,
  "unrecognized_count": 0,
+ "window_digests": [
+  "06e24c39e87c2b00323c6006736e4e26959d3a1e51896946c2241a9400ca5461",
+  "2874e1b0c74e5bcd049d5a3b900ff901868f95a11798bfd549317a7a6ab67b40",
+  "2d21e6bc684b9d048ad0a31f2f28dd276ace7f2fa0d32e57d63ec5fbaded93bc",
+  "dc42c3964490f89f2b0aa83e7a123bc82d54fe16dda644ac0d3e1389fa3858d3",
+  "20ea05c94bb8f1c9646e90448380c4221b2c360b2f126e14b21c82a41a9abdbe",
+  "dec7ed6e59b06c8243a64fbd8d4cf0fe73dbcbd0826df41c443dc2d6cc36b0e3"
+ ],
+ "window_size": 256,
  "xtce": "ctim/ctim_xtce_v1.xml"
 }
