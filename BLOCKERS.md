@@ -29,8 +29,10 @@ nothing in reach uses.
    digest moved, the regeneration would have been wrong and the answer would have been to stop
    rather than to accept the new value.
 
-2. **Talk to `greglucas/space-data-toolkit`.** Section 7 of the specification suggests it,
-   and the benchmark it asked for now exists.
+2. **Talk to `greglucas/space-data-toolkit`.** Section 7 of the specification suggests it, and
+   the benchmark it asked for now exists. A draft of the message is in `OUTREACH.MD`, which is
+   deliberately not committed: it names a person, and a repository should not carry a draft
+   letter about someone. Sending it is a decision, not a task.
 
 ## Known divergences with no test behind them
 
