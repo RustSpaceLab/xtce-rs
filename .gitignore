@@ -7,3 +7,9 @@
 
 # maturin build output for the Python bindings
 /crates/xtce-py/target
+
+# Python bytecode cache. One of these was committed by accident with the bindings; it is
+# named after the exact interpreter and pytest version that produced it, so it is useless to
+# anyone else and churns on every run.
+__pycache__/
+*.py[cod]
