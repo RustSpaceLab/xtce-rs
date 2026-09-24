@@ -1,5 +1,6 @@
 //! `xtce info` — what a definition contains, and what this crate cannot decode in it.
 
+use std::fmt::Write as _;
 use std::time::Duration;
 
 use xtce_model::{ContainerId, EntryKind, MatchCriteria, SizeSpec, TypeKind, XtceDb};
@@ -8,8 +9,7 @@ pub fn report(db: &XtceDb, elapsed: Duration, verbose: bool) {
     let stats = db.stats();
     let source = db
         .source()
-        .map(|path| path.display().to_string())
-        .unwrap_or_else(|| "<memory>".to_owned());
+        .map_or_else(|| "<memory>".to_owned(), |path| path.display().to_string());
 
     println!("{source}");
     println!(
@@ -61,8 +61,7 @@ pub fn report(db: &XtceDb, elapsed: Duration, verbose: bool) {
     for (id, reason) in blocked.iter().take(if verbose { usize::MAX } else { 5 }) {
         let name = db
             .container(*id)
-            .map(|container| db.name(container.qualified_name))
-            .unwrap_or("?");
+            .map_or("?", |container| db.name(container.qualified_name));
         println!("    blocked: {name} — {reason}");
     }
     if !verbose && blocked.len() > 5 {
@@ -151,9 +150,10 @@ fn classify_containers(db: &XtceDb) -> (usize, Vec<(ContainerId, String)>) {
                         reason = Some(format!("entry list contains <{}>", db.name(element)));
                         break;
                     }
-                    // Bits the definition fixes. Nothing to decode and nothing that can
-                    // make a container undecodable.
-                    EntryKind::FixedValue { .. } => {}
+                    // Neither can block this container. A fixed value is bits the definition
+                    // itself supplies, and a referenced container is judged on its own
+                    // account when the outer loop reaches it.
+                    EntryKind::FixedValue { .. } | EntryKind::Container(_) => {}
                     EntryKind::Parameter(parameter) => {
                         let Some(ty) = db.type_of(parameter) else {
                             continue;
@@ -175,7 +175,6 @@ fn classify_containers(db: &XtceDb) -> (usize, Vec<(ContainerId, String)>) {
                             break;
                         }
                     }
-                    EntryKind::Container(_) => {}
                 }
             }
         }
@@ -228,8 +227,7 @@ fn print_containers(db: &XtceDb) {
                     let ty = db.type_of(parameter);
                     let bits = ty
                         .and_then(xtce_model::ParameterType::fixed_size_in_bits)
-                        .map(|bits| format!("{bits}b"))
-                        .unwrap_or_else(|| "var".to_owned());
+                        .map_or_else(|| "var".to_owned(), |bits| format!("{bits}b"));
                     println!(
                         "      {:<28} {:<16} {}",
                         db.name(param.name),
@@ -247,7 +245,11 @@ fn print_containers(db: &XtceDb) {
                     size_in_bits,
                 } => {
                     let bytes = db.fixed_value(value);
-                    let hex: String = bytes.iter().map(|byte| format!("{byte:02X}")).collect();
+                    let mut hex = String::with_capacity(bytes.len() * 2);
+                    for byte in bytes {
+                        // Writing to a String cannot fail; there is no error to handle.
+                        let _ = write!(hex, "{byte:02X}");
+                    }
                     let label = name.map_or_else(
                         || "<fixed value>".to_owned(),
                         |name| format!("<fixed {}>", db.name(name)),

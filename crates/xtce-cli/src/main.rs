@@ -1,5 +1,16 @@
 //! `xtce` — inspect and decode CCSDS telemetry defined by XTCE.
 
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![deny(clippy::todo, clippy::unimplemented)]
+#![warn(clippy::pedantic)]
+// Counts, durations and byte totals become f64 only to be printed as a rate or a size in
+// KiB. A definition with 2^53 parameters would have louder problems than a rounded average.
+#![allow(clippy::cast_precision_loss)]
+// The doc comments on `Command` are clap's `--help` text, not rustdoc. Backticks around a
+// container name would be shown to the reader literally, so they do not belong there.
+#![allow(clippy::doc_markdown)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -51,7 +62,8 @@ enum Command {
         #[arg(long)]
         limit: Option<usize>,
 
-        /// Show only these parameters. Repeatable.
+        /// Show only these parameters. Repeatable. A * matches any run of characters, and a
+        /// value matching nothing in the definition is an error.
         #[arg(long = "param")]
         params: Vec<String>,
 
@@ -172,7 +184,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         Command::Bench { file, iterations } => {
-            let bytes = std::fs::metadata(&file).map(|meta| meta.len()).unwrap_or(0);
+            let bytes = std::fs::metadata(&file).map_or(0, |meta| meta.len());
             let mut timings = Vec::with_capacity(iterations as usize);
             let mut last = None;
             for _ in 0..iterations.max(1) {
