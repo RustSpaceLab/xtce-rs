@@ -60,6 +60,39 @@ from space_packet_parser.xtce import definitions
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TESTDATA = REPO_ROOT / "testdata" / "spp"
 
+#: The commit the goldens were produced from, recorded in `testdata/SOURCES.md`.
+PINNED_COMMIT = "6de220ff25e75d0a8b6258086f9d99ce9eae820b"
+
+
+def require_pinned_reference() -> None:
+    """Refuse to overwrite the goldens with output from the wrong reference.
+
+    `space_packet_parser==6.1.2` is a real PyPI release and is *not* the pinned commit: the
+    commit reads a `<UnitSet>` holding several `<Unit>` elements as a tuple of units, where
+    the release raises `NotImplementedError` on the second. Both report version 6.1.2, so
+    the version string cannot tell them apart and a golden regenerated against the release
+    would simply differ, with nothing in the file to say why.
+
+    So check for the change itself rather than for a version. This is a heuristic — a later
+    commit could rewrite `get_units` again — but it separates the two things that exist
+    today, which is the confusion that can actually happen.
+    """
+    import inspect
+
+    from space_packet_parser.xtce import parameter_types
+
+    source = inspect.getsource(parameter_types.ParameterType.get_units)
+    if "local-name()" not in source:
+        raise SystemExit(
+            "refusing to regenerate: the installed space_packet_parser is not the pinned "
+            f"commit {PINNED_COMMIT}.\n"
+            "The PyPI release reports the same version (6.1.2) but is different code, and "
+            "the goldens would change for that reason alone.\n"
+            "Install the pin:\n"
+            "    pip install 'space_packet_parser @ "
+            f"git+https://github.com/lasp/space_packet_parser@{PINNED_COMMIT}'"
+        )
+
 #: Marker recorded for a packet the reference itself refuses to decode.
 UNRECOGNIZED = "__unrecognized__"
 
@@ -296,6 +329,9 @@ def main() -> int:
     ap.add_argument("--detail", type=int, default=64, help="packets stored in full detail")
     ap.add_argument("--only", action="append", help="restrict to named case(s)")
     args = ap.parse_args()
+
+    # Before anything is written, not after: this script overwrites the ground truth.
+    require_pinned_reference()
 
     args.out.mkdir(parents=True, exist_ok=True)
     selected = [c for c in CASES if not args.only or c.name in args.only]

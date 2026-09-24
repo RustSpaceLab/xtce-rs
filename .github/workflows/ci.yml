@@ -70,8 +70,14 @@ jobs:
           python-version: "3.12"
       - uses: Swatinem/rust-cache@v2
 
+      # The reference comes from the pinned commit, not from PyPI. `space_packet_parser==6.1.2`
+      # installs and reports the same version but is not the same code — see
+      # `testdata/SOURCES.md`. Installing the release here would compare the bindings against
+      # something other than what produced the goldens, with the version strings agreeing.
       - name: Install build and test tools
-        run: pip install maturin pytest space_packet_parser==6.1.2
+        run: |
+          pip install maturin pytest \
+            'space_packet_parser @ git+https://github.com/lasp/space_packet_parser@6de220ff25e75d0a8b6258086f9d99ce9eae820b'
 
       # `maturin develop` needs an activated virtualenv, which a runner does not have.
       # Building a wheel and installing it is what maturin itself suggests instead, and it

@@ -5,10 +5,13 @@ diff`. This checks the *binding*: that nothing is lost or reshaped on the way ac
 boundary. It is a separate question, and a binding that quietly turned an unsigned 64-bit
 value into a float would pass every Rust test in the project.
 
-Run with the reference installed:
+Run with the reference installed. It has to come from the pinned commit rather than from
+PyPI: `space_packet_parser==6.1.2` installs and reports the same version but is not the same
+code, and `testdata/SOURCES.md` says what differs.
 
     python3.12 -m venv .venv
-    .venv/bin/pip install space_packet_parser maturin pytest
+    .venv/bin/pip install maturin pytest \\
+      'space_packet_parser @ git+https://github.com/lasp/space_packet_parser@6de220ff25e75d0a8b6258086f9d99ce9eae820b'
     .venv/bin/maturin develop --release --manifest-path crates/xtce-py/Cargo.toml
     .venv/bin/pytest crates/xtce-py/tests
 """

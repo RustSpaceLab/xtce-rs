@@ -10,7 +10,7 @@ whole point — a hand-rolled XTCE fixture would only test the assumptions of wh
 |---|---|
 | Project | [`lasp/space_packet_parser`](https://github.com/lasp/space_packet_parser) |
 | Commit | `6de220ff25e75d0a8b6258086f9d99ce9eae820b` (2026-08-07) |
-| Version | 6.1.2 |
+| Version | 6.1.2 — the commit's own string, which the 6.1.2 *release* also reports; see below |
 | Path | `tests/test_data/` |
 | Licence | BSD 3-Clause, © 2023 University of Colorado — see `testdata/spp/LICENSE.txt` |
 
@@ -87,9 +87,19 @@ reference, and are committed so that CI needs no Python interpreter. Each file h
 Regenerate with:
 
 ```console
-$ python3.12 -m venv .venv && .venv/bin/pip install space_packet_parser==6.1.2
+$ python3.12 -m venv .venv
+$ .venv/bin/pip install \
+    'space_packet_parser @ git+https://github.com/lasp/space_packet_parser@6de220ff25e75d0a8b6258086f9d99ce9eae820b'
 $ .venv/bin/python tools/gen_goldens.py
 ```
+
+Install from the commit, not from PyPI. `pip install space_packet_parser==6.1.2` succeeds — 6.1.2
+is a real release — but it is **not** this commit. The commit is ahead of the tag: it reads a
+`<UnitSet>` holding several `<Unit>` elements as a tuple of units, where the released 6.1.2 raises
+`NotImplementedError` on the second one. Both call themselves 6.1.2, so `pip show` cannot tell them
+apart, and a golden regenerated against the release would differ with nothing to say why. No
+definition under `testdata/` uses compound units today, so the two agree on everything here — that
+is luck, and the next definition added is under no obligation to preserve it.
 
 Values are encoded losslessly: integers as JSON numbers, floats as `{"f": "<float.hex()>"}`
 so the IEEE-754 bit pattern round-trips exactly, and bytes as `{"b": "<hex>"}`.
