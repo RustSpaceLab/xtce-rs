@@ -245,6 +245,106 @@ blocking jobs are unchanged.
 
 M0 through M7. `BLOCKERS.md` says where a next session should start.
 
+## 2026-09-01 — a mistyped `--param`, and a pinned commit that is not the release
+
+### The failure that looked like a success
+
+`xtce decode --param ADGPSPOZX` printed every packet header, no values at all, and exited 0.
+That is the same output a definition gives when it genuinely never carries the parameter, so
+there was nothing to tell a typo from a fact about the data. On CTIM, which describes 9493
+parameters, the odds of spotting it by eye are not good.
+
+`--param` is now checked against the definition before the stream is opened, and a value that
+selects nothing is an error naming the nearest parameter:
+
+```
+error: 1 of 1 --param value(s) match no parameter in this definition, which describes 9493:
+  ana_proc_tmep  — did you mean ana_proc_temp?
+```
+
+Wrong case is tried first and separately, because XTCE names are case-sensitive and
+`SHCoarse` for `SHCOARSE` is a different mistake from a slipped key. After that it is optimal
+string alignment rather than plain Levenshtein: a transposition costs one edit, not two, which
+is what lets `UESC` still reach `USEC` on a four-character name where the budget is one.
+
+Every unmatched value is reported at once. Failing on the first would make the second run
+teach you about the second typo.
+
+### `*`, and the two ends that must not overlap
+
+A value may now contain `*`, standing for any run of characters, so `--param 'ADGPSPOS*'`
+takes the three position components. The matcher strips the prefix, walks the middle segments
+left to right consuming what each one matched, and ends with `ends_with` on the suffix.
+
+Leftmost is the right choice for the middles — it leaves the most room for what follows — and
+consuming the match is what stops `AD*S*S*S*X` from finding one `S` three times.
+
+An earlier version guarded the suffix with `rest.len() >= suffix.len() && rest.ends_with(..)`,
+with a comment claiming the length test was what kept the two ends from claiming the same
+characters. Mutation testing removed the guard and every test still passed, which is how the
+comment was found to be wrong: `ends_with` is already length-safe, and what actually separates
+the ends is that the prefix is stripped out of `rest` before the suffix is looked for. The
+guard was dead code and the comment was a plausible story about it.
+
+### The first tests in `xtce-cli`
+
+The crate had none. There are now 16, and the behaviour they pin was checked with seven
+mutations — the middle segment not advancing, the middles skipped, a starless pattern
+matching any prefix, the suffix ignored, matching turned case-insensitive, `check_only`
+always succeeding, a transposition charged two edits. All seven were caught.
+
+`xtce-cli` was also the only crate anyone writes by hand that carried no lint attributes:
+`xtce-model`, `xtce-decode`, `xtce-codegen` and `xtce-py` each deny `unwrap_used`,
+`expect_used` and `panic` and warn on `clippy::pedantic`, and the binary warned on nothing.
+It now carries the same set. Eleven warnings fell out, all mechanical, and `xtce info
+--verbose` over all 19 bundled definitions is unchanged afterwards — identical once the
+`loaded in … ms` lines, which are a timing and never reproduce, are filtered out. Two of the
+allowances are deliberate: `cast_precision_loss`, because the casts
+exist to print a rate, and `doc_markdown`, because the doc comments on `Command` are clap's
+`--help` text and backticks around a container name would be shown to the reader literally.
+
+### The reference was pinned to a commit, and the docs said to install the release
+
+`README.md` and `testdata/SOURCES.md` both said `pip install space_packet_parser==6.1.2`.
+That command works — 6.1.2 is a real PyPI release — and installs code that is **not** the
+commit this project pins, `6de220ff25e75d0a8b6258086f9d99ce9eae820b`. The commit is ahead of
+the tag in `xtce/parameter_types.py`: it reads a `<UnitSet>` holding several `<Unit>`
+elements as a tuple of units, where the release raises `NotImplementedError` on the second.
+
+Both call themselves 6.1.2, so `pip show` cannot tell them apart. A golden regenerated
+against the release would simply differ, with the version string agreeing and nothing to say
+why.
+
+Two places did more than say it. `.github/workflows/ci.yml` installed the release in the
+advisory Python job — so the binding comparison that CI actually runs was against something
+other than what produced the goldens — and the docstring of
+`crates/xtce-py/tests/test_against_reference.py` gave an install line with no pin at all. All
+four now install from the commit, and `SOURCES.md` records what differs. Its `Version` row
+used to read a bare `6.1.2`, which was the trap stated as a fact; it now says whose 6.1.2.
+
+`tools/gen_goldens.py` no longer takes this on trust. Before it writes anything it checks
+that `ParameterType.get_units` contains the commit's `local-name()` xpath, and refuses with
+the correct `pip install` line otherwise. Verified both ways: it passes against the pinned
+commit and exits 1 against a venv holding the PyPI 6.1.2. The check is a heuristic — a later
+commit could rewrite that method again — but it separates the two things that exist today,
+and a version string cannot.
+
+`xtce-rs-spec.md` also says `pip install space_packet_parser`, unpinned. That file is the
+original specification, written before any of this existed; it is left as written, because it
+records what was asked for rather than what is true now.
+
+No definition under `testdata/` uses compound units — 19 files scanned, none with more than
+one `<Unit>` in a `<UnitSet>` — so the two versions agree on every golden here. That is luck,
+not a property, and the next definition added is under no obligation to preserve it.
+
+### One thing found while cleaning up
+
+`crates/xtce-py/tests/__pycache__/test_against_reference.cpython-312-pytest-9.1.1.pyc` has
+been tracked since e8f4efa, the commit that added the bindings. `.gitignore` had `/.venv` but
+nothing for bytecode. The file is named after the exact interpreter and pytest version that
+produced it, so it means nothing to anyone else and would churn on every run. Untracked, and
+`__pycache__/` and `*.py[cod]` added.
+
 ## 2026-08-23 — CommandMetaData, the section that was thrown away
 
 The other half of XTCE. `<CommandMetaData>` is where telecommands are defined, and this crate

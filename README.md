@@ -179,16 +179,33 @@ $ cargo run --release -p xtce-cli -- decode \
 reports packets with bits no entry claimed — on CTIM that is 105 of 1499, which says the
 definition does not describe the whole packet.
 
+`--param` narrows the output to the parameters you name, and `*` in a value stands for any
+run of characters, so `--param 'ADGPSPOS*'` selects the three position components. A value
+that matches nothing in the definition is an error rather than an empty report, and the
+message names the closest parameter:
+
+```console
+$ ... decode ctim_xtce_v1.xml ccsds_2021_155_14_39_51 --root CCSDSTelemetryPacket \
+      --param ana_proc_tmep
+error: 1 of 1 --param value(s) match no parameter in this definition, which describes 9493:
+  ana_proc_tmep  — did you mean ana_proc_temp?
+```
+
 ### Python bindings
 
 These do need a Python toolchain:
 
 ```console
 $ python3.12 -m venv .venv
-$ .venv/bin/pip install maturin pytest space_packet_parser==6.1.2
+$ .venv/bin/pip install maturin pytest \
+    'space_packet_parser @ git+https://github.com/lasp/space_packet_parser@6de220ff25e75d0a8b6258086f9d99ce9eae820b'
 $ .venv/bin/maturin develop --release --manifest-path crates/xtce-py/Cargo.toml
 $ .venv/bin/pytest crates/xtce-py/tests -q
 ```
+
+The reference comes from that commit rather than from PyPI. `space_packet_parser==6.1.2` installs
+and reports the same version, but is *not* the same code — see `testdata/SOURCES.md` for what
+differs and why it matters to the goldens.
 
 ### Regenerating the golden files
 
