@@ -350,11 +350,6 @@ impl GuardTest {
 /// operator is therefore meaningful and every one is resolvable here: the enumeration is a
 /// finite list, so the answer for each entry is known when the code is generated, and what is
 /// left for run time is a membership test over the raw values.
-///
-/// Adjacent ranges are merged where the `<EnumerationList>` is in ascending order, which it
-/// almost always is, so an enumeration whose labels all satisfy the comparison becomes one
-/// range rather than two hundred. Out of order it simply does not merge: the set is the same
-/// either way, only longer to write.
 fn labels_satisfying(
     entries: &[(i128, i128, String)],
     operator: CompareOp,
@@ -487,10 +482,6 @@ struct Builder<'db> {
 const MAX_DEPTH: usize = 64;
 
 /// How far into the packet the layout has reached, while it is still knowable.
-///
-/// Becomes `None` the moment a field's width comes from the data: from there on the offsets
-/// are whatever the packet says, and the generated decoder has to carry a cursor.
-/// `bytes` as exactly `bit_width.div_ceil(8)` bytes, right-aligned, leading bits cleared.
 ///
 /// XTCE gives a fixed value as `hexBinary` and its width separately, and does not require the
 /// two to agree. Reading the bytes as one big-endian unsigned number and keeping the low

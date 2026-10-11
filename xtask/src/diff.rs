@@ -604,7 +604,6 @@ mod tests {
         assert_eq!(windows.first_difference(&expected(1000, 256, None)), None);
     }
 
-    /// The window is reported as the packets it covers, not as its index.
     #[test]
     fn a_differing_window_is_reported_as_a_packet_range() {
         let windows = observed(1000, 256);
@@ -617,8 +616,6 @@ mod tests {
     /// The last window is short unless the stream divides evenly, and still has to be checked.
     ///
     /// Without finishing it, a divergence in the final packets would be the one case the
-    /// windows could not localise — and a stream whose length is a multiple of the window is
-    /// the exception rather than the rule.
     #[test]
     fn the_short_final_window_is_compared_too() {
         let windows = observed(700, 256);
@@ -628,7 +625,6 @@ mod tests {
         assert_eq!(windows.first_difference(&theirs), Some((512, 767)));
     }
 
-    /// A stream of a different length differs at the first window one side does not have.
     #[test]
     fn a_shorter_stream_differs_at_the_window_it_runs_out_on() {
         let windows = observed(512, 256);
@@ -638,7 +634,6 @@ mod tests {
         );
     }
 
-    /// A golden written before window digests existed localises nothing, and says nothing.
     #[test]
     fn a_golden_without_windows_reports_none() {
         let windows = observed(1000, 0);

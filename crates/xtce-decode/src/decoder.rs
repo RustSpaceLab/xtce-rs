@@ -913,15 +913,6 @@ impl<'db> Decoder<'db> {
 }
 
 /// The largest number of entries any single decode path from `root` can visit.
-///
-/// A decode walks from the root down one chain of inheritors, decoding each container's own
-/// entry list and expanding any `<ContainerRefEntry>` inline. This is the deepest such walk,
-/// used to size a packet's storage once instead of regrowing it.
-///
-/// Container expansion is memoised, which is what actually bounds the work: the depth limit
-/// alone would not: a chain of forty containers each referencing the next twice is 2^40
-/// calls before the cap ever fires. Decoding has the same shape but is braked by running out
-/// of packet; this runs at construction time with no such brake.
 fn longest_path_entries(db: &XtceDb, root: ContainerId) -> usize {
     let mut expanded: Vec<Option<usize>> = vec![None; db.containers().len()];
     let mut deepest: Vec<Option<usize>> = vec![None; db.containers().len()];

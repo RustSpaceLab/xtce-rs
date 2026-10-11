@@ -87,8 +87,6 @@ fn one_dimension_expands_in_order() {
 /// Two dimensions, with **different** extents.
 ///
 /// The extents differ on purpose. With a square array a transposed expansion produces the
-/// same number of fields covering the same bits, and every test passes; 2 by 3 is the
-/// smallest shape where row-major and column-major disagree about which name sits where.
 #[test]
 fn two_dimensions_expand_with_the_last_varying_fastest() {
     let xml = definition(
@@ -117,8 +115,6 @@ fn two_dimensions_expand_with_the_last_varying_fastest() {
 /// A `<DimensionList>` on the *entry* subsets the array, and keeps the array's own indices.
 ///
 /// XTCE: "Only used for subsetting an array. The array's maximum dimension sizes are set in
-/// the type." Renumbering the subset from zero would make its fields impossible to line up
-/// with the same array read whole.
 #[test]
 fn a_subset_keeps_the_indices_it_covers() {
     let xml = definition(
@@ -135,7 +131,6 @@ fn a_subset_keeps_the_indices_it_covers() {
     assert_eq!(expanded(&xml), ["ARR[2]", "ARR[3]", "ARR[4]"]);
 }
 
-/// A subset that runs past the type's declared size is a definition error.
 #[test]
 fn a_subset_outside_the_declared_dimensions_is_refused() {
     let xml = definition(
@@ -158,7 +153,6 @@ fn a_subset_outside_the_declared_dimensions_is_refused() {
     );
 }
 
-/// An index the packet supplies cannot be expanded when the file is loaded.
 #[test]
 fn a_dimension_read_from_the_packet_is_not_expanded() {
     let xml = definition(
@@ -185,8 +179,6 @@ fn a_dimension_read_from_the_packet_is_not_expanded() {
 /// The synthetic parameters are not visible to a `parameterRef`.
 ///
 /// They live in the arena so that entries can point at them, but not in the index that
-/// `<Comparison parameterRef=…>`, `DynamicValue` and context calibrators search. A synthetic
-/// `ARR[0]` there could shadow a real parameter of that name, and nothing would say so.
 #[test]
 fn synthetic_elements_cannot_be_referenced_by_name() {
     let xml = definition(
@@ -225,8 +217,6 @@ fn synthetic_elements_cannot_be_referenced_by_name() {
 /// The expansion has a ceiling, and the refusal names it and the entry.
 ///
 /// It does not name the total. Counting the leaves of an arbitrary nesting first would mean a
-/// second traversal that has to agree with the one that builds them, and the pair drifting
-/// apart is a worse failure than a message that says "more than this".
 #[test]
 fn an_array_larger_than_the_ceiling_is_refused() {
     let xml = definition(
@@ -251,7 +241,6 @@ fn an_array_larger_than_the_ceiling_is_refused() {
     );
 }
 
-/// An aggregate becomes its members, in order, under the dot syntax.
 #[test]
 fn an_aggregate_expands_into_its_members() {
     let xml = definition(
@@ -273,8 +262,6 @@ fn an_aggregate_expands_into_its_members() {
 /// An array of aggregates, and an aggregate holding an array, both compose.
 ///
 /// The two nest in either direction, and the name spells the path either way. Three members
-/// and two elements rather than two and two: the counts differ so that a mix-up between the
-/// axis and the member list cannot produce the same list.
 #[test]
 fn arrays_and_aggregates_nest_in_both_directions() {
     let outer_array = definition(
@@ -328,7 +315,6 @@ fn arrays_and_aggregates_nest_in_both_directions() {
 /// A type that contains itself cannot be expanded, and says so rather than not returning.
 ///
 /// XTCE forbids it — `MemberType`: "Circular references are not allowed" — but a file can
-/// still say it, and following it would recurse until the stack ran out.
 #[test]
 fn a_type_that_contains_itself_is_refused() {
     let xml = definition(
@@ -348,7 +334,6 @@ fn a_type_that_contains_itself_is_refused() {
     );
 }
 
-/// An aggregate with no members has nothing to place, which is a definition error.
 #[test]
 fn an_aggregate_with_no_members_is_reported() {
     let xml = definition(
@@ -367,8 +352,6 @@ fn an_aggregate_with_no_members_is_reported() {
 
 /// The ceiling counts leaves, not one array's elements.
 ///
-/// An aggregate of arrays of aggregates reaches large numbers without any single dimension
-/// looking unreasonable, which is why the limit is where it is.
 #[test]
 fn the_ceiling_counts_leaves_across_the_whole_nesting() {
     let xml = definition(

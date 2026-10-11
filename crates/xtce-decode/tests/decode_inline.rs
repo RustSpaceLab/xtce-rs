@@ -698,8 +698,6 @@ fn namespace_spelling_does_not_change_the_result() {
 /// Every reference shape XTCE allows, across nested space systems.
 ///
 /// All ten bundled test files have exactly one `SpaceSystem`, so nothing in `testdata`
-/// reaches path resolution, ancestor search, or `.`/`..` segments. This is the only coverage
-/// those paths have.
 #[test]
 fn references_resolve_across_nested_space_systems() {
     let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -840,8 +838,6 @@ fn an_unresolvable_reference_names_itself() {
 ///
 /// The reference raises when a definition says otherwise, and raises at *load*, so a file
 /// like this one does not open in Python at all. Here it opens — loading always succeeds, and
-/// only decoding reports what it cannot do — but the parameter reports rather than decoding
-/// the low 32 bits of a 48-bit field, which is a number nothing else would ever produce.
 #[test]
 fn a_mil_std_1750a_float_that_is_not_32_bits_is_refused() {
     let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -944,8 +940,6 @@ const COMMANDS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 /// A telecommand decodes with the machinery telemetry uses, because it is a container.
 ///
 /// Nothing in the decoder knows what a command is. The root is named rather than defaulted —
-/// see below — and from there the argument assignment selects the specialisation exactly as
-/// a `<RestrictionCriteria>` would.
 #[test]
 fn a_telecommand_decodes_like_any_other_container() {
     let db = load(COMMANDS);
@@ -978,7 +972,6 @@ fn a_telecommand_decodes_like_any_other_container() {
     );
 }
 
-/// An opcode the assignment does not match stops at the abstract base, and is refused.
 #[test]
 fn a_telecommand_whose_assignment_does_not_hold_is_not_that_command() {
     let db = load(COMMANDS);
@@ -997,8 +990,6 @@ fn a_telecommand_whose_assignment_does_not_hold_is_not_that_command() {
 /// Adding a command half does not take the default root away from the telemetry.
 ///
 /// A command container with no `<BaseContainer>` is a root of the command tree, so counting
-/// it among the candidates would leave a definition that used to have exactly one root with
-/// two, and `Decoder::new` would stop working on a file whose telemetry had not changed.
 #[test]
 fn the_default_root_ignores_command_containers() {
     let db = load(COMMANDS);

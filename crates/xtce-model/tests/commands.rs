@@ -138,8 +138,6 @@ fn a_command_becomes_a_container_and_its_arguments_become_parameters() {
 ///
 /// Both halves of this definition declare a `MODE`. They are different things — one is
 /// reported by the spacecraft, the other is supplied by whoever sends the command — and the
-/// index that `<Comparison parameterRef="MODE">` searches has to keep pointing at the
-/// telemetry one.
 #[test]
 fn an_argument_does_not_shadow_a_parameter_of_the_same_name() {
     let db = load(INHERITED);
@@ -162,8 +160,6 @@ fn an_argument_does_not_shadow_a_parameter_of_the_same_name() {
 /// An argument assignment becomes a restriction criterion on the command's container.
 ///
 /// It is the same statement read two ways: assigning `OPCODE = 7` is what makes this command
-/// a specialisation of `Base`, and comparing `OPCODE == 7` is what recognises an arriving
-/// packet as this command rather than as a sibling.
 #[test]
 fn an_argument_assignment_becomes_a_restriction_criterion() {
     let db = load(INHERITED);
@@ -198,7 +194,6 @@ fn an_argument_assignment_becomes_a_restriction_criterion() {
     );
 }
 
-/// A `<FixedValueEntry>` keeps its bytes and its width, and carries no parameter.
 #[test]
 fn a_fixed_value_entry_keeps_its_bytes() {
     let db = load(INHERITED);
@@ -223,8 +218,6 @@ fn a_fixed_value_entry_keeps_its_bytes() {
 /// Two commands may give their containers the same name, and both must load.
 ///
 /// The schema's uniqueness key for container names covers `ContainerSet` and
-/// `CommandContainerSet` but not a MetaCommand's own `<CommandContainer>`, which it calls
-/// private. Rejecting this file would reject one the schema allows.
 #[test]
 fn two_commands_may_name_their_containers_the_same() {
     let db = load(
@@ -272,7 +265,6 @@ fn two_commands_may_name_their_containers_the_same() {
     }
 }
 
-/// An `argumentRef` naming nothing the command can see is a load failure, not a guess.
 #[test]
 fn an_unknown_argument_reference_is_refused() {
     let error = refusal(
@@ -297,8 +289,6 @@ fn an_unknown_argument_reference_is_refused() {
 /// An `argumentRef` cannot reach a *telemetry* parameter of the same name.
 ///
 /// "There is no path, this is a local reference." A command whose entry list names `MODE`
-/// without declaring a `MODE` argument is missing an argument, not silently packing the
-/// spacecraft's telemetry parameter.
 #[test]
 fn an_argument_reference_does_not_fall_back_to_a_parameter() {
     let error = refusal(
@@ -324,8 +314,6 @@ fn an_argument_reference_does_not_fall_back_to_a_parameter() {
 ///
 /// "Arguments are user provided to the specific command definition. Parameters are
 /// provided/calculated/determined by the software creating the command instance." A sequence
-/// count the ground fills in is a parameter, and `<ParameterRefEntry>` is how a command names
-/// one.
 #[test]
 fn a_command_container_may_reference_a_parameter() {
     let db = load(
@@ -356,7 +344,6 @@ fn a_command_container_may_reference_a_parameter() {
     );
 }
 
-/// Command inheritance that loops is refused at load, not followed.
 #[test]
 fn a_cycle_in_command_inheritance_is_refused() {
     let error = refusal(
@@ -375,7 +362,6 @@ fn a_cycle_in_command_inheritance_is_refused() {
     );
 }
 
-/// `CommandMetaData` is no longer reported as a section this crate skipped.
 #[test]
 fn the_command_section_is_no_longer_skipped() {
     let db = load(INHERITED);
@@ -389,7 +375,6 @@ fn the_command_section_is_no_longer_skipped() {
     assert_eq!(db.stats().meta_commands, 2);
 }
 
-/// A definition with no command half has no commands, and nothing else changes.
 #[test]
 fn a_definition_with_no_commands_is_unaffected() {
     let db = XtceDb::from_xml(
@@ -418,8 +403,6 @@ fn a_definition_with_no_commands_is_unaffected() {
 /// `abstract` on a `MetaCommand` means it is "not instantiated, rather only used as bases to
 /// inherit from to create specialized command definitions". No packet is one, so its
 /// container can never be a packet's final match either. That is what `abstract` means on a
-/// container, said one level up — and without carrying it down, a packet that matched no
-/// specialisation would decode as the base rather than being refused.
 #[test]
 fn a_container_packing_an_abstract_command_is_abstract() {
     let db = load(INHERITED);
@@ -438,7 +421,6 @@ fn a_container_packing_an_abstract_command_is_abstract() {
     );
 }
 
-/// The container a command packs knows which command that is; a telemetry container does not.
 #[test]
 fn a_command_container_points_back_at_its_command() {
     let db = load(INHERITED);
@@ -461,8 +443,6 @@ fn a_command_container_points_back_at_its_command() {
 /// The schema keys these in two overlapping ways. One key covers `TelemetryMetaData`'s and
 /// `CommandMetaData`'s `<ParameterTypeSet>`s; another covers `CommandMetaData`'s
 /// `<ArgumentTypeSet>` and its `<ParameterTypeSet>`. An argument type and a *telemetry*
-/// parameter type are in no key together — so `U8` may be both, meaning two different things,
-/// and a loader that shared one index would reject a file the schema allows.
 #[test]
 fn an_argument_type_may_share_a_name_with_a_parameter_type() {
     let db = load(
@@ -497,7 +477,6 @@ fn an_argument_type_may_share_a_name_with_a_parameter_type() {
     );
 }
 
-/// Two argument types of the same name are still a duplicate, as the schema requires.
 #[test]
 fn two_argument_types_of_the_same_name_are_refused() {
     let error = refusal(
@@ -559,8 +538,6 @@ fn a_command_parameter_type_is_reachable_from_both_kinds_of_reference() {
 ///
 /// The effective argument scope is built root-first over the whole chain, so a command sees
 /// every argument its ancestors declare. Two levels is where a one-level shortcut would still
-/// pass, so this goes three deep: `Leaf` pins an argument that `Root` declares and `Middle`
-/// never mentions.
 #[test]
 fn an_assignment_reaches_an_argument_two_levels_up() {
     let db = load(
@@ -623,8 +600,6 @@ fn an_assignment_reaches_an_argument_two_levels_up() {
 /// A container in a `<CommandContainerSet>` is shared, and belongs to no single command.
 ///
 /// The schema puts them there so that MetaCommand definitions can "reference/share" them, and
-/// keys their names at the system level like a telemetry container's. So they register like
-/// one — and, unlike a command's own private container, they carry no back-link to a command.
 #[test]
 fn a_shared_command_container_belongs_to_no_command() {
     let db = load(
@@ -684,8 +659,6 @@ fn a_shared_command_container_belongs_to_no_command() {
 /// The awkward one. A `<CommandContainerSet>` container that is neither abstract nor derived
 /// looks exactly like a telemetry root: no `<BaseContainer>`, a name keyed at the system
 /// level, entries like any other. Counting it would leave a definition that had one root with
-/// two, and `Decoder::new` would stop working on a file whose telemetry had not changed —
-/// the same failure a command's own container would have caused, one level further out.
 #[test]
 fn a_shared_command_container_does_not_steal_the_default_root() {
     let db = load(

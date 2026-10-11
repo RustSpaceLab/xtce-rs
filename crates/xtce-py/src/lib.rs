@@ -184,13 +184,6 @@ impl Definition {
     }
 
     /// Decodes every CCSDS packet in `data`.
-    ///
-    /// Returns one dictionary per packet, mapping parameter name to value. The Rust decoding
-    /// runs with the GIL released.
-    ///
-    /// `raw=True` returns the values as encoded in the packet rather than after calibration
-    /// and enumeration lookup. `skip_unrecognized=True` drops packets whose type the
-    /// definition does not describe instead of raising.
     #[pyo3(signature = (data, *, skip_header_bytes = 0, root = None, raw = false, skip_unrecognized = false))]
     fn decode_stream(
         &self,

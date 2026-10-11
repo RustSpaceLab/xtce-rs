@@ -449,12 +449,6 @@ fn byte_slice(field: &Field, packet: &Ident) -> TokenStream {
 }
 
 /// The body of a container's `decode`.
-///
-/// Two shapes. When every width is fixed, the packet is narrowed to an array once and each
-/// field is a literal offset into it — no cursor exists at run time. When one field takes its
-/// width from the packet, everything before it still reads that way, and only the tail is
-/// walked with a cursor. The split is the honest one: the offsets after a data-dependent
-/// width are a property of the data, not of this generator.
 fn decode_body(plan: &ContainerPlan) -> TokenStream {
     let packet = ident("packet");
     let prefix_bits = if plan.is_dynamic() {
@@ -735,8 +729,6 @@ fn accessor(field: &Field) -> Option<TokenStream> {
 /// two are compared field by field on every packet of the differential suite. Floating-point
 /// addition is neither associative nor commutative, so "the same arithmetic in a different
 /// order" is a different answer, and a calibrator is where that is easiest to get wrong.
-///
-/// Two things carry that:
 ///
 /// * **Terms are summed in document order**, not by Horner's method and not sorted.
 /// * **The integer and float paths are separate.** For an integral raw the power is computed
@@ -1093,9 +1085,6 @@ const fn mask_for(width: u32) -> u64 {
 
 /// The expression that extracts `width` bits at `offset` as a `u64`.
 ///
-/// The byte span, shift and mask are all decided here, so the emitted code is a load, a
-/// shift and an `and` — no loop, no cursor, no branch.
-///
 /// The load uses the narrowest integer that spans the field rather than always padding to
 /// eight bytes. That is not cosmetic: a 1.6 MB mission database has nine thousand fields, and
 /// padding every one of them to an eight-element array literal turned the generated file into
@@ -1105,11 +1094,6 @@ const fn mask_for(width: u32) -> u64 {
 /// beyond the packet for a field that ends at its final byte, which on a fixed-size array is
 /// a compile error rather than something to discover later.
 /// A generated expression, and whether embedding it needs parentheses.
-///
-/// Rust binds `as` and `<<` tighter than `&`, so splicing `a & b` into `#expr as u32` would
-/// silently produce `a & (b as u32)`. Tracking atomicity means the parentheses go in exactly
-/// where they are needed — adding them everywhere would trip `unused_parens`, which a file
-/// meant for `include!` cannot switch off.
 #[derive(Clone)]
 struct Expr {
     tokens: TokenStream,
@@ -1832,9 +1816,6 @@ fn swap_helper() -> TokenStream {
 /// exponent in the bottom, neither biased, no implicit leading one, no infinities and no
 /// NaN. Line for line what `xtce_decode::decoder::mil_std_1750a` computes, which in turn is
 /// what the reference computes: `mantissa * 2 ** (exponent - 23)`.
-///
-/// Both fields are masked before the sign extension, so the shifts below have nothing above
-/// their width to discard and the masking and unmasked forms coincide.
 fn mil_helper() -> TokenStream {
     quote! {
         fn mil_std_1750a(bits: u64) -> f64 {
@@ -1877,13 +1858,6 @@ fn powi_helper() -> TokenStream {
 }
 
 /// Spline interpolation, line for line as `xtce_decode::calibrate::interpolate` does it.
-///
-/// The order and the extrapolation flag are passed in rather than specialised away, so that
-/// the two implementations can be read side by side; both are constants at every call site,
-/// so nothing survives optimisation.
-///
-/// Orders above one and an empty point list are refused when the code is generated, which is
-/// why the only failure left here is a query outside the points.
 fn spline_helpers() -> TokenStream {
     quote! {
         fn spline_line(x: f64, x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
