@@ -33,17 +33,18 @@ the oracle — as it is for arrays and aggregates.
 #### Correctness
 
 Correctness is defined as agreement with the reference, not as passing tests written
-alongside the code. `testdata/golden/` holds the reference's output for six real
-definition/packet pairs, and `cargo xtask diff` re-derives all of it:
+alongside the code. `testdata/golden/` holds the reference's output for nine
+definition/packet pairs — six of them real mission streams — and `cargo xtask diff`
+re-derives all of it:
 
 * every raw and engineering value of the first 64 packets, compared field by field;
-* a SHA-256 over a canonical encoding of **all** ~17 000 packets, so a divergence past the
+* a SHA-256 over a canonical encoding of **all** 19 025 packets, so a divergence past the
   detail window cannot hide — and one per 256 packets besides, so it cannot hide *where* it is
   either;
 * one case is a definition pointed at a stream it does not describe, so the "both refuse this
   packet" half of the contract is tested too.
 
-All six agree.
+All nine agree.
 
 #### Speed
 
@@ -69,7 +70,7 @@ $ cargo run --release -p xtce-cli -- info testdata/spp/ctim/ctim_xtce_v1.xml
 $ cargo run --release -p xtce-cli -- decode \
       testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml \
       testdata/spp/jpss/J01_G011_LZ_2021-04-09T00-00-00Z_V01.DAT1 --limit 3 --raw
-$ cargo run --release -p xtce-cli -- codegen \\
+$ cargo run --release -p xtce-cli -- codegen \
       testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml
 $ cargo xtask diff
 $ cargo bench
@@ -101,30 +102,31 @@ committed under `testdata/golden/`.
 ### Everything, the short way
 
 ```console
-$ cargo test --workspace     # 149 tests
+$ cargo test --workspace     # 179 tests
 $ cargo xtask diff           # the differential suite, 9 definition/stream pairs
 ```
 
-`cargo xtask diff` is the one that matters. It decodes every packet of six real mission
-streams and checks the result against what `space_packet_parser` produced:
+`cargo xtask diff` is the one that matters. It decodes every packet of nine streams — six of
+them real mission downlinks — and checks the result against what `space_packet_parser`
+produced:
 
 ```
-ctim                             ok
-  1499 packets (0 not described)   load 8.7x   decode 4.9x   digest ok
+ctim                         ok
+  1499 packets (0 not described)   load 17.6x   decode 9.8x   digest ok
   105 packet(s) had bits no entry claimed (both implementations agree on the values)
 ...
-all 6 case(s) match the reference implementation
+all 9 case(s) match the reference implementation
 ```
 
 Two independent checks per case. Every raw and engineering value of the first 64 packets is
 compared field by field, so a failure names the packet, the parameter and both values. Then a
-SHA-256 over a canonical encoding of **all** ~17 000 packets is compared against the digest
+SHA-256 over a canonical encoding of **all** 19 025 packets is compared against the digest
 the reference produced — so a divergence past the detail window cannot hide. `digest ok` and a
 clean detail section together mean the two implementations agree on every packet.
 
 A digest alone says *whether*, not *where*. So the goldens carry one per 256 packets as well,
 and a mismatch reports the range it falls in and the command that widens the detail to reach
-it — turning "somewhere in seventeen thousand packets" into "somewhere in these 256".
+it — turning "somewhere in nineteen thousand packets" into "somewhere in these 256".
 
 The `load`/`decode` multipliers in that output include the harness's own bookkeeping. They are
 a floor, not a benchmark; use `cargo bench` for real numbers.
