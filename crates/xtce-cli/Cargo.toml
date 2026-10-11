@@ -1,6 +1,9 @@
 [package]
 name = "xtce-cli"
 description = "Command-line tools for inspecting and decoding CCSDS telemetry defined by XTCE"
+readme = "README.md"
+keywords = ["xtce", "ccsds", "telemetry", "spacecraft", "cli"]
+categories = ["aerospace::space-protocols", "command-line-utilities"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
