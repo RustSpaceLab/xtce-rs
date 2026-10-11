@@ -1,6 +1,9 @@
 [package]
 name = "xtce-decode"
 description = "Decode CCSDS telemetry packets against an XTCE definition"
+readme = "README.md"
+keywords = ["xtce", "ccsds", "telemetry", "spacecraft", "decoder"]
+categories = ["aerospace::space-protocols", "encoding"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

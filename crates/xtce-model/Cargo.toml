@@ -1,6 +1,9 @@
 [package]
 name = "xtce-model"
 description = "XTCE telemetry metadata: streaming XML parser and arena-backed intermediate representation"
+readme = "README.md"
+keywords = ["xtce", "ccsds", "telemetry", "spacecraft", "parser"]
+categories = ["aerospace::space-protocols", "parser-implementations"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

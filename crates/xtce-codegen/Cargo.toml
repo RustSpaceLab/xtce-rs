@@ -1,6 +1,9 @@
 [package]
 name = "xtce-codegen"
 description = "Compile an XTCE telemetry definition into a static Rust decoder"
+readme = "README.md"
+keywords = ["xtce", "ccsds", "telemetry", "codegen", "spacecraft"]
+categories = ["aerospace::space-protocols", "development-tools"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
