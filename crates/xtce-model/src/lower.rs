@@ -1342,6 +1342,19 @@ impl<'d> Lowering<'d> {
         parameters: &mut Vec<Parameter>,
         out: &mut Vec<Entry>,
     ) -> Result<(), XtceError> {
+        // Parsed before the match rather than after it, because the composite arm returns
+        // early: an array entry carrying either of these used to drop it on the way past.
+        let location = entry_location(element);
+        let repeat = entry_repeat(element);
+
+        // What this reader cannot act on, reported rather than passed over. An entry whose
+        // bits are claimed when they should not be does not go missing — it shifts every
+        // entry behind it, and the values that come out are wrong rather than absent.
+        if let Some(reason) = entry_out_of_scope(element, repeat) {
+            self.push_unsupported_entry(element, reason, location, repeat, out);
+            return Ok(());
+        }
+
         let kind = match element.tag() {
             Tag::ParameterRefEntry
             | Tag::ArrayParameterRefEntry
@@ -1384,6 +1397,18 @@ impl<'d> Lowering<'d> {
                 // here means the interpreter, the code generator and the flight encoder all
                 // see ordinary fields and none of them has to know arrays exist.
                 if let Some(expanded) = self.expand_composite(element, id, types, parameters)? {
+                    if location.is_some() || repeat.is_some() {
+                        self.push_unsupported_entry(
+                            element,
+                            "a LocationInContainerInBits or a RepeatEntry on an entry that \
+                             names an array or an aggregate; the entry becomes one field per \
+                             leaf here, and neither is carried onto the leaves",
+                            location,
+                            repeat,
+                            out,
+                        );
+                        return Ok(());
+                    }
                     out.extend(expanded);
                     return Ok(());
                 }
@@ -1415,27 +1440,6 @@ impl<'d> Lowering<'d> {
                 }
             }
         };
-
-        let location = element
-            .child(Tag::LocationInContainerInBits)
-            .and_then(|node| {
-                let offset = node
-                    .child(Tag::FixedValue)
-                    .and_then(Element::text)
-                    .or_else(|| node.text())
-                    .and_then(|text| text.trim().parse::<i64>().ok())?;
-                Some(Location {
-                    reference: location_reference(node.attr(AttrKey::ReferenceLocation)),
-                    offset_in_bits: offset,
-                })
-            });
-
-        let repeat = element
-            .child(Tag::RepeatEntry)
-            .and_then(|repeat| repeat.child(Tag::Count))
-            .and_then(|count| count.child(Tag::FixedValue))
-            .and_then(Element::text)
-            .and_then(|text| text.trim().parse::<u32>().ok());
 
         out.push(Entry {
             kind,
@@ -2007,6 +2011,30 @@ impl<'d> Lowering<'d> {
         }
     }
 
+    /// Records `reason` against `element` and puts an unsupported entry in its place.
+    ///
+    /// The entry is pushed rather than dropped: it keeps the place the definition gave it, so
+    /// a caller reading the container sees something it cannot decode where the bits are,
+    /// instead of a container that is quietly one entry shorter than the packet.
+    fn push_unsupported_entry(
+        &mut self,
+        element: Element<'d>,
+        reason: &'static str,
+        location: Option<Location>,
+        repeat: Option<u32>,
+        out: &mut Vec<Entry>,
+    ) {
+        let name = element.name().to_owned();
+        self.note_unsupported(&name, &element.path(), reason);
+        out.push(Entry {
+            kind: EntryKind::Unsupported {
+                element: self.interner.intern(&name),
+            },
+            location,
+            repeat,
+        });
+    }
+
     fn note_unsupported(&mut self, element: &str, path: &str, reason: &'static str) {
         self.unsupported.push(Unsupported {
             element: element.to_owned(),
@@ -2014,6 +2042,59 @@ impl<'d> Lowering<'d> {
             reason,
         });
     }
+}
+
+/// The `<LocationInContainerInBits>` an entry carries, if any.
+fn entry_location(element: Element<'_>) -> Option<Location> {
+    element
+        .child(Tag::LocationInContainerInBits)
+        .and_then(|node| {
+            let offset = node
+                .child(Tag::FixedValue)
+                .and_then(Element::text)
+                .or_else(|| node.text())
+                .and_then(|text| text.trim().parse::<i64>().ok())?;
+            Some(Location {
+                reference: location_reference(node.attr(AttrKey::ReferenceLocation)),
+                offset_in_bits: offset,
+            })
+        })
+}
+
+/// The repetition count an entry carries, when it is a plain `<FixedValue>`.
+///
+/// `None` covers both "no `<RepeatEntry>`" and "a `<RepeatEntry>` whose count comes from the
+/// packet". [`entry_out_of_scope`] is what tells those two apart, because they are not the
+/// same thing and decoding once is only right for the first.
+fn entry_repeat(element: Element<'_>) -> Option<u32> {
+    element
+        .child(Tag::RepeatEntry)
+        .and_then(|repeat| repeat.child(Tag::Count))
+        .and_then(|count| count.child(Tag::FixedValue))
+        .and_then(Element::text)
+        .and_then(|text| text.trim().parse::<u32>().ok())
+}
+
+/// Why an entry cannot be read as written, if it cannot.
+///
+/// Both of these used to be dropped without a word, and dropping them is worse than it sounds:
+/// the entry keeps its place in the container, so its bits are still claimed and every entry
+/// behind it is still read at the offset that assumes them. The values that come out are wrong
+/// rather than missing, and nothing says so.
+fn entry_out_of_scope(element: Element<'_>, repeat: Option<u32>) -> Option<&'static str> {
+    if element.child(Tag::IncludeCondition).is_some() {
+        return Some(
+            "an IncludeCondition, which decides at decode time whether the entry is present \
+             at all; reading it unconditionally claims bits the packet may not have given it",
+        );
+    }
+    if element.child(Tag::RepeatEntry).is_some() && repeat.is_none() {
+        return Some(
+            "a RepeatEntry whose Count is not a FixedValue; the count is in the packet and \
+             this reader does not read it, so the entry would decode exactly once",
+        );
+    }
+    None
 }
 
 #[derive(Clone, Copy)]

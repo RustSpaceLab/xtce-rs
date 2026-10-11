@@ -183,6 +183,7 @@ symbols! {
         OffsetFrom => "OffsetFrom",
         RepeatEntry => "RepeatEntry",
         Count => "Count",
+        IncludeCondition => "IncludeCondition",
         ServiceSet => "ServiceSet",
         MessageSet => "MessageSet",
         StreamSet => "StreamSet",

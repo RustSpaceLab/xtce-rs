@@ -376,3 +376,73 @@ fn the_ceiling_counts_leaves_across_the_whole_nesting() {
         "the refusal should name the ceiling: {error}"
     );
 }
+
+/// An entry that is only sometimes there cannot be read as if it always is.
+///
+/// Dropping the `<IncludeCondition>` is worse than it sounds: the entry keeps its place, so
+/// its bits are claimed anyway and every entry behind it is read at an offset that assumes
+/// them. Wrong values rather than missing ones, and in silence.
+#[test]
+fn an_entry_with_an_include_condition_is_reported_rather_than_read_unconditionally() {
+    let xml = definition(
+        "",
+        r#"<Parameter name="FLAG" parameterTypeRef="U8"/><Parameter name="MAYBE" parameterTypeRef="U8"/>"#,
+        r#"<ParameterRefEntry parameterRef="FLAG"/>
+           <ParameterRefEntry parameterRef="MAYBE">
+             <IncludeCondition>
+               <Comparison parameterRef="FLAG" value="1"/>
+             </IncludeCondition>
+           </ParameterRefEntry>"#,
+    );
+    let db = XtceDb::from_xml(&xml).expect("the definition loads");
+    assert!(
+        db.unsupported()
+            .iter()
+            .any(|item| item.reason.contains("IncludeCondition")),
+        "an IncludeCondition has to be reported: {:?}",
+        db.unsupported()
+    );
+}
+
+/// A count that lives in the packet is not the same as no count at all.
+#[test]
+fn a_repeat_entry_whose_count_is_dynamic_is_reported_rather_than_decoded_once() {
+    let xml = definition(
+        "",
+        r#"<Parameter name="N" parameterTypeRef="U8"/><Parameter name="X" parameterTypeRef="U8"/>"#,
+        r#"<ParameterRefEntry parameterRef="N"/>
+           <ParameterRefEntry parameterRef="X">
+             <RepeatEntry>
+               <Count><DynamicValue><ParameterInstanceRef parameterRef="N"/></DynamicValue></Count>
+             </RepeatEntry>
+           </ParameterRefEntry>"#,
+    );
+    let db = XtceDb::from_xml(&xml).expect("the definition loads");
+    assert!(
+        db.unsupported()
+            .iter()
+            .any(|item| item.reason.contains("RepeatEntry")),
+        "a dynamic RepeatEntry has to be reported: {:?}",
+        db.unsupported()
+    );
+}
+
+/// A fixed count still works, so the refusal above is not a blanket one.
+#[test]
+fn a_repeat_entry_with_a_fixed_count_is_still_decodable() {
+    let xml = definition(
+        "",
+        r#"<Parameter name="X" parameterTypeRef="U8"/>"#,
+        r#"<ParameterRefEntry parameterRef="X">
+             <RepeatEntry><Count><FixedValue>3</FixedValue></Count></RepeatEntry>
+           </ParameterRefEntry>"#,
+    );
+    let db = XtceDb::from_xml(&xml).expect("the definition loads");
+    assert!(
+        !db.unsupported()
+            .iter()
+            .any(|item| item.reason.contains("RepeatEntry")),
+        "a fixed count is handled: {:?}",
+        db.unsupported()
+    );
+}

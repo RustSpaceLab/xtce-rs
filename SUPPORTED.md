@@ -86,12 +86,13 @@ case for commands.
 | `BaseContainer` + `RestrictionCriteria` | Decodable | |
 | `Comparison`, `ComparisonList` | Decodable | all six operators, in every accepted spelling |
 | `BooleanExpression` (`Condition`, `ANDedConditions`, `ORedConditions`) | Decodable | required by `contrived_inheritance_structure.xml` |
-| `LocationInContainerInBits` | Decodable | `previousEntry` and `containerStart` |
+| `LocationInContainerInBits` | Decodable | `previousEntry` and `containerStart`; reported as unsupported when the entry it sits on names an array or an aggregate, because that entry becomes one field per leaf and the offset is not carried onto them |
 | `LocationInContainerInBits` with `containerEnd` / `nextEntry` | Represented | needs a container size that is only known once decoding finishes; reported at decode time |
-| `RepeatEntry` with a fixed `Count` | Decodable | |
-| `RepeatEntry` with `DynamicValue` | Represented | entry decodes once, then reports unsupported |
+| `RepeatEntry` with a fixed `Count` | Decodable | reported as unsupported on an entry that names an array or an aggregate, for the same reason as the row above |
+| `RepeatEntry` with `DynamicValue` | Represented | `EntryKind::Unsupported`, reported at load. The count is in the packet and this reader does not read it, so decoding the entry once would be a container one field long where the packet has *n* |
+| `IncludeCondition` | Represented | `EntryKind::Unsupported`, reported at load. Whether the entry is there at all is decided at decode time; reading it unconditionally would claim bits the packet may not have given it and shift every entry behind it |
 | `IndirectParameterRefEntry` | Represented | `EntryKind::Unsupported` |
-| `ArrayParameterRefEntry` | Represented | `EntryKind::Unsupported` |
+| `ArrayParameterRefEntry` | Decodable | expanded into one entry per leaf, the same as `ArrayParameterType` — see the code-generation table below, which says so too |
 | `CustomAlgorithm` in `RestrictionCriteria` | Represented | `MatchCriteria::Unsupported`; never silently matches |
 
 ## Calibration
