@@ -167,8 +167,6 @@ fn ctim_generated_matches_interpreted_on_every_packet() {
 /// IDEX: a binary field whose width comes from `PKT_LEN`, with two fields after it.
 ///
 /// This is the case that forced the cursor. Everything up to the blob is read at literal
-/// offsets; the blob and the two fields behind it are walked, because where they sit is a
-/// property of the packet.
 #[test]
 fn idex_generated_matches_interpreted_on_every_packet() {
     compare_with_interpreter!(
@@ -220,7 +218,6 @@ fn synthetic_packet(apid: u16, payload: usize) -> Vec<u8> {
 /// `APID_6`, `APID_10` and `APID_28` — never occur in it. Without this, compiled string
 /// decoding would have no comparison against the interpreter at all, which is precisely the
 /// kind of gap the differential suite exists to close. Synthetic packets are enough, because
-/// both decoders read the same bytes and any difference between them is real.
 #[test]
 fn ctim_string_containers_match_on_synthetic_packets() {
     let db = XtceDb::from_path(testdata("ctim/ctim_xtce_v1.xml")).expect("definition loads");
@@ -286,8 +283,6 @@ fn ctim_strings_are_borrowed_from_the_packet() {
 ///
 /// The packets are generated rather than fixed: bit patterns matter here — NaN payloads,
 /// subnormals, the sign bit of a 63-bit two's-complement field — and a handful of
-/// hand-written packets would test whichever ones happened to be written. A fixed seed keeps
-/// a failure reproducible.
 #[test]
 fn every_numeric_shape_matches_the_interpreter() {
     const BYTES: usize = 80;
@@ -332,8 +327,6 @@ fn every_numeric_shape_matches_the_interpreter() {
 /// has no answer outside its points. Agreement therefore has to include agreeing to fail, and
 /// on the same packets — which the macro, written when nothing could fail, does not express.
 ///
-/// `calibrators.xml` is deliberately built so both outcomes are common: two of its splines
-/// sit on a four-bit field whose range is wider than their points.
 #[test]
 fn calibration_matches_the_interpreter_bit_for_bit() {
     const BYTES: usize = 23;
@@ -426,7 +419,6 @@ fn calibration_matches_the_interpreter_bit_for_bit() {
 ///
 /// Without this, an emitter that sent both through one path would pass everything above —
 /// the two fields are compared against the interpreter separately, and a test that never
-/// feeds them the same number never notices they agree when they should not.
 #[test]
 fn the_integer_power_path_is_not_the_float_one() {
     // 2^27 + 1. Its cube needs 82 bits, so rounding it once is not the same as rounding the
@@ -461,8 +453,6 @@ fn the_integer_power_path_is_not_the_float_one() {
 /// A calibrator on an enumeration or a boolean is ignored, because the reference ignores it.
 ///
 /// XTCE looks both up from the *raw* value, and the interpreter returns before it consults a
-/// calibrator. `ENUM_CAL` and `BOOL_CAL` carry one anyway; a generator that helpfully applied
-/// it would turn `ARMED` into 1000.
 #[test]
 fn a_calibrator_on_an_enumeration_or_boolean_is_ignored() {
     let mut packet = vec![0u8; 23];
@@ -500,8 +490,6 @@ fn a_calibrator_on_an_enumeration_or_boolean_is_ignored() {
 ///
 /// The loop below has to tolerate failure on both sides, and for two different reasons: a
 /// packet may match nothing, or it may match two inheritors at once. `boolean_criteria.xml`
-/// gives Alpha and Beta overlapping branches so that the second case is common, because an
-/// OR is exactly what makes it easy to write by accident.
 #[test]
 fn a_boolean_expression_tree_matches_the_interpreter() {
     let db = XtceDb::from_path(testdata("boolean_criteria.xml")).expect("definition loads");
@@ -616,8 +604,6 @@ fn a_boolean_expression_tree_matches_the_interpreter() {
 /// reversed load; where they do not, the reversal has to happen after the read, and for a
 /// twelve-bit field it produces a value wider than the field it came from.
 ///
-/// One packet in four carries an APID the definition does not describe, so both
-/// implementations have to refuse the same packets as well as decode the same ones.
 #[test]
 fn byte_order_matches_the_interpreter() {
     let db = XtceDb::from_path(testdata("byte_order.xml")).expect("definition loads");
@@ -687,8 +673,6 @@ fn byte_order_matches_the_interpreter() {
 /// the file loads, and both of them read whatever it produced — so this test is not proving
 /// the semantics, which `crates/xtce-model/tests/arrays.rs` pins against the XTCE text. It is
 /// proving that reading 27 fields whose offsets came from an expansion is no different from
-/// reading 27 fields written out by hand, including the six nibbles that are not byte-aligned
-/// and the three floats behind them.
 #[test]
 fn arrays_match_the_interpreter() {
     const BYTES: usize = 39;
@@ -777,8 +761,6 @@ fn the_expanded_field_names_are_the_ones_xtce_describes() {
 /// Like arrays, this has no Python rung — the reference refuses aggregates too. And like
 /// arrays, the comparison cannot see a misreading the two implementations share, because both
 /// read the same expansion. It is here for what it *can* prove: that seventeen fields whose
-/// offsets came out of a nesting are read the same way as seventeen written out by hand,
-/// including the four-bit member that leaves everything after it off a byte boundary.
 #[test]
 fn aggregates_match_the_interpreter() {
     const BYTES: usize = 37;
@@ -817,7 +799,6 @@ fn aggregates_match_the_interpreter() {
 ///
 /// Checked against the XTCE text rather than against the interpreter, for the same reason as
 /// the array version: the interpreter derives its names from the same expansion, so a shared
-/// misreading would pass a comparison between them.
 #[test]
 fn the_nested_field_names_are_the_ones_xtce_describes() {
     let packet = vec![0u8; 37];
@@ -1127,8 +1108,6 @@ fn telecommands_match_the_interpreter() {
 /// Driven deliberately: the loop above proves they agree with the interpreter, and this proves
 /// what they agree *on*. `POWER = "ON"` and `POWER = "OFF"` are the same comparison against
 /// different labels, and a resolution that lost the distinction — took the first label, or the
-/// raw value of the literal, or matched everything — would still pass a test that only asked
-/// whether the two implementations said the same thing, if both were wrong the same way.
 #[test]
 fn an_assignment_on_an_enumeration_picks_the_command_by_its_label() {
     let mut packet = vec![0u8; 24];

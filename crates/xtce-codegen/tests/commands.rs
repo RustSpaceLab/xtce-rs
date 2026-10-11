@@ -38,7 +38,6 @@ fn container<'p>(plan: &'p plan::Plan, name: &str) -> &'p plan::ContainerPlan {
         .unwrap_or_else(|| panic!("no container named {name}"))
 }
 
-/// Every fixed value reaches the plan, at the bit it occupies, inherited ones included.
 #[test]
 fn fixed_values_keep_their_place() {
     let plan = commands_plan();
@@ -78,8 +77,6 @@ fn fixed_values_keep_their_place() {
 ///
 /// XTCE requires both `binaryValue` and `sizeInBits` and does not require them to agree.
 /// `TRAILER` gives four bytes for a sixteen-bit field: read as one big-endian number,
-/// `DEADBEEF` in sixteen bits is `BEEF`, and an encoder that wrote `DEAD` — or all four bytes
-/// — would produce a packet nothing recognises.
 #[test]
 fn a_fixed_value_wider_than_its_field_is_truncated_from_the_left() {
     let plan = commands_plan();
@@ -104,8 +101,6 @@ fn a_fixed_value_wider_than_its_field_is_truncated_from_the_left() {
 /// A value narrower than its field is zero-extended, and spare leading bits are cleared.
 ///
 /// The other direction of the same rule. `SPARE` is four bits and its `binaryValue` is a
-/// whole byte, `0A`: the byte that reaches the plan has the high nibble cleared, so a caller
-/// writing it into a four-bit field cannot spill into whatever sits above it.
 #[test]
 fn a_fixed_value_narrower_than_its_bytes_has_its_leading_bits_cleared() {
     let plan = commands_plan();
@@ -119,7 +114,6 @@ fn a_fixed_value_narrower_than_its_bytes_has_its_leading_bits_cleared() {
     assert_eq!(spare.value, vec![0x0A]);
 }
 
-/// A container with no fixed values has none, rather than an empty one invented for it.
 #[test]
 fn a_telemetry_container_has_no_fixed_values() {
     let db = XtceDb::from_path(testdata("commands.xml")).expect("definition loads");
@@ -138,8 +132,6 @@ fn a_telemetry_container_has_no_fixed_values() {
 /// A criterion on an enumeration resolves to the raw values its labels cover.
 ///
 /// Not a string comparison at run time, and not a comparison against the literal read as a
-/// number either: the labels are a finite list, so which of them satisfy the operator is known
-/// when the code is generated, and what is left is a set of raw values.
 #[test]
 fn a_criterion_on_a_label_becomes_a_set_of_raw_values() {
     let plan = commands_plan();
@@ -188,8 +180,6 @@ fn collect(node: &plan::Node, out: &mut Vec<plan::Guard>) {
 
 /// A criterion comparing a *raw* enumeration value is an ordinary number comparison.
 ///
-/// `useCalibratedValue="false"` says to compare the bits, and the bits are a number. Only the
-/// engineering value is a label.
 #[test]
 fn a_raw_criterion_on_an_enumeration_stays_a_number() {
     let db = XtceDb::from_xml(

@@ -266,13 +266,6 @@ impl<'d> Lowering<'d> {
     }
 
     /// Registers what a `<CommandMetaData>` section defines.
-    ///
-    /// It may hold its own `<ParameterTypeSet>` and `<ParameterSet>` as well as an
-    /// `<ArgumentTypeSet>` — the schema puts them there "so that `MetaCommand` data can be
-    /// built independently of `TelemetryMetaData`" — and all three register exactly as their
-    /// telemetry counterparts do. An argument type is a parameter type: the encodings are the
-    /// same elements, and `IntegerArgumentType` extends the same base `IntegerParameterType`
-    /// does.
     fn register_command_meta_data(
         &mut self,
         element: Element<'d>,
@@ -367,14 +360,6 @@ impl<'d> Lowering<'d> {
     /// unqualified index: that index is what `<Comparison parameterRef=..>` and every
     /// telemetry reference searches, and an argument appearing there could shadow a real
     /// parameter of the same name.
-    ///
-    /// The container is qualified under the command for the same reason and one more: the
-    /// schema's uniqueness key for container names covers `ContainerSet` and
-    /// `CommandContainerSet` but *not* a `MetaCommand`'s own `<CommandContainer>`, which is
-    /// "private except as referred to in `BaseMetaCommand`". Two commands may therefore give
-    /// their containers the same name, and registering both at the system level would reject
-    /// a file the schema allows. It is still indexed by its bare name, first one winning, so
-    /// that the usual `<BaseContainer containerRef="SOME_CMD_CONTAINER">` resolves.
     fn register_meta_command(
         &mut self,
         element: Element<'d>,
@@ -1462,16 +1447,6 @@ impl<'d> Lowering<'d> {
 
     /// Turns an entry that names an array or an aggregate into one entry per leaf field, or
     /// `None` if it names neither.
-    ///
-    /// Both are containers of other things, and both are laid out packed and in order, so
-    /// both flatten the same way: an array repeats one type under `[i]`, an aggregate lists
-    /// named members under `.name`, and either may hold the other. What comes out is one
-    /// synthetic parameter per leaf, carrying the leaf's own type and a name that spells the
-    /// path to it — `GRID[1][2]`, `STATE.voltage`, `SENSORS[0].reading`.
-    ///
-    /// The synthetic parameters go into the arena but **not** into the name-resolution index.
-    /// That index is what `<Comparison parameterRef=…>`, `DynamicValue` and context
-    /// calibrators all search, and a synthetic entry there could shadow a real parameter.
     fn expand_composite(
         &mut self,
         element: Element<'d>,
@@ -1952,10 +1927,6 @@ impl<'d> Lowering<'d> {
     ///
     /// XTCE reference syntax (CCSDS 660.1-G-2 §4.3.1) is path-like:
     ///
-    /// * `/A/B/name` — absolute from the document root;
-    /// * `sub/name`, `./name`, `../name` — relative to the current space system;
-    /// * `name` — searched in the current space system, then each ancestor in turn.
-    ///
     /// A final fallback searches the whole document by unqualified name. That is not in the
     /// standard, but the reference implementation keys its lookup tables that way, and
     /// several shipped databases rely on it.
@@ -2203,12 +2174,6 @@ struct Walk<'a> {
 }
 
 /// How many leaf fields one entry may expand into.
-///
-/// Every leaf becomes a parameter in the arena and a field in any generated decoder, so a
-/// definition asking for a million of them would produce something no compiler will finish.
-/// An aggregate of arrays of aggregates reaches large numbers quickly, which is why the limit
-/// counts leaves rather than one array's elements. It is arbitrary but named: nothing in a
-/// real database comes close, and the refusal says what it was asked for.
 const MAX_EXPANDED_FIELDS: usize = 4096;
 
 /// A `<StartingIndex>` or `<EndingIndex>` that is a plain `<FixedValue>`.

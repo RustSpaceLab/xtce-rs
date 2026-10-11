@@ -513,8 +513,6 @@ mod tests {
         /// Every width at every offset, against the one-bit-at-a-time oracle.
         ///
         /// The generator is written so that width 64 at a non-byte-aligned offset — the
-        /// nine-byte case — is actually reachable, rather than being buried under a uniform
-        /// distribution that would hit it once in a thousand runs.
         #[test]
         fn matches_naive_reference(
             data in proptest::collection::vec(proptest::num::u8::ANY, 1..24),
@@ -535,7 +533,6 @@ mod tests {
             }
         }
 
-        /// Wide fields specifically: nine-byte spans and everything around them.
         #[test]
         fn wide_reads_at_every_bit_offset(
             data in proptest::collection::vec(proptest::num::u8::ANY, 9..17),
@@ -548,7 +545,6 @@ mod tests {
             proptest::prop_assert_eq!(cursor.read_uint(width), Ok(want));
         }
 
-        /// Reading N bits as bytes and as an integer must agree for N <= 64.
         #[test]
         fn bytes_and_integers_agree(
             data in proptest::collection::vec(proptest::num::u8::ANY, 1..20),
@@ -578,8 +574,6 @@ mod tests {
 
         /// Sign extension at every width, against the arbitrary-precision oracle.
         ///
-        /// Width 63 is the interesting one and a uniform generator finds it once in sixty
-        /// runs, so widths are drawn across the whole range deliberately.
         #[test]
         fn twos_complement_matches_naive_reference(
             bits in proptest::num::u64::ANY,
@@ -610,7 +604,6 @@ mod tests {
             );
         }
 
-        /// Above the field's width the two part company, and the unmasked one is right.
         #[test]
         fn unmasked_sign_extension_keeps_the_high_bits(
             bits in proptest::num::u64::ANY,
@@ -629,7 +622,6 @@ mod tests {
             );
         }
 
-        /// A read never panics and never moves the cursor on failure.
         #[test]
         fn failures_leave_the_cursor_untouched(
             data in proptest::collection::vec(proptest::num::u8::ANY, 0..8),

@@ -62,7 +62,6 @@ fn the_committed_decoder_is_what_the_generator_produces() {
     );
 }
 
-/// Both decoders, over every packet of the real stream, compared field by field.
 #[test]
 fn generated_matches_interpreted_on_every_packet() {
     let db = load();
@@ -200,8 +199,6 @@ fn a_packet_of_another_type_is_refused() {
 /// and its `<BooleanExpression>` compiles.
 ///
 /// So the assertion is inverted. If one of these ever stops compiling, that is either a
-/// regression or a definition that grew a construct outside the subset, and either way it
-/// should be noticed here rather than in whatever downstream build goes quiet.
 #[test]
 fn every_bundled_definition_compiles() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/spp");
@@ -292,8 +289,6 @@ fn planned_offsets_match_the_interpreters_offsets() {
 
 /// Constructs that must stay refused, each with the reason it cannot be compiled.
 ///
-/// Written inline because no bundled definition contains them, and a refusal path with no
-/// test is a refusal that can silently turn into a wrong answer.
 #[test]
 fn constructs_outside_the_compilable_subset_are_refused() {
     fn definition(types: &str, parameters: &str, entries: &str) -> String {
@@ -416,8 +411,6 @@ fn constructs_outside_the_compilable_subset_are_refused() {
 /// engineering value is a float, or a boolean, whose engineering value is 0 or 1 rather than
 /// its raw bits — comparing the raw bits would select a different container. Silently.
 ///
-/// The first of those became reachable the day calibrators started compiling: before then a
-/// calibrated field was refused outright, so a criterion could not name one.
 #[test]
 fn criteria_the_generator_would_evaluate_differently_are_refused() {
     fn definition(types: &str, parameters: &str, criteria: &str) -> String {
