@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::time::Instant;
 
-use xtce_decode::{DecodeError, Decoder, EngValue, PacketIter, RawValue};
+use xtce_decode::{DecodeError, Decoder, EngValue, PacketReader, RawValue};
 use xtce_model::XtceDb;
 
 /// How to render each packet.
@@ -33,13 +33,12 @@ pub struct Options<'a> {
     pub no_summary: bool,
 }
 
-fn load_stream(packets: &Path) -> std::io::Result<Vec<u8>> {
+fn open_packet_source(packets: &Path) -> std::io::Result<Box<dyn Read>> {
     if packets.as_os_str() == "-" {
-        let mut bytes = Vec::new();
-        std::io::stdin().read_to_end(&mut bytes)?;
-        Ok(bytes)
+        Ok(Box::new(std::io::BufReader::new(std::io::stdin())))
     } else {
-        std::fs::read(packets)
+        let file = std::fs::File::open(packets)?;
+        Ok(Box::new(std::io::BufReader::new(file)))
     }
 }
 
@@ -112,7 +111,8 @@ pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
         None => Decoder::new(&db)?,
     };
 
-    let stream = load_stream(options.packets)?;
+    let source = open_packet_source(options.packets)?;
+    let mut reader = PacketReader::new(source, options.skip_header_bytes);
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
 
@@ -121,9 +121,6 @@ pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
     let mut unrecognised = 0usize;
     let mut trailing = 0usize;
     let mut total = 0usize;
-
-    // One packet buffer for the whole stream: after the first packet this allocates nothing.
-    let mut packet = decoder.new_packet(&stream);
 
     if options.format == Format::Csv {
         if options.show_raw {
@@ -134,15 +131,15 @@ pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let decode_start = Instant::now();
-    for (index, framed) in PacketIter::new(&stream, options.skip_header_bytes).enumerate() {
+    let mut index = 0usize;
+    while let Some(framed) = reader.next_packet()? {
         if options.limit.is_some_and(|limit| total >= limit) {
             break;
         }
         total += 1;
-        let framed = framed?;
 
-        match decoder.decode_into(&mut packet, framed.bytes()) {
-            Ok(()) => {
+        match decoder.decode(framed.bytes()) {
+            Ok(packet) => {
                 decoded_count += 1;
                 if packet.trailing_bits() != 0 {
                     trailing += 1;
@@ -176,6 +173,7 @@ pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+        index += 1;
     }
     let decode_elapsed = decode_start.elapsed();
 
@@ -822,5 +820,27 @@ mod tests {
         let text = String::from_utf8(out).expect("utf8");
         assert!(text.contains("10 packet(s): 8 decoded, 1 not described, 1 failed"));
         assert!(text.contains("2 packet(s) had bits no entry claimed"));
+    }
+
+    #[test]
+    fn run_rejects_stdin_conflict_for_definition_and_packets() {
+        let options = super::Options {
+            definition: std::path::Path::new("-"),
+            packets: std::path::Path::new("-"),
+            root: None,
+            skip_header_bytes: 0,
+            limit: None,
+            only: &[],
+            format: super::Format::Quiet,
+            show_raw: false,
+            no_summary: true,
+        };
+        let result = super::run(&options);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "cannot read both definition and packets from standard input"
+        );
     }
 }

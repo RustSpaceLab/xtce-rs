@@ -69,7 +69,7 @@ pub mod error;
 pub mod value;
 
 pub use bits::{BitCursor, BitError};
-pub use ccsds::{FramingError, PacketIter, SpacePacketBytes};
+pub use ccsds::{FramingError, PacketIter, PacketReadError, PacketReader, SpacePacketBytes};
 pub use decoder::Decoder;
 pub use error::DecodeError;
 pub use value::{DecodedPacket, EngValue, ParameterValue, RawValue};
