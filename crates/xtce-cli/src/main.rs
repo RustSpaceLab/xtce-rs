@@ -121,10 +121,14 @@ fn main() -> ExitCode {
     }
 }
 
+const MAX_DEFINITION_BYTES: u64 = 256 * 1024 * 1024;
+
 fn load_db(path: &Path) -> Result<XtceDb, Box<dyn std::error::Error>> {
     if path.as_os_str() == "-" {
         let mut xml = String::new();
-        std::io::stdin().read_to_string(&mut xml)?;
+        std::io::stdin()
+            .take(MAX_DEFINITION_BYTES)
+            .read_to_string(&mut xml)?;
         Ok(XtceDb::from_xml(&xml)?)
     } else {
         Ok(XtceDb::from_path(path)?)
@@ -211,7 +215,9 @@ fn run_codegen(
 fn run_bench(file: &Path, iterations: u32) -> Result<(), Box<dyn std::error::Error>> {
     let (bytes, xml_data) = if file.as_os_str() == "-" {
         let mut xml = String::new();
-        std::io::stdin().read_to_string(&mut xml)?;
+        std::io::stdin()
+            .take(MAX_DEFINITION_BYTES)
+            .read_to_string(&mut xml)?;
         (xml.len() as u64, Some(xml))
     } else {
         (std::fs::metadata(file).map_or(0, |meta| meta.len()), None)

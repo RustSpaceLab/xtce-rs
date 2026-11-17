@@ -42,10 +42,14 @@ fn open_packet_source(packets: &Path) -> std::io::Result<Box<dyn Read>> {
     }
 }
 
+const MAX_DEFINITION_BYTES: u64 = 256 * 1024 * 1024;
+
 fn load_definition(definition: &Path) -> Result<XtceDb, Box<dyn std::error::Error>> {
     if definition.as_os_str() == "-" {
         let mut xml = String::new();
-        std::io::stdin().read_to_string(&mut xml)?;
+        std::io::stdin()
+            .take(MAX_DEFINITION_BYTES)
+            .read_to_string(&mut xml)?;
         Ok(XtceDb::from_xml(&xml)?)
     } else {
         Ok(XtceDb::from_path(definition)?)
@@ -527,14 +531,16 @@ fn write_hex_raw(out: &mut impl Write, bytes: &[u8]) -> std::io::Result<()> {
 fn write_csv_string(out: &mut impl Write, text: &str) -> std::io::Result<()> {
     if text.contains([',', '"', '\n', '\r']) {
         out.write_all(b"\"")?;
-        for ch in text.chars() {
-            if ch == '"' {
-                out.write_all(b"\"\"")?;
-            } else {
-                let mut buf = [0u8; 4];
-                out.write_all(ch.encode_utf8(&mut buf).as_bytes())?;
+        let bytes = text.as_bytes();
+        let mut last = 0;
+        for (i, &b) in bytes.iter().enumerate() {
+            if b == b'"' {
+                out.write_all(&bytes[last..=i])?;
+                out.write_all(b"\"")?;
+                last = i + 1;
             }
         }
+        out.write_all(&bytes[last..])?;
         out.write_all(b"\"")
     } else {
         out.write_all(text.as_bytes())
