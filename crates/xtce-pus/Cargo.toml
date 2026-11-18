@@ -1,0 +1,14 @@
+[package]
+name = "xtce-pus"
+description = "ECSS-E-ST-70-41C Packet Utilization Standard (PUS-C) no_std framing, CRC-16-CCITT, and HIL responder"
+readme = "README.md"
+keywords = ["ecss", "pus", "ccsds", "spacecraft", "no-std"]
+categories = ["aerospace::space-protocols", "no-std", "embedded"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]

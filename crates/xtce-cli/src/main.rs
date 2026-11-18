@@ -22,6 +22,7 @@ use xtce_model::XtceDb;
 mod decode;
 mod info;
 mod pcap;
+mod pus;
 mod wireshark;
 
 #[derive(Parser)]
@@ -133,6 +134,28 @@ enum Command {
         limit: Option<usize>,
     },
 
+    /// Inspect ECSS-E-ST-70-41C (PUS-C) packet streams or run a closed-loop HIL OBC session.
+    Pus {
+        /// File of concatenated CCSDS/PUS packets. Use '-' to read from standard input.
+        packets: Option<PathBuf>,
+
+        /// Run a closed-loop Hardware-in-the-Loop (HIL) session against the no_std OBC responder.
+        #[arg(long)]
+        hil_demo: bool,
+
+        /// Write HIL session packets to this raw stream file.
+        #[arg(long, short)]
+        out: Option<PathBuf>,
+
+        /// Bytes of per-packet wrapper to skip before each CCSDS header.
+        #[arg(long, default_value_t = 0)]
+        skip_header_bytes: usize,
+
+        /// Stop after this many packets.
+        #[arg(long)]
+        limit: Option<usize>,
+    },
+
     /// Time loading an XTCE file.
     Bench {
         /// XTCE file to load. Use '-' to read from standard input.
@@ -215,6 +238,19 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             limit,
         } => pcap::run(&pcap::Options {
             packets: &packets,
+            out: out.as_deref(),
+            skip_header_bytes,
+            limit,
+        }),
+        Command::Pus {
+            packets,
+            hil_demo,
+            out,
+            skip_header_bytes,
+            limit,
+        } => pus::run(&pus::Options {
+            packets: packets.as_deref(),
+            hil_demo,
             out: out.as_deref(),
             skip_header_bytes,
             limit,

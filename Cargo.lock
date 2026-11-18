@@ -931,6 +931,7 @@ dependencies = [
  "xtce-codegen",
  "xtce-decode",
  "xtce-model",
+ "xtce-pus",
 ]
 
 [[package]]
@@ -975,6 +976,10 @@ dependencies = [
  "quick-xml",
  "thiserror",
 ]
+
+[[package]]
+name = "xtce-pus"
+version = "0.1.1"
 
 [[package]]
 name = "zerocopy"
