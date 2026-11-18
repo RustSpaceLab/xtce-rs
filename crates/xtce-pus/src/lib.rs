@@ -1,15 +1,17 @@
 //! `#![no_std]` implementation of ECSS-E-ST-70-41C Packet Utilization Standard (PUS-C)
 //! over CCSDS 133.0-B Space Packets, with a deterministic Hardware-in-the-Loop (HIL)
-//! On-Board Computer responder.
+//! On-Board Computer responder and dual-use telecommand authentication.
 //!
 //! # Guarantees
 //!
-//! * **`#![no_std]` and zero heap allocations.** Every parser, encoder, and HIL responder
-//!   method operates on caller-supplied byte slices so the crate can run unmodified on bare-metal
-//!   flight targets (`thumbv7em-none-eabihf` Cortex-M, RISC-V, LEON/SPARC) and ground tools.
+//! * **`#![no_std]` and zero heap allocations.** Every parser, encoder, security gate, and HIL
+//!   responder method operates on caller-supplied byte slices so the crate can run unmodified
+//!   on bare-metal flight targets (`thumbv7em-none-eabihf` Cortex-M, RISC-V, LEON/SPARC) and
+//!   ground tools.
 //! * **No panics.** `unwrap`, `expect`, and `panic!` are denied across the library.
-//! * **End-to-end CRC-16-CCITT protection.** Every parsed and encoded frame is checked or
-//!   stamped with the ECSS-E-ST-70-41C Annex B syndrome (`0x1021`, initial `0xFFFF`).
+//! * **End-to-end CRC-16-CCITT and SipHash-2-4 protection.** Every frame is verified against
+//!   the ECSS-E-ST-70-41C Annex B syndrome (`0x1021`, initial `0xFFFF`), and critical dual-use
+//!   telecommands can be protected against spoofing and replay via [`TcSecurityGate`].
 
 #![no_std]
 #![deny(missing_docs)]
@@ -27,20 +29,28 @@
 pub mod crc;
 pub mod hil;
 pub mod packet;
+pub mod security;
 pub mod services;
 
 pub use crc::{crc16_ccitt, verify_crc16_ccitt};
 pub use hil::{
     ERR_CODE_CRC_MISMATCH, ERR_CODE_NOT_A_TC, ERR_CODE_UNSUPPORTED, EVENT_ID_CORRUPTED_TC,
-    EVENT_ID_HK_ENABLED, MAX_HIL_FRAME_LEN, PusResponder,
+    EVENT_ID_DPU_INFERENCE, EVENT_ID_EO_CAPTURE, EVENT_ID_HK_ENABLED, FUNC_DPU_AI_INFERENCE,
+    FUNC_ENTER_SAFE_MODE, FUNC_EO_OPTICAL_CAPTURE, MAX_HIL_FRAME_LEN, OBC_SCRATCHPAD_LEN,
+    PusResponder,
 };
 pub use packet::{
     AckFlags, CucTimestamp, PEC_LEN, PRIMARY_HEADER_LEN, PUS_VERSION_C, PusError, PusHeader,
     PusPacket, TC_SECONDARY_HEADER_LEN, TM_SECONDARY_HEADER_LEN, TcParams, TmParams, encode_tc,
     encode_tm,
 };
+pub use security::{
+    AUTH_KEY_LEN, ERR_CODE_AUTH_FAILED, ERR_CODE_REPLAY_DETECTED, SecurityError,
+    TC_AUTH_TRAILER_LEN, TcSecurityGate, build_auth_trailer, compute_mac_tag,
+};
 pub use services::{
-    EventReport, EventSeverity, HousekeepingMessage, ObcHousekeeping, PusService, TestMessage,
+    EventReport, EventSeverity, FunctionCall, HousekeepingMessage, MemoryMessage,
+    MonitoringMessage, ObcHousekeeping, PusService, ScheduleMessage, TestMessage,
     VerificationReport,
 };
 
@@ -79,7 +89,6 @@ mod tests {
             .expect("HIL processes TC[17,1]");
         assert_eq!(count, 3);
 
-        // 1. TM[1,1] Acceptance Success
         let tm0 = PusPacket::parse(&out_frames[0][..out_lens[0]]).expect("TM[1,1]");
         assert_eq!(
             tm0.decode_service().expect("ST[01]"),
@@ -88,14 +97,12 @@ mod tests {
             })
         );
 
-        // 2. TM[17,2] Are-You-Alive Connection Test Report
         let tm1 = PusPacket::parse(&out_frames[1][..out_lens[1]]).expect("TM[17,2]");
         assert_eq!(
             tm1.decode_service().expect("ST[17]"),
             PusService::Test(TestMessage::AreYouAliveReport)
         );
 
-        // 3. TM[1,7] Execution Complete Success
         let tm2 = PusPacket::parse(&out_frames[2][..out_lens[2]]).expect("TM[1,7]");
         assert_eq!(
             tm2.decode_service().expect("ST[01]"),
@@ -145,6 +152,143 @@ mod tests {
     }
 
     #[test]
+    fn hil_responder_loads_dumps_and_scrubs_on_board_memory_st06() {
+        let mut responder = PusResponder::new(0x010, 0x0001);
+        let mut tc_buf = [0u8; 64];
+        let mut out_frames = [[0u8; MAX_HIL_FRAME_LEN]; 4];
+        let mut out_lens = [0usize; 4];
+
+        // 1. TC[6,2] Load b"CAMILA" into memory_id=1 at offset 0x0000_0008
+        let load_app = [1, 0, 0, 0, 8, b'C', b'A', b'M', b'I', b'L', b'A'];
+        let tc_len = encode_tc(
+            &TcParams {
+                apid: 0x010,
+                sequence_count: 10,
+                ack: AckFlags::ACCEPT_AND_COMPLETE,
+                service: 6,
+                subtype: 2,
+                source_id: 0x0042,
+            },
+            &load_app,
+            &mut tc_buf,
+        )
+        .expect("encodes TC[6,2]");
+        let count = responder
+            .process_telecommand(&tc_buf[..tc_len], &mut out_frames, &mut out_lens)
+            .expect("TC[6,2] runs");
+        assert_eq!(count, 2); // TM[1,1] + TM[1,7]
+        assert_eq!(&responder.scratchpad[8..14], b"CAMILA");
+
+        // 2. TC[6,9] Check CRC-16-CCITT over [8..14] (length = 6)
+        let check_app = [1, 0, 0, 0, 8, 0, 6];
+        let tc_len = encode_tc(
+            &TcParams {
+                apid: 0x010,
+                sequence_count: 11,
+                ack: AckFlags::ACCEPT_AND_COMPLETE,
+                service: 6,
+                subtype: 9,
+                source_id: 0x0042,
+            },
+            &check_app,
+            &mut tc_buf,
+        )
+        .expect("encodes TC[6,9]");
+        let count = responder
+            .process_telecommand(&tc_buf[..tc_len], &mut out_frames, &mut out_lens)
+            .expect("TC[6,9] runs");
+        assert_eq!(count, 3); // TM[1,1] + TM[6,10] + TM[1,7]
+
+        let tm_check = PusPacket::parse(&out_frames[1][..out_lens[1]]).expect("TM[6,10]");
+        assert_eq!(
+            tm_check.decode_service().expect("ST[06]"),
+            PusService::Memory(MemoryMessage::CheckRawReport {
+                memory_id: 1,
+                address: 8,
+                length: 6,
+                checksum: crc16_ccitt(b"CAMILA"),
+            })
+        );
+    }
+
+    #[test]
+    fn hil_responder_executes_st08_eo_imaging_and_st11_schedule() {
+        let mut responder = PusResponder::new(0x010, 0x0001);
+        let mut tc_buf = [0u8; 64];
+        let mut out_frames = [[0u8; MAX_HIL_FRAME_LEN]; 4];
+        let mut out_lens = [0usize; 4];
+
+        // TC[8,1] Function Call: FUNC_EO_OPTICAL_CAPTURE (0x0010) with target_id = 0x01 (Warsaw)
+        let fn_id = FUNC_EO_OPTICAL_CAPTURE.to_be_bytes();
+        let fn_app = [fn_id[0], fn_id[1], 0x01];
+        let tc_len = encode_tc(
+            &TcParams {
+                apid: 0x010,
+                sequence_count: 12,
+                ack: AckFlags::ACCEPT_AND_COMPLETE,
+                service: 8,
+                subtype: 1,
+                source_id: 0x0042,
+            },
+            &fn_app,
+            &mut tc_buf,
+        )
+        .expect("TC[8,1]");
+        let count = responder
+            .process_telecommand(&tc_buf[..tc_len], &mut out_frames, &mut out_lens)
+            .expect("ST[08] runs");
+        assert_eq!(count, 3); // TM[1,1] + TM[5,1] EO_CAPTURE + TM[1,7]
+        assert_eq!(responder.hk.mode, 3);
+
+        // TC[11,1] Enable schedule, then TC[11,4] Insert time-tagged activity at T=600s
+        let enable_len = encode_tc(
+            &TcParams {
+                apid: 0x010,
+                sequence_count: 13,
+                ack: AckFlags::ACCEPT_AND_COMPLETE,
+                service: 11,
+                subtype: 1,
+                source_id: 0x0042,
+            },
+            &[],
+            &mut tc_buf,
+        )
+        .expect("TC[11,1]");
+        responder
+            .process_telecommand(&tc_buf[..enable_len], &mut out_frames, &mut out_lens)
+            .expect("enables schedule");
+        assert!(responder.schedule_enabled);
+
+        let sched_app = [0x00, 0x00, 0x02, 0x58, 0x00, 0x20]; // release_time=600s, DPU task
+        let tc_ins = encode_tc(
+            &TcParams {
+                apid: 0x010,
+                sequence_count: 14,
+                ack: AckFlags::ACCEPT_AND_COMPLETE,
+                service: 11,
+                subtype: 4,
+                source_id: 0x0042,
+            },
+            &sched_app,
+            &mut tc_buf,
+        )
+        .expect("TC[11,4]");
+        let count = responder
+            .process_telecommand(&tc_buf[..tc_ins], &mut out_frames, &mut out_lens)
+            .expect("inserts scheduled activity");
+        assert_eq!(count, 3); // TM[1,1] + TM[11,13] + TM[1,7]
+
+        let tm_sched = PusPacket::parse(&out_frames[1][..out_lens[1]]).expect("TM[11,13]");
+        assert_eq!(
+            tm_sched.decode_service().expect("ST[11]"),
+            PusService::Schedule(ScheduleMessage::SummaryReport {
+                enabled: true,
+                pending_count: 1,
+            })
+        );
+    }
+
+    #[test]
     fn hil_responder_rejects_corrupted_crc_with_tm_1_2_and_tm_5_2() {
         let mut responder = PusResponder::new(0x010, 0x0001);
         let mut tc_buf = [0u8; 32];
@@ -162,7 +306,6 @@ mod tests {
         )
         .expect("encodes TC");
 
-        // Flip one bit in the service byte to corrupt the frame over the link
         tc_buf[7] ^= 0x80;
 
         let mut out_frames = [[0u8; MAX_HIL_FRAME_LEN]; 4];

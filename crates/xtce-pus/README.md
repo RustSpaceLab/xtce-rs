@@ -15,7 +15,12 @@ Space Packets, with a bare-metal Hardware-in-the-Loop (HIL) spacecraft responder
   - **ST\[01\] Request Verification**: `TM[1,1]` Acceptance Success, `TM[1,2]` Acceptance Failure, `TM[1,3]` Execution Start, `TM[1,7]` Execution Complete Success, `TM[1,8]` Execution Complete Failure.
   - **ST\[03\] Housekeeping**: `TC[3,5]` Enable HK, `TC[3,6]` Disable HK, `TC[3,27]` One-Shot HK Request, `TM[3,25]` Housekeeping Parameter Report (`ObcHousekeeping`).
   - **ST\[05\] Event Reporting**: `TM[5,1]` Informative Event through `TM[5,4]` High-Severity Anomaly.
+  - **ST\[06\] On-Board Memory Management**: `TC[6,2]` Load Raw Memory, `TC[6,5]` / `TM[6,6]` Dump Raw Memory, `TC[6,9]` / `TM[6,10]` CRC-16-CCITT Memory Scrubbing Check.
+  - **ST\[08\] Function Management**: `TC[8,1]` Perform Function (e.g., EO optical capture, on-board DPU AI inference, safe-mode transition).
+  - **ST\[11\] Time-Based Scheduling**: `TC[11,1..3]` Enable/Disable/Reset Schedule, `TC[11,4]` Insert Time-Tagged Activity, `TM[11,13]` Schedule Summary Report.
+  - **ST\[12\] On-Board Monitoring (FDIR)**: `TC[12,1..2]` Enable/Disable Parameter Monitoring, `TM[12,12]` Check Transition Report.
   - **ST\[17\] Test Service**: `TC[17,1]` Are-You-Alive Connection Test and `TM[17,2]` Are-You-Alive Connection Report.
+- **Dual-Use Telecommand Security (`TcSecurityGate`)**: constant-time 64-bit **SipHash-2-4 MAC** verification and monotonic 32-bit **Anti-Replay** counter protection for critical uplink commands.
 - **`PusResponder` HIL State Machine**: deterministic, zero-heap flight responder suitable for `thumbv7em-none-eabihf` (STM32 Cortex-M), RISC-V (ESP32), RP2040/RP2350, or desktop HIL benches.
 
 ## Installation

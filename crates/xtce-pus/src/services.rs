@@ -1,4 +1,5 @@
-//! ECSS-E-ST-70-41C service payload decoders and encoders (`ST[01]`, `ST[03]`, `ST[05]`, `ST[17]`).
+//! ECSS-E-ST-70-41C service payload decoders and encoders (`ST[01]`, `ST[03]`, `ST[05]`, `ST[06]`,
+//! `ST[08]`, `ST[11]`, `ST[12]`, `ST[17]`).
 
 use crate::packet::{PusError, PusPacket};
 
@@ -72,7 +73,7 @@ pub struct ObcHousekeeping {
     pub bus_voltage_mv: u16,
     /// OBC board temperature in centi-degrees Celsius (e.g. `2350` for 23.50 °C).
     pub obc_temp_cdeg: i16,
-    /// Operational mode (`0 = SAFE`, `1 = IDLE`, `2 = NOMINAL`, `3 = SCIENCE`).
+    /// Operational mode (`0 = SAFE`, `1 = IDLE`, `2 = NOMINAL`, `3 = EO_IMAGING`).
     pub mode: u8,
 }
 
@@ -135,6 +136,110 @@ pub struct EventReport<'a> {
     pub aux_data: &'a [u8],
 }
 
+/// ECSS Service 6 (`ST[06]`) On-Board Memory Management message.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MemoryMessage<'a> {
+    /// `TC[6,2]` — Load raw data bytes into on-board memory `memory_id` at `address`.
+    LoadRaw {
+        /// Target memory partition identifier (e.g. `1 = OBC_RAM`, `2 = DPU_FLASH`).
+        memory_id: u8,
+        /// 32-bit start address.
+        address: u32,
+        /// Bytes to write.
+        data: &'a [u8],
+    },
+    /// `TC[6,5]` — Request a raw memory dump from `memory_id` at `address`.
+    DumpRawRequest {
+        /// Target memory partition identifier.
+        memory_id: u8,
+        /// 32-bit start address.
+        address: u32,
+        /// Number of octets requested.
+        length: u16,
+    },
+    /// `TM[6,6]` — Raw memory dump telemetry report.
+    DumpRawReport {
+        /// Source memory partition identifier.
+        memory_id: u8,
+        /// 32-bit start address.
+        address: u32,
+        /// Dumped memory octets.
+        data: &'a [u8],
+    },
+    /// `TC[6,9]` — Request a CRC-16-CCITT memory integrity scrub over `[address..address+length]`.
+    CheckRawRequest {
+        /// Target memory partition identifier.
+        memory_id: u8,
+        /// 32-bit start address.
+        address: u32,
+        /// Number of octets to scrub.
+        length: u16,
+    },
+    /// `TM[6,10]` — Memory integrity check report carrying the computed CRC-16-CCITT checksum.
+    CheckRawReport {
+        /// Source memory partition identifier.
+        memory_id: u8,
+        /// 32-bit start address.
+        address: u32,
+        /// Number of octets scrubbed.
+        length: u16,
+        /// Computed CRC-16-CCITT syndrome over the region.
+        checksum: u16,
+    },
+}
+
+/// ECSS Service 8 (`ST[08]`) Function Management telecommand.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct FunctionCall<'a> {
+    /// 16-bit Mission Function Identifier (`Function_ID`).
+    pub function_id: u16,
+    /// Raw argument bytes passed to the on-board function.
+    pub args: &'a [u8],
+}
+
+/// ECSS Service 11 (`ST[11]`) Time-Based Scheduling message.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ScheduleMessage<'a> {
+    /// `TC[11,1]` — Enable execution of time-tagged on-board schedule activities.
+    Enable,
+    /// `TC[11,2]` — Disable execution of time-tagged on-board schedule activities.
+    Disable,
+    /// `TC[11,3]` — Reset (clear) all queued activities in the on-board command schedule.
+    Reset,
+    /// `TC[11,4]` — Insert a time-tagged activity into the on-board schedule.
+    InsertActivity {
+        /// Spacecraft CUC coarse release time (seconds) when the activity shall execute.
+        release_time_s: u32,
+        /// Encoded telecommand or action payload to release at `release_time_s`.
+        activity_data: &'a [u8],
+    },
+    /// `TM[11,13]` — Schedule summary status report.
+    SummaryReport {
+        /// Whether the time-based scheduler is currently enabled.
+        enabled: bool,
+        /// Number of pending time-tagged activities waiting in the queue.
+        pending_count: u16,
+    },
+}
+
+/// ECSS Service 12 (`ST[12]`) On-Board Monitoring (FDIR) message.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MonitoringMessage {
+    /// `TC[12,1]` — Enable autonomous on-board parameter limit monitoring (FDIR).
+    Enable,
+    /// `TC[12,2]` — Disable autonomous on-board parameter limit monitoring.
+    Disable,
+    /// `TM[12,12]` — Check transition report emitted when a monitored parameter crosses a limit.
+    CheckTransitionReport {
+        /// Monitored parameter identifier (`Param_ID`).
+        param_id: u16,
+        /// Observed parameter value that triggered the transition.
+        observed_value: i32,
+        /// Limit threshold that was crossed.
+        limit_value: i32,
+    },
+}
+
 /// ECSS Service 17 (`ST[17]`) Test service message.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TestMessage {
@@ -153,6 +258,14 @@ pub enum PusService<'a> {
     Housekeeping(HousekeepingMessage<'a>),
     /// `ST[05]` Event Report.
     Event(EventReport<'a>),
+    /// `ST[06]` On-Board Memory Management message.
+    Memory(MemoryMessage<'a>),
+    /// `ST[08]` Function Management call (`TC[8,1]`).
+    Function(FunctionCall<'a>),
+    /// `ST[11]` Time-Based Scheduling message.
+    Schedule(ScheduleMessage<'a>),
+    /// `ST[12]` On-Board Monitoring (FDIR) message.
+    Monitoring(MonitoringMessage),
     /// `ST[17]` Test service message.
     Test(TestMessage),
     /// Any other service/subtype pair with its raw application data slice.
@@ -178,10 +291,39 @@ impl<'a> PusPacket<'a> {
         let subtype = self.header.subtype();
         let data = self.app_data;
 
-        match (self.header.is_telecommand(), service, subtype) {
-            (false, 1, 1 | 3 | 7) => {
+        match service {
+            1 => Self::decode_st01(self.header.is_telecommand(), subtype, data),
+            3 => Self::decode_st03(self.header.is_telecommand(), subtype, data),
+            5 => Self::decode_st05(self.header.is_telecommand(), subtype, data),
+            6 => Self::decode_st06(self.header.is_telecommand(), subtype, data),
+            8 => Self::decode_st08(self.header.is_telecommand(), subtype, data),
+            11 => Self::decode_st11(self.header.is_telecommand(), subtype, data),
+            12 => Self::decode_st12(self.header.is_telecommand(), subtype, data),
+            17 => match (self.header.is_telecommand(), subtype) {
+                (true, 1) => Ok(PusService::Test(TestMessage::AreYouAliveCommand)),
+                (false, 2) => Ok(PusService::Test(TestMessage::AreYouAliveReport)),
+                _ => Ok(PusService::Custom {
+                    service,
+                    subtype,
+                    app_data: data,
+                }),
+            },
+            _ => Ok(PusService::Custom {
+                service,
+                subtype,
+                app_data: data,
+            }),
+        }
+    }
+
+    fn decode_st01(is_tc: bool, subtype: u8, data: &'a [u8]) -> Result<PusService<'a>, PusError> {
+        match (is_tc, subtype) {
+            (false, 1 | 3 | 7) => {
                 if data.len() < 4 {
-                    return Err(PusError::MalformedServiceData { service, subtype });
+                    return Err(PusError::MalformedServiceData {
+                        service: 1,
+                        subtype,
+                    });
                 }
                 let request_id = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
                 let report = match subtype {
@@ -191,9 +333,12 @@ impl<'a> PusPacket<'a> {
                 };
                 Ok(PusService::Verification(report))
             }
-            (false, 1, 2 | 8) => {
+            (false, 2 | 8) => {
                 if data.len() < 6 {
-                    return Err(PusError::MalformedServiceData { service, subtype });
+                    return Err(PusError::MalformedServiceData {
+                        service: 1,
+                        subtype,
+                    });
                 }
                 let request_id = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
                 let failure_code = u16::from_be_bytes([data[4], data[5]]);
@@ -210,9 +355,22 @@ impl<'a> PusPacket<'a> {
                 };
                 Ok(PusService::Verification(report))
             }
-            (true, 3, 5 | 6 | 27) => {
+            _ => Ok(PusService::Custom {
+                service: 1,
+                subtype,
+                app_data: data,
+            }),
+        }
+    }
+
+    fn decode_st03(is_tc: bool, subtype: u8, data: &'a [u8]) -> Result<PusService<'a>, PusError> {
+        match (is_tc, subtype) {
+            (true, 5 | 6 | 27) => {
                 if data.len() < 2 {
-                    return Err(PusError::MalformedServiceData { service, subtype });
+                    return Err(PusError::MalformedServiceData {
+                        service: 3,
+                        subtype,
+                    });
                 }
                 let sid = u16::from_be_bytes([data[0], data[1]]);
                 let msg = match subtype {
@@ -222,9 +380,12 @@ impl<'a> PusPacket<'a> {
                 };
                 Ok(PusService::Housekeeping(msg))
             }
-            (false, 3, 25) => {
+            (false, 25) => {
                 if data.len() < 2 {
-                    return Err(PusError::MalformedServiceData { service, subtype });
+                    return Err(PusError::MalformedServiceData {
+                        service: 3,
+                        subtype,
+                    });
                 }
                 let sid = u16::from_be_bytes([data[0], data[1]]);
                 Ok(PusService::Housekeeping(
@@ -234,27 +395,204 @@ impl<'a> PusPacket<'a> {
                     },
                 ))
             }
-            (false, 5, 1..=4) => {
-                if data.len() < 2 {
-                    return Err(PusError::MalformedServiceData { service, subtype });
+            _ => Ok(PusService::Custom {
+                service: 3,
+                subtype,
+                app_data: data,
+            }),
+        }
+    }
+
+    fn decode_st05(is_tc: bool, subtype: u8, data: &'a [u8]) -> Result<PusService<'a>, PusError> {
+        if is_tc || !(1..=4).contains(&subtype) {
+            return Ok(PusService::Custom {
+                service: 5,
+                subtype,
+                app_data: data,
+            });
+        }
+        if data.len() < 2 {
+            return Err(PusError::MalformedServiceData {
+                service: 5,
+                subtype,
+            });
+        }
+        let severity = match subtype {
+            1 => EventSeverity::Informative,
+            2 => EventSeverity::LowAnomaly,
+            3 => EventSeverity::MediumAnomaly,
+            _ => EventSeverity::HighAnomaly,
+        };
+        let event_id = u16::from_be_bytes([data[0], data[1]]);
+        Ok(PusService::Event(EventReport {
+            severity,
+            event_id,
+            aux_data: &data[2..],
+        }))
+    }
+
+    fn decode_st06(is_tc: bool, subtype: u8, data: &'a [u8]) -> Result<PusService<'a>, PusError> {
+        match (is_tc, subtype) {
+            (true, 2) | (false, 6) => {
+                if data.len() < 5 {
+                    return Err(PusError::MalformedServiceData {
+                        service: 6,
+                        subtype,
+                    });
                 }
-                let severity = match subtype {
-                    1 => EventSeverity::Informative,
-                    2 => EventSeverity::LowAnomaly,
-                    3 => EventSeverity::MediumAnomaly,
-                    _ => EventSeverity::HighAnomaly,
+                let memory_id = data[0];
+                let address = u32::from_be_bytes([data[1], data[2], data[3], data[4]]);
+                let msg = if is_tc {
+                    MemoryMessage::LoadRaw {
+                        memory_id,
+                        address,
+                        data: &data[5..],
+                    }
+                } else {
+                    MemoryMessage::DumpRawReport {
+                        memory_id,
+                        address,
+                        data: &data[5..],
+                    }
                 };
-                let event_id = u16::from_be_bytes([data[0], data[1]]);
-                Ok(PusService::Event(EventReport {
-                    severity,
-                    event_id,
-                    aux_data: &data[2..],
+                Ok(PusService::Memory(msg))
+            }
+            (true, 5 | 9) => {
+                if data.len() < 7 {
+                    return Err(PusError::MalformedServiceData {
+                        service: 6,
+                        subtype,
+                    });
+                }
+                let memory_id = data[0];
+                let address = u32::from_be_bytes([data[1], data[2], data[3], data[4]]);
+                let length = u16::from_be_bytes([data[5], data[6]]);
+                let msg = if subtype == 5 {
+                    MemoryMessage::DumpRawRequest {
+                        memory_id,
+                        address,
+                        length,
+                    }
+                } else {
+                    MemoryMessage::CheckRawRequest {
+                        memory_id,
+                        address,
+                        length,
+                    }
+                };
+                Ok(PusService::Memory(msg))
+            }
+            (false, 10) => {
+                if data.len() < 9 {
+                    return Err(PusError::MalformedServiceData {
+                        service: 6,
+                        subtype,
+                    });
+                }
+                let memory_id = data[0];
+                let address = u32::from_be_bytes([data[1], data[2], data[3], data[4]]);
+                let length = u16::from_be_bytes([data[5], data[6]]);
+                let checksum = u16::from_be_bytes([data[7], data[8]]);
+                Ok(PusService::Memory(MemoryMessage::CheckRawReport {
+                    memory_id,
+                    address,
+                    length,
+                    checksum,
                 }))
             }
-            (true, 17, 1) => Ok(PusService::Test(TestMessage::AreYouAliveCommand)),
-            (false, 17, 2) => Ok(PusService::Test(TestMessage::AreYouAliveReport)),
             _ => Ok(PusService::Custom {
-                service,
+                service: 6,
+                subtype,
+                app_data: data,
+            }),
+        }
+    }
+
+    fn decode_st08(is_tc: bool, subtype: u8, data: &'a [u8]) -> Result<PusService<'a>, PusError> {
+        if !is_tc || subtype != 1 {
+            return Ok(PusService::Custom {
+                service: 8,
+                subtype,
+                app_data: data,
+            });
+        }
+        if data.len() < 2 {
+            return Err(PusError::MalformedServiceData {
+                service: 8,
+                subtype,
+            });
+        }
+        let function_id = u16::from_be_bytes([data[0], data[1]]);
+        Ok(PusService::Function(FunctionCall {
+            function_id,
+            args: &data[2..],
+        }))
+    }
+
+    fn decode_st11(is_tc: bool, subtype: u8, data: &'a [u8]) -> Result<PusService<'a>, PusError> {
+        match (is_tc, subtype) {
+            (true, 1) => Ok(PusService::Schedule(ScheduleMessage::Enable)),
+            (true, 2) => Ok(PusService::Schedule(ScheduleMessage::Disable)),
+            (true, 3) => Ok(PusService::Schedule(ScheduleMessage::Reset)),
+            (true, 4) => {
+                if data.len() < 4 {
+                    return Err(PusError::MalformedServiceData {
+                        service: 11,
+                        subtype,
+                    });
+                }
+                let release_time_s = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+                Ok(PusService::Schedule(ScheduleMessage::InsertActivity {
+                    release_time_s,
+                    activity_data: &data[4..],
+                }))
+            }
+            (false, 13) => {
+                if data.len() < 3 {
+                    return Err(PusError::MalformedServiceData {
+                        service: 11,
+                        subtype,
+                    });
+                }
+                let enabled = data[0] != 0;
+                let pending_count = u16::from_be_bytes([data[1], data[2]]);
+                Ok(PusService::Schedule(ScheduleMessage::SummaryReport {
+                    enabled,
+                    pending_count,
+                }))
+            }
+            _ => Ok(PusService::Custom {
+                service: 11,
+                subtype,
+                app_data: data,
+            }),
+        }
+    }
+
+    fn decode_st12(is_tc: bool, subtype: u8, data: &'a [u8]) -> Result<PusService<'a>, PusError> {
+        match (is_tc, subtype) {
+            (true, 1) => Ok(PusService::Monitoring(MonitoringMessage::Enable)),
+            (true, 2) => Ok(PusService::Monitoring(MonitoringMessage::Disable)),
+            (false, 12) => {
+                if data.len() < 10 {
+                    return Err(PusError::MalformedServiceData {
+                        service: 12,
+                        subtype,
+                    });
+                }
+                let param_id = u16::from_be_bytes([data[0], data[1]]);
+                let observed_value = i32::from_be_bytes([data[2], data[3], data[4], data[5]]);
+                let limit_value = i32::from_be_bytes([data[6], data[7], data[8], data[9]]);
+                Ok(PusService::Monitoring(
+                    MonitoringMessage::CheckTransitionReport {
+                        param_id,
+                        observed_value,
+                        limit_value,
+                    },
+                ))
+            }
+            _ => Ok(PusService::Custom {
+                service: 12,
                 subtype,
                 app_data: data,
             }),

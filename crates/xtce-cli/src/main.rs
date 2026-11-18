@@ -134,7 +134,7 @@ enum Command {
         limit: Option<usize>,
     },
 
-    /// Inspect ECSS-E-ST-70-41C (PUS-C) packet streams or run a closed-loop HIL OBC session.
+    /// Inspect ECSS-E-ST-70-41C (PUS-C) packet streams, run a HIL OBC session, or emit XTCE XML.
     Pus {
         /// File of concatenated CCSDS/PUS packets. Use '-' to read from standard input.
         packets: Option<PathBuf>,
@@ -143,7 +143,11 @@ enum Command {
         #[arg(long)]
         hil_demo: bool,
 
-        /// Write HIL session packets to this raw stream file.
+        /// Emit a complete XTCE 1.2 XML mission definition for the ECSS PUS-C spacecraft profile.
+        #[arg(long)]
+        emit_xtce: bool,
+
+        /// Write output (HIL capture or emitted XTCE XML) to this file.
         #[arg(long, short)]
         out: Option<PathBuf>,
 
@@ -245,12 +249,14 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Command::Pus {
             packets,
             hil_demo,
+            emit_xtce,
             out,
             skip_header_bytes,
             limit,
         } => pus::run(&pus::Options {
             packets: packets.as_deref(),
             hil_demo,
+            emit_xtce,
             out: out.as_deref(),
             skip_header_bytes,
             limit,

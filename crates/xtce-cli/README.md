@@ -31,9 +31,10 @@ $ xtce wireshark mission.xml --udp-port 5005 -o mission.lua
 $ xtce pcap downlink.dat -o downlink.pcap
 $ wireshark -X lua_script:mission.lua downlink.pcap
 
-# 5. Inspect ECSS-E-ST-70-41C (PUS-C) frames or run a closed-loop OBC HIL session
+# 5. Inspect ECSS-E-ST-70-41C (PUS-C) frames, run an EO HIL session, or emit a PUS XTCE database
 $ xtce pus --hil-demo -o hil_session.bin
-$ xtce pus hil_session.bin
+$ xtce pus --emit-xtce -o ecss_pus.xml
+$ xtce decode ecss_pus.xml hil_session.bin --format table
 ```
 
 Part of [RustSpaceLab/xtce-rs](https://github.com/RustSpaceLab/xtce-rs).
