@@ -1,6 +1,8 @@
 # xtce-rs
 
 [![CI](https://github.com/RustSpaceLab/xtce-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/RustSpaceLab/xtce-rs/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/xtce-cli.svg)](https://crates.io/crates/xtce-cli)
+[![docs.rs](https://docs.rs/xtce-decode/badge.svg)](https://docs.rs/xtce-decode)
 
 Decode CCSDS telemetry packets in Rust, according to an [XTCE](https://www.omg.org/spec/XTCE/)
 definition. Part of [RustSpaceLab](https://github.com/RustSpaceLab).
@@ -13,10 +15,11 @@ validated against that same implementation packet for packet.
 
 | Crate | What it does |
 |---|---|
-| `xtce-model` | XTCE XML → arena-backed IR, reference resolution, validation; telemetry and telecommands |
-| `xtce-decode` | IR + `&[u8]` → parameter values |
-| `xtce-codegen` | IR → a static Rust decoder with every offset baked in |
-| `xtce-cli` | `xtce info`, `xtce decode`, `xtce codegen`, `xtce bench` |
+| [`xtce-model`](https://crates.io/crates/xtce-model) | XTCE XML → arena-backed IR, reference resolution, validation; telemetry and telecommands |
+| [`xtce-decode`](https://crates.io/crates/xtce-decode) | IR + `&[u8]` / `PacketReader` → parameter values |
+| [`xtce-codegen`](https://crates.io/crates/xtce-codegen) | IR → a static Rust decoder with every offset baked in |
+| [`xtce-pus`](https://crates.io/crates/xtce-pus) | `#![no_std]` ECSS-E-ST-70-41C (PUS-C) framing, CRC-16-CCITT, and HIL OBC responder |
+| [`xtce-cli`](https://crates.io/crates/xtce-cli) | `xtce info`, `xtce decode`, `xtce codegen`, `xtce wireshark`, `xtce pcap`, `xtce pus`, `xtce bench` |
 | `xtce-py` | Python bindings (PyO3), built by `maturin` |
 | `xtask` | differential test harness against the Python reference |
 
@@ -66,12 +69,18 @@ back — see [`SUPPORTED.md`](SUPPORTED.md).
 #### Try it
 
 ```console
+$ cargo install xtce-cli
 $ cargo run --release -p xtce-cli -- info testdata/spp/ctim/ctim_xtce_v1.xml
 $ cargo run --release -p xtce-cli -- decode \
       testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml \
       testdata/spp/jpss/J01_G011_LZ_2021-04-09T00-00-00Z_V01.DAT1 --limit 3 --raw
 $ cargo run --release -p xtce-cli -- codegen \
       testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml
+$ cargo run --release -p xtce-cli -- wireshark \
+      testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml --udp-port 5005
+$ cargo run --release -p xtce-cli -- pcap \
+      testdata/spp/jpss/J01_G011_LZ_2021-04-09T00-00-00Z_V01.DAT1 --limit 10 -o jpss.pcap
+$ cargo run --release -p xtce-cli -- pus --hil-demo
 $ cargo xtask diff
 $ cargo bench
 ```
