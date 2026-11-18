@@ -20,6 +20,7 @@ Space Packets, with a bare-metal Hardware-in-the-Loop (HIL) spacecraft responder
   - **ST\[11\] Time-Based Scheduling**: `TC[11,1..3]` Enable/Disable/Reset Schedule, `TC[11,4]` Insert Time-Tagged Activity, `TM[11,13]` Schedule Summary Report.
   - **ST\[12\] On-Board Monitoring (FDIR)**: `TC[12,1..2]` Enable/Disable Parameter Monitoring, `TM[12,12]` Check Transition Report.
   - **ST\[17\] Test Service**: `TC[17,1]` Are-You-Alive Connection Test and `TM[17,2]` Are-You-Alive Connection Report.
+  - **ST\[20\] On-Board Parameter Management**: `TC[20,1]` Report Parameter Value, `TM[20,2]` Parameter Value Report, `TC[20,3]` Set Parameter Value in flight.
 - **Dual-Use Telecommand Security (`TcSecurityGate`)**: constant-time 64-bit **SipHash-2-4 MAC** verification and monotonic 32-bit **Anti-Replay** counter protection for critical uplink commands.
 - **`PusResponder` HIL State Machine**: deterministic, zero-heap flight responder suitable for `thumbv7em-none-eabihf` (STM32 Cortex-M), RISC-V (ESP32), RP2040/RP2350, or desktop HIL benches.
 

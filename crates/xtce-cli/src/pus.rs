@@ -7,14 +7,16 @@ use std::path::Path;
 use xtce_decode::PacketReader;
 use xtce_pus::{
     AckFlags, FUNC_EO_OPTICAL_CAPTURE, HousekeepingMessage, MAX_HIL_FRAME_LEN, MemoryMessage,
-    MonitoringMessage, ObcHousekeeping, PusError, PusHeader, PusPacket, PusResponder, PusService,
-    ScheduleMessage, TcParams, TestMessage, VerificationReport, encode_tc,
+    MonitoringMessage, ObcHousekeeping, ParameterManagementMessage, PusError, PusHeader, PusPacket,
+    PusResponder, PusService, ScheduleMessage, TcParams, TestMessage, VerificationReport,
+    encode_tc,
 };
 
 /// Configuration for `xtce pus`.
 pub struct Options<'a> {
     pub packets: Option<&'a Path>,
     pub hil_demo: bool,
+    pub hil_udp: Option<&'a str>,
     pub emit_xtce: bool,
     pub out: Option<&'a Path>,
     pub skip_header_bytes: usize,
@@ -34,8 +36,8 @@ fn open_packet_source(packets: &Path) -> std::io::Result<Box<dyn Read>> {
 ///
 /// # Errors
 ///
-/// Returns an error if no action (`<PACKETS>`, `--hil-demo`, or `--emit-xtce`) is specified or
-/// if I/O fails.
+/// Returns an error if no action (`<PACKETS>`, `--hil-demo`, `--hil-udp`, or `--emit-xtce`) is
+/// specified or if I/O fails.
 pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
     if options.emit_xtce {
         return write_pus_xtce(options.out);
@@ -43,6 +45,13 @@ pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
 
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
+
+    if let Some(bind_addr) = options.hil_udp {
+        let socket = std::net::UdpSocket::bind(bind_addr)?;
+        serve_hil_udp(&socket, &mut out, options.limit)?;
+        out.flush()?;
+        return Ok(());
+    }
 
     if options.hil_demo {
         run_hil_demo(&mut out, options.out)?;
@@ -52,7 +61,7 @@ pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
 
     let Some(packets_path) = options.packets else {
         return Err(
-            "provide a packet stream file (or '-'), pass --hil-demo, or pass --emit-xtce".into(),
+            "provide a packet stream file (or '-'), --hil-demo, --hil-udp, or --emit-xtce".into(),
         );
     };
 
@@ -172,6 +181,7 @@ fn write_pus_packet(
         ),
         Ok(PusService::Schedule(sched)) => write_schedule_summary(out, &sched),
         Ok(PusService::Monitoring(mon)) => write_monitoring_summary(out, mon),
+        Ok(PusService::ParameterManagement(pm)) => write_param_mgmt_summary(out, pm),
         Ok(PusService::Test(TestMessage::AreYouAliveCommand)) => {
             writeln!(out, "AreYouAliveCommand")
         }
@@ -336,6 +346,29 @@ fn write_monitoring_summary(out: &mut impl Write, mon: MonitoringMessage) -> std
     }
 }
 
+fn write_param_mgmt_summary(
+    out: &mut impl Write,
+    pm: ParameterManagementMessage,
+) -> std::io::Result<()> {
+    match pm {
+        ParameterManagementMessage::ReportRequest { param_id } => {
+            writeln!(out, "ParameterReportRequest(param=0x{param_id:04X})")
+        }
+        ParameterManagementMessage::ValueReport { param_id, value } => {
+            writeln!(
+                out,
+                "ParameterValueReport(param=0x{param_id:04X}, val={value})"
+            )
+        }
+        ParameterManagementMessage::SetValue { param_id, value } => {
+            writeln!(
+                out,
+                "ParameterSetValue(param=0x{param_id:04X}, val={value})"
+            )
+        }
+    }
+}
+
 fn run_hil_demo(
     out: &mut impl Write,
     capture_out: Option<&Path>,
@@ -422,6 +455,50 @@ fn run_hil_demo(
             recorded_stream.len(),
             path.display()
         );
+    }
+
+    Ok(())
+}
+
+/// Runs a live UDP FlatSat OBC responder loop on `socket`, processing up to `limit` telecommands.
+///
+/// # Errors
+///
+/// Returns an error if socket I/O or stream writing fails.
+pub fn serve_hil_udp(
+    socket: &std::net::UdpSocket,
+    out: &mut impl Write,
+    limit: Option<usize>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut responder = PusResponder::new(0x010, 0x0001);
+    let mut rx_buf = [0u8; 256];
+    let mut tm_frames = [[0u8; MAX_HIL_FRAME_LEN]; 4];
+    let mut tm_lens = [0usize; 4];
+    let mut processed = 0usize;
+    let mut frame_index = 0usize;
+
+    while limit.is_none_or(|max| processed < max) {
+        let (n, peer) = socket.recv_from(&mut rx_buf)?;
+        responder.tick_second();
+        let tc_slice = &rx_buf[..n];
+
+        if let Ok(parsed_tc) = PusPacket::parse(tc_slice) {
+            write_pus_packet(out, frame_index, &parsed_tc)?;
+        }
+        frame_index += 1;
+
+        if let Ok(tm_count) = responder.process_telecommand(tc_slice, &mut tm_frames, &mut tm_lens)
+        {
+            for slot in 0..tm_count {
+                let slice = &tm_frames[slot][..tm_lens[slot]];
+                socket.send_to(slice, peer)?;
+                if let Ok(parsed_tm) = PusPacket::parse(slice) {
+                    write_pus_packet(out, frame_index, &parsed_tm)?;
+                }
+                frame_index += 1;
+            }
+        }
+        processed += 1;
     }
 
     Ok(())
@@ -752,5 +829,65 @@ mod tests {
                 .expect("XTCE decodes ECSS PUS frame");
             assert!(packet.len() >= 15);
         }
+    }
+
+    #[test]
+    fn hil_udp_roundtrip_over_localhost_socket() {
+        let server_sock = std::net::UdpSocket::bind("127.0.0.1:0").expect("binds server");
+        let server_addr = server_sock.local_addr().expect("server addr");
+
+        let client_sock = std::net::UdpSocket::bind("127.0.0.1:0").expect("binds client");
+        client_sock
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .expect("timeout");
+
+        // Send one TC[17,1] Are-You-Alive telecommand datagram to the server socket
+        let mut tc_buf = [0u8; 32];
+        let tc_len = xtce_pus::encode_tc(
+            &xtce_pus::TcParams {
+                apid: 0x010,
+                sequence_count: 1,
+                ack: xtce_pus::AckFlags::ACCEPT_AND_COMPLETE,
+                service: 17,
+                subtype: 1,
+                source_id: 0x0042,
+            },
+            &[],
+            &mut tc_buf,
+        )
+        .expect("TC[17,1]");
+        client_sock
+            .send_to(&tc_buf[..tc_len], server_addr)
+            .expect("sends TC over UDP");
+
+        let mut log = Vec::new();
+        super::serve_hil_udp(&server_sock, &mut log, Some(1)).expect("serves 1 UDP command");
+
+        // Receive all 3 response datagrams (TM[1,1], TM[17,2], TM[1,7])
+        let mut rx = [0u8; 64];
+        let (n0, _) = client_sock.recv_from(&mut rx).expect("TM[1,1]");
+        assert_eq!(
+            xtce_pus::PusPacket::parse(&rx[..n0])
+                .unwrap()
+                .header
+                .subtype(),
+            1
+        );
+        let (n1, _) = client_sock.recv_from(&mut rx).expect("TM[17,2]");
+        assert_eq!(
+            xtce_pus::PusPacket::parse(&rx[..n1])
+                .unwrap()
+                .header
+                .service(),
+            17
+        );
+        let (n2, _) = client_sock.recv_from(&mut rx).expect("TM[1,7]");
+        assert_eq!(
+            xtce_pus::PusPacket::parse(&rx[..n2])
+                .unwrap()
+                .header
+                .subtype(),
+            7
+        );
     }
 }

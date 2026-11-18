@@ -37,7 +37,7 @@ pub use hil::{
     ERR_CODE_CRC_MISMATCH, ERR_CODE_NOT_A_TC, ERR_CODE_UNSUPPORTED, EVENT_ID_CORRUPTED_TC,
     EVENT_ID_DPU_INFERENCE, EVENT_ID_EO_CAPTURE, EVENT_ID_HK_ENABLED, FUNC_DPU_AI_INFERENCE,
     FUNC_ENTER_SAFE_MODE, FUNC_EO_OPTICAL_CAPTURE, MAX_HIL_FRAME_LEN, OBC_SCRATCHPAD_LEN,
-    PusResponder,
+    PARAM_EO_EXPOSURE_US, PusResponder,
 };
 pub use packet::{
     AckFlags, CucTimestamp, PEC_LEN, PRIMARY_HEADER_LEN, PUS_VERSION_C, PusError, PusHeader,
@@ -50,8 +50,8 @@ pub use security::{
 };
 pub use services::{
     EventReport, EventSeverity, FunctionCall, HousekeepingMessage, MemoryMessage,
-    MonitoringMessage, ObcHousekeeping, PusService, ScheduleMessage, TestMessage,
-    VerificationReport,
+    MonitoringMessage, ObcHousekeeping, ParameterManagementMessage, PusService, ScheduleMessage,
+    TestMessage, VerificationReport,
 };
 
 #[cfg(test)]

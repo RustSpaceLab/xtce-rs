@@ -31,8 +31,14 @@ $ xtce wireshark mission.xml --udp-port 5005 -o mission.lua
 $ xtce pcap downlink.dat -o downlink.pcap
 $ wireshark -X lua_script:mission.lua downlink.pcap
 
-# 5. Inspect ECSS-E-ST-70-41C (PUS-C) frames, run an EO HIL session, or emit a PUS XTCE database
+# 5. Assemble a binary CCSDS telemetry or telecommand packet from an XTCE definition
+$ xtce encode ecss_pus.xml TM_3_25_ObcHousekeeping \
+    --set CCSDS_SEC_HDR=1 --set CCSDS_APID=0x010 --set PUS_VERSION=2 \
+    --set HK_SID=1 --set OBC_UPTIME_S=3600 --set OBC_MODE=EO_IMAGING --crc --hex
+
+# 6. Inspect ECSS-E-ST-70-41C (PUS-C) frames, run a live UDP HIL OBC server, or emit XTCE XML
 $ xtce pus --hil-demo -o hil_session.bin
+$ xtce pus --hil-udp 127.0.0.1:5006
 $ xtce pus --emit-xtce -o ecss_pus.xml
 $ xtce decode ecss_pus.xml hil_session.bin --format table
 ```

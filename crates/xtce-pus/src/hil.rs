@@ -45,6 +45,9 @@ pub const FUNC_DPU_AI_INFERENCE: u16 = 0x0020;
 /// `ST[08]` Function ID: command spacecraft into `SAFE` mode (`mode = 0`).
 pub const FUNC_ENTER_SAFE_MODE: u16 = 0x00FF;
 
+/// `ST[20]` On-Board Parameter ID: optical payload integration exposure time in microseconds.
+pub const PARAM_EO_EXPOSURE_US: u16 = 0x0001;
+
 /// Deterministic, zero-heap ECSS PUS spacecraft responder state machine.
 #[derive(Clone, Debug)]
 #[allow(clippy::struct_excessive_bools)]
@@ -67,6 +70,8 @@ pub struct PusResponder {
     pub scheduled_count: u16,
     /// Whether `ST[12]` autonomous on-board parameter limit monitoring (FDIR) is enabled.
     pub monitoring_enabled: bool,
+    /// Tunable optical payload exposure duration in microseconds (`ST[20]`, `Param_ID = 1`).
+    pub eo_exposure_us: i32,
     /// On-board scratchpad RAM (`Memory_ID = 1`) accessible via `ST[06]` load/dump/check.
     pub scratchpad: [u8; OBC_SCRATCHPAD_LEN],
 }
@@ -90,6 +95,7 @@ impl PusResponder {
             schedule_enabled: false,
             scheduled_count: 0,
             monitoring_enabled: false,
+            eo_exposure_us: 15_000,
             scratchpad: [0u8; OBC_SCRATCHPAD_LEN],
         }
     }
@@ -231,6 +237,7 @@ impl PusResponder {
                 self.emit_frame(17, 2, &[], out_frames, out_lens, count, max_slots)?;
                 Ok(true)
             }
+            20 => self.execute_st20(subtype, app_data, out_frames, out_lens, count, max_slots),
             _ => Ok(false),
         }
     }
@@ -438,6 +445,47 @@ impl PusResponder {
                 true
             }
             _ => false,
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_st20(
+        &mut self,
+        subtype: u8,
+        app_data: &[u8],
+        out_frames: &mut [[u8; MAX_HIL_FRAME_LEN]],
+        out_lens: &mut [usize],
+        count: &mut usize,
+        max_slots: usize,
+    ) -> Result<bool, PusError> {
+        match subtype {
+            1 if app_data.len() >= 2 => {
+                let param_id = u16::from_be_bytes([app_data[0], app_data[1]]);
+                if param_id != PARAM_EO_EXPOSURE_US {
+                    return Ok(false);
+                }
+                let val_bytes = self.eo_exposure_us.to_be_bytes();
+                let report = [
+                    app_data[0],
+                    app_data[1],
+                    val_bytes[0],
+                    val_bytes[1],
+                    val_bytes[2],
+                    val_bytes[3],
+                ];
+                self.emit_frame(20, 2, &report, out_frames, out_lens, count, max_slots)?;
+                Ok(true)
+            }
+            3 if app_data.len() >= 6 => {
+                let param_id = u16::from_be_bytes([app_data[0], app_data[1]]);
+                if param_id != PARAM_EO_EXPOSURE_US {
+                    return Ok(false);
+                }
+                self.eo_exposure_us =
+                    i32::from_be_bytes([app_data[2], app_data[3], app_data[4], app_data[5]]);
+                Ok(true)
+            }
+            _ => Ok(false),
         }
     }
 

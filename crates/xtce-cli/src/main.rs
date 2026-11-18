@@ -20,6 +20,7 @@ use clap::{Parser, Subcommand};
 use xtce_model::XtceDb;
 
 mod decode;
+mod encode;
 mod info;
 mod pcap;
 mod pus;
@@ -134,6 +135,35 @@ enum Command {
         limit: Option<usize>,
     },
 
+    /// Assemble a binary CCSDS telemetry or telecommand packet from an XTCE definition.
+    Encode {
+        /// XTCE definition. Use '-' to read from standard input.
+        definition: PathBuf,
+
+        /// Concrete container or MetaCommand name to encode.
+        target: String,
+
+        /// Explicit root container to start inheritance walk from.
+        #[arg(long)]
+        root: Option<String>,
+
+        /// Field or argument assignment in NAME=VALUE form (repeatable).
+        #[arg(long = "set", short = 's')]
+        assignments: Vec<String>,
+
+        /// Write encoded packet here instead of standard output.
+        #[arg(long, short)]
+        out: Option<PathBuf>,
+
+        /// Emit lowercase hexadecimal text instead of raw binary bytes.
+        #[arg(long)]
+        hex: bool,
+
+        /// Stamp the final 16 bits of the packet with an ECSS CRC-16-CCITT syndrome.
+        #[arg(long)]
+        crc: bool,
+    },
+
     /// Inspect ECSS-E-ST-70-41C (PUS-C) packet streams, run a HIL OBC session, or emit XTCE XML.
     Pus {
         /// File of concatenated CCSDS/PUS packets. Use '-' to read from standard input.
@@ -142,6 +172,10 @@ enum Command {
         /// Run a closed-loop Hardware-in-the-Loop (HIL) session against the no_std OBC responder.
         #[arg(long)]
         hil_demo: bool,
+
+        /// Bind a live UDP socket (e.g. 127.0.0.1:5006) serving the no_std HIL OBC responder.
+        #[arg(long)]
+        hil_udp: Option<String>,
 
         /// Emit a complete XTCE 1.2 XML mission definition for the ECSS PUS-C spacecraft profile.
         #[arg(long)]
@@ -246,9 +280,27 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             skip_header_bytes,
             limit,
         }),
+        Command::Encode {
+            definition,
+            target,
+            root,
+            assignments,
+            out,
+            hex,
+            crc,
+        } => run_encode(
+            &definition,
+            &target,
+            root.as_deref(),
+            &assignments,
+            out.as_deref(),
+            hex,
+            crc,
+        ),
         Command::Pus {
             packets,
             hil_demo,
+            hil_udp,
             emit_xtce,
             out,
             skip_header_bytes,
@@ -256,6 +308,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         } => pus::run(&pus::Options {
             packets: packets.as_deref(),
             hil_demo,
+            hil_udp: hil_udp.as_deref(),
             emit_xtce,
             out: out.as_deref(),
             skip_header_bytes,
@@ -263,6 +316,29 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }),
         Command::Bench { file, iterations } => run_bench(&file, iterations),
     }
+}
+
+fn run_encode(
+    definition: &Path,
+    target: &str,
+    root: Option<&str>,
+    assignments: &[String],
+    out: Option<&Path>,
+    hex: bool,
+    crc: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let db = load_db(definition)?;
+    encode::run_with_db(
+        &db,
+        &encode::Options {
+            target,
+            root,
+            assignments,
+            out,
+            hex,
+            crc,
+        },
+    )
 }
 
 fn run_wireshark(

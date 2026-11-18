@@ -249,6 +249,30 @@ pub enum TestMessage {
     AreYouAliveReport,
 }
 
+/// ECSS Service 20 (`ST[20]`) On-Board Parameter Management message.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ParameterManagementMessage {
+    /// `TC[20,1]` — Request the current value of on-board parameter `param_id`.
+    ReportRequest {
+        /// 16-bit On-Board Parameter Identifier (`Param_ID`).
+        param_id: u16,
+    },
+    /// `TM[20,2]` — Telemetry report carrying the current value of `param_id`.
+    ValueReport {
+        /// 16-bit On-Board Parameter Identifier (`Param_ID`).
+        param_id: u16,
+        /// Current 32-bit parameter value.
+        value: i32,
+    },
+    /// `TC[20,3]` — Set the value of on-board parameter `param_id` in flight.
+    SetValue {
+        /// 16-bit On-Board Parameter Identifier (`Param_ID`).
+        param_id: u16,
+        /// New 32-bit parameter value.
+        value: i32,
+    },
+}
+
 /// High-level decoded ECSS PUS service payload.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PusService<'a> {
@@ -268,6 +292,8 @@ pub enum PusService<'a> {
     Monitoring(MonitoringMessage),
     /// `ST[17]` Test service message.
     Test(TestMessage),
+    /// `ST[20]` On-Board Parameter Management message.
+    ParameterManagement(ParameterManagementMessage),
     /// Any other service/subtype pair with its raw application data slice.
     Custom {
         /// ECSS service type (`ST[x]`).
@@ -308,6 +334,7 @@ impl<'a> PusPacket<'a> {
                     app_data: data,
                 }),
             },
+            20 => Self::decode_st20(self.header.is_telecommand(), subtype, data),
             _ => Ok(PusService::Custom {
                 service,
                 subtype,
@@ -593,6 +620,44 @@ impl<'a> PusPacket<'a> {
             }
             _ => Ok(PusService::Custom {
                 service: 12,
+                subtype,
+                app_data: data,
+            }),
+        }
+    }
+
+    fn decode_st20(is_tc: bool, subtype: u8, data: &'a [u8]) -> Result<PusService<'a>, PusError> {
+        match (is_tc, subtype) {
+            (true, 1) => {
+                if data.len() < 2 {
+                    return Err(PusError::MalformedServiceData {
+                        service: 20,
+                        subtype,
+                    });
+                }
+                let param_id = u16::from_be_bytes([data[0], data[1]]);
+                Ok(PusService::ParameterManagement(
+                    ParameterManagementMessage::ReportRequest { param_id },
+                ))
+            }
+            (false, 2) | (true, 3) => {
+                if data.len() < 6 {
+                    return Err(PusError::MalformedServiceData {
+                        service: 20,
+                        subtype,
+                    });
+                }
+                let param_id = u16::from_be_bytes([data[0], data[1]]);
+                let value = i32::from_be_bytes([data[2], data[3], data[4], data[5]]);
+                let msg = if is_tc {
+                    ParameterManagementMessage::SetValue { param_id, value }
+                } else {
+                    ParameterManagementMessage::ValueReport { param_id, value }
+                };
+                Ok(PusService::ParameterManagement(msg))
+            }
+            _ => Ok(PusService::Custom {
+                service: 20,
                 subtype,
                 app_data: data,
             }),
