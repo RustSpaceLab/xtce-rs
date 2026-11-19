@@ -41,6 +41,17 @@ $ xtce pus --hil-demo -o hil_session.bin
 $ xtce pus --hil-udp 127.0.0.1:5006
 $ xtce pus --emit-xtce -o ecss_pus.xml
 $ xtce decode ecss_pus.xml hil_session.bin --format table
+
+# 7. Validate an XTCE definition or export a normalized JSON metadata dictionary
+$ xtce validate ecss_pus.xml --strict
+$ xtce validate ecss_pus.xml --json > metadata.json
+
+# 8. Compare two XTCE definitions and classify changes (BREAKING, WARNING, COMPATIBLE)
+$ xtce diff mission_v1.xml mission_v2.xml --fail-on-breaking
+
+# 9. Simulate a deterministic CCSDS / ECSS PUS-C telemetry stream (with fault injection)
+$ xtce sim --scenario voltage-drop --packets 20 --seed 42 -o fault_pass.bin
+$ xtce sim --scenario overheat --packets 20 --seed 42 --pcap -o overheat_pass.pcap
 ```
 
 Part of [RustSpaceLab/xtce-rs](https://github.com/RustSpaceLab/xtce-rs).

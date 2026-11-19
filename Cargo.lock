@@ -915,7 +915,7 @@ checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
 
 [[package]]
 name = "xtask"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "clap",
  "serde_json",
@@ -925,7 +925,7 @@ dependencies = [
 
 [[package]]
 name = "xtce-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "clap",
  "xtce-codegen",
@@ -936,7 +936,7 @@ dependencies = [
 
 [[package]]
 name = "xtce-codegen"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "criterion",
  "prettyplease",
@@ -950,7 +950,7 @@ dependencies = [
 
 [[package]]
 name = "xtce-codegen-e2e"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "xtce-codegen",
  "xtce-decode",
@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "xtce-decode"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "criterion",
  "proptest",
@@ -969,7 +969,7 @@ dependencies = [
 
 [[package]]
 name = "xtce-model"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "criterion",
  "proptest",
@@ -979,7 +979,7 @@ dependencies = [
 
 [[package]]
 name = "xtce-pus"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "zerocopy"

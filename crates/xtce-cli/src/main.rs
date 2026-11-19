@@ -20,10 +20,13 @@ use clap::{Parser, Subcommand};
 use xtce_model::XtceDb;
 
 mod decode;
+mod diff;
 mod encode;
 mod info;
 mod pcap;
 mod pus;
+mod sim;
+mod validate;
 mod wireshark;
 
 #[derive(Parser)]
@@ -203,6 +206,64 @@ enum Command {
         #[arg(long, default_value_t = 10)]
         iterations: u32,
     },
+
+    /// Compare two XTCE definitions and classify changes (BREAKING, WARNING, COMPATIBLE).
+    Diff {
+        /// Previous (baseline) XTCE definition file.
+        old: PathBuf,
+
+        /// New (candidate) XTCE definition file.
+        new: PathBuf,
+
+        /// Explicit root container to start inheritance and bit-offset analysis from.
+        #[arg(long)]
+        root: Option<String>,
+
+        /// Exit with a non-zero status code when BREAKING changes are detected.
+        #[arg(long)]
+        fail_on_breaking: bool,
+    },
+
+    /// Validate an XTCE definition for structural, semantic, and codegen readiness, or emit JSON metadata.
+    Validate {
+        /// XTCE definition. Use '-' to read from standard input.
+        definition: PathBuf,
+
+        /// Explicit root container to start from.
+        #[arg(long)]
+        root: Option<String>,
+
+        /// Emit a canonical JSON metadata dictionary (parameters, containers, telecommands) instead of the text report.
+        #[arg(long)]
+        json: bool,
+
+        /// Fail with a non-zero exit code on warnings as well as errors.
+        #[arg(long)]
+        strict: bool,
+    },
+
+    /// Generate a deterministic CCSDS / ECSS PUS-C mission telemetry stream (with optional fault injection).
+    Sim {
+        /// Mission scenario to simulate.
+        #[arg(long, value_enum, default_value_t = sim::Scenario::Nominal)]
+        scenario: sim::Scenario,
+
+        /// Number of telemetry packets to generate.
+        #[arg(long, default_value_t = 20)]
+        packets: usize,
+
+        /// Deterministic PRNG seed (SplitMix64) for reproducible sensor noise.
+        #[arg(long, default_value_t = 42)]
+        seed: u64,
+
+        /// Wrap the generated packet stream in a libpcap (.pcap) DLT_USER0 container for Wireshark.
+        #[arg(long)]
+        pcap: bool,
+
+        /// Write generated packets here instead of standard output.
+        #[arg(long, short)]
+        out: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -234,6 +295,7 @@ fn load_db(path: &Path) -> Result<XtceDb, Box<dyn std::error::Error>> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Command::Info { files, verbose } => run_info(&files, verbose),
@@ -315,7 +377,60 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             limit,
         }),
         Command::Bench { file, iterations } => run_bench(&file, iterations),
+        Command::Diff {
+            old,
+            new,
+            root,
+            fail_on_breaking,
+        } => run_diff(&old, &new, root.as_deref(), fail_on_breaking),
+        Command::Validate {
+            definition,
+            root,
+            json,
+            strict,
+        } => run_validate(&definition, root.as_deref(), json, strict),
+        Command::Sim {
+            scenario,
+            packets,
+            seed,
+            pcap,
+            out,
+        } => sim::run(&sim::Options {
+            scenario,
+            packets,
+            seed,
+            pcap_format: pcap,
+            out: out.as_deref(),
+        }),
     }
+}
+
+fn run_diff(
+    old: &Path,
+    new: &Path,
+    root: Option<&str>,
+    fail_on_breaking: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let old_db = load_db(old)?;
+    let new_db = load_db(new)?;
+    diff::run(
+        &old_db,
+        &new_db,
+        &diff::Options {
+            root,
+            fail_on_breaking,
+        },
+    )
+}
+
+fn run_validate(
+    definition: &Path,
+    root: Option<&str>,
+    json: bool,
+    strict: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let db = load_db(definition)?;
+    validate::run(&db, &validate::Options { root, json, strict })
 }
 
 fn run_encode(
