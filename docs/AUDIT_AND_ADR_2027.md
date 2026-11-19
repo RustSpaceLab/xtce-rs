@@ -19,11 +19,11 @@ Główny plik `Cargo.toml` (linie `1–48`) definiuje workspace z `resolver = "3
 | **`xtce-codegen`** | `crates/xtce-codegen` | `lib` (emituje kod `core`/`no_std`) | `std` (generator) / `core` (wyjście) | `xtce-model`, `thiserror = "2"`, `proc-macro2 = "1"`, `quote = "1"`, `prettyplease = "0.2"`, `syn = "2"` | **15** (1 unit + 14 integr.) |
 | **`xtce-codegen-e2e`** | `crates/xtce-codegen-e2e` | `lib` (`publish = false`) | `std` | `[build-dependencies]`: `xtce-model`, `xtce-codegen`; `[dev-dependencies]`: `xtce-model`, `xtce-decode` | **19** (19 integr. E2E) |
 | **`xtce-pus`** | `crates/xtce-pus` | `lib` | **`#![no_std]`** (zero alokacji) | **Brak (`0` zależności zewnętrznych)** | **9** (9 unit/HIL) |
-| **`xtce-cli`** | `crates/xtce-cli` | `bin` (`xtce`) | `std` | `xtce-model`, `xtce-decode`, `xtce-codegen`, `xtce-pus`, `clap = "4"` (`derive`) | **38** (38 unit) |
+| **`xtce-cli`** | `crates/xtce-cli` | `bin` (`xtce`) | `std` | `xtce-model`, `xtce-decode`, `xtce-codegen`, `xtce-pus`, `clap = "4"` (`derive`) | **39** (39 unit) |
 | **`xtce-py`** | `crates/xtce-py` | `cdylib` (`xtce`, osobny workspace) | `std` + CPython ABI3 | `xtce-model`, `xtce-decode`, `pyo3 = "0.28"` (`abi3-py310`, `extension-module`) | **14** uruchomień `pytest` (6 funkcji + 2×4 parametryzacji) |
 | **`xtask`** | `xtask` | `bin` (`publish = false`) | `std` | `xtce-model`, `xtce-decode`, `serde_json = "1"`, `clap = "4"` | **12** (12 unit) |
 
-*Łączna liczba testów Rust (`#[test]` w workspace):* **213 testów** (+ 5 doc-testów + 14 przypadków testowych `pytest` w `crates/xtce-py/tests/test_against_reference.py` oraz 18 zestawów referencyjnych *golden files* weryfikowanych przez `cargo xtask diff`).
+*Łączna liczba testów Rust (`#[test]` w workspace):* **214 testów** (+ 5 doc-testów + 14 przypadków testowych `pytest` w `crates/xtce-py/tests/test_against_reference.py` oraz 18 zestawów referencyjnych *golden files* weryfikowanych przez `cargo xtask diff`).
 
 ---
 
@@ -71,18 +71,19 @@ Główny plik `Cargo.toml` (linie `1–48`) definiuje workspace z `resolver = "3
   * **Suma kontrolna (`crc.rs`):** `crc16_ccitt`, `verify_crc16_ccitt`.
 
 #### 1.2.5. `xtce-cli` (`crates/xtce-cli/src/main.rs`)
-* Narzędzie wiersza poleceń `xtce` z 11 podkomendami (`Command` enum):
+* Narzędzie wiersza poleceń `xtce` z 12 podkomendami (`Command` enum):
   1. `xtce info <files...> [--verbose]` (`src/info.rs`)
   2. `xtce decode <definition> <packets> [--root] [--skip-header-bytes] [--limit] [--param] [--format table|jsonl|csv] [--raw] [--no-summary]` (`src/decode.rs`)
   3. `xtce codegen <definition> [--root] [--out]` (`src/main.rs`)
-  4. `xtce wireshark <definition> [--root] [--out] [--udp-port]` (`src/wireshark.rs` — generator dysektora Lua dla Wireshark)
-  5. `xtce pcap <packets> [--out] [--skip-header-bytes] [--limit]` (`src/pcap.rs` — opakowanie strumienia CCSDS w `DLT_USER0` `.pcap`)
-  6. `xtce encode <definition> <target> [--root] [--set NAME=VAL] [--out] [--hex] [--crc]` (`src/encode.rs` — koder pakietów TM/TC z definicji XTCE)
-  7. `xtce pus [packets] [--hil-demo] [--hil-udp ADDR] [--emit-xtce] [--out] [--skip-header-bytes] [--limit]` (`src/pus.rs`)
-  8. `xtce bench <file> [--iterations]` (`src/main.rs`)
-  9. `xtce diff <old> <new> [--root] [--fail-on-breaking]` (`src/diff.rs` — Zadanie 4: Semantic Diff MVP dla definicji XTCE)
-  10. `xtce validate <definition> [--root] [--json] [--strict]` (`src/validate.rs` — Zadanie 3: Walidator semantyczny i eksporter kanonicznego słownika JSON)
-  11. `xtce sim [--scenario nominal|voltage-drop|overheat|comm-loss|reboot] [--packets N] [--seed S] [--pcap] [--out]` (`src/sim.rs` — Zadanie 5: Deterministyczny symulator telemetrii z wstrzykiwaniem awarii)
+  4. `xtce compile <definition> [--target rust-ground|wireshark|json-schema|docs|dashboard] [--root] [--out]` (`src/compile.rs` — wielocelowy kompilator misji XTCE)
+  5. `xtce wireshark <definition> [--root] [--out] [--udp-port]` (`src/wireshark.rs` — generator dysektora Lua dla Wireshark)
+  6. `xtce pcap <packets> [--out] [--skip-header-bytes] [--limit]` (`src/pcap.rs` — opakowanie strumienia CCSDS w `DLT_USER0` `.pcap`)
+  7. `xtce encode <definition> <target> [--root] [--set NAME=VAL] [--out] [--hex] [--crc]` (`src/encode.rs` — koder pakietów TM/TC z definicji XTCE)
+  8. `xtce pus [packets] [--hil-demo] [--hil-udp ADDR] [--emit-xtce] [--out] [--skip-header-bytes] [--limit]` (`src/pus.rs`)
+  9. `xtce bench <file> [--iterations]` (`src/main.rs`)
+  10. `xtce diff <old> <new> [--root] [--fail-on-breaking]` (`src/diff.rs` — Zadanie 4: Semantic Diff MVP dla definicji XTCE)
+  11. `xtce validate <definition> [--root] [--json] [--strict]` (`src/validate.rs` — Zadanie 3: Walidator semantyczny i eksporter kanonicznego słownika JSON)
+  12. `xtce sim [--scenario nominal|voltage-drop|overheat|comm-loss|reboot|attitude-loss|sensor-glitch] [--packets N] [--seed S] [--pcap] [--out]` (`src/sim.rs` — Zadanie 5: Deterministyczny symulator telemetrii z wstrzykiwaniem awarii)
 
 #### 1.2.6. `xtce-py` (`crates/xtce-py/src/lib.rs`)
 * Moduł natywny Python (`#[pymodule] fn xtce`, `abi3-py310`):
@@ -323,3 +324,74 @@ Poniższa macierz zestawia pełne pokrycie standardu **OMG XTCE 1.2 (CCSDS 660.1
 | `ContextCalibratorList` / `ContextCalibrator` (`ContextMatch` z `Comparison` / `ComparisonList` oraz obecnym `DefaultCalibrator`) | **Interpreter + Codegen** | `lower.rs:1083–1106` | `decoder.rs:396–411`, `782–798` | `plan.rs:789–821`, `904–1100` (`emit.rs:747–759`) | `L103`, `L163`, `L228–235` |
 | `ContextCalibratorList` bez `DefaultCalibrator`, lub z `BooleanExpression`, lub z `useCalibratedValue="true"` na aktualnie kalibrowanym polu | **Tylko Interpreter** (Refused w Codegen) | `lower.rs:1083–1106` | `decoder.rs:396–425`, `785–790` | **Refused:** `plan.rs:922–929` (brak `DefaultCalibrator`), `plan.rs:987–991` (`BooleanExpression`), `plan.rs:1027–1036` (`useCalibratedValue` na bieżącym polu) | `L164–166` |
 | `MathOperationCalibrator` oraz `CustomAlgorithm` jako kalibrator | **Represented** (`Calibrator::Unsupported`) | `lower.rs:1150–1156` | `decoder.rs:433–438` (`DecodeError::Unsupported`) | **Refused:** `plan.rs:891–894`, `950–955` | `L104`, `L169` |
+
+---
+
+## 4. Uzupełnienie ze strategii `RustSpaceLab` (XTCE Compiler, Telemetry Studio, Interoperacyjność i Rozpoznawalność)
+
+Poniższa sekcja domyka elementy wizji strategicznej `RustSpaceLab`, które zostały zidentyfikowane w analizie ekosystemowej, a zostały skrócone w pierwotnym dokumencie PDF.
+
+### 4.1. Wielocelowy kompilator misji (`xtce compile --target <TARGET>`)
+
+Zgodnie z koncepcją *„Jeden ekosystem. Jeden model danych. Wiele zastosowań”*, pojedynczy plik definicji XTCE 1.2 stanowi źródło prawdy kompilowane z poziomu `xtce-cli` (`crates/xtce-cli/src/compile.rs`) do pięciu artefaktów inżynieryjnych:
+
+```bash
+xtce compile mission.xml --target rust-ground -o decoder.rs
+xtce compile mission.xml --target wireshark   -o mission.lua
+xtce compile mission.xml --target json-schema -o mission.schema.json
+xtce compile mission.xml --target docs        -o MISSION_DICTIONARY.md
+xtce compile mission.xml --target dashboard   -o telemetry_studio.json
+```
+
+*Dla kompilacji pokładowych koderów `#![no_std]` używany jest komplementarny kompilator `xtce-flight` z repozytorium `RustSpaceLab/xtce-flight`, a dla wiązań Python — pakiet `xtce-py`.*
+
+### 4.2. Rozszerzony Symulator Misji (`xtce sim`)
+
+Symulator `xtce sim` (`crates/xtce-cli/src/sim.rs`) obsługuje pełen zestaw 7 deterministycznych profili orbitalnych i awaryjnych zasilanych 64-bitowym generatorem SplitMix64 (`--seed`):
+1. `nominal` — nominalny przelot orbitalny LEO (28,2 V, 22,5 °C, telemetria `TM[3,25]` i `TM[17,2]`).
+2. `voltage-drop` — degradacja / spadek napięcia baterii w cieniu Ziemi poniżej 24,0 V z raportem `TM[5,2]` (`0x1201`) i przejściem do `SAFE_MODE`.
+3. `overheat` — przegrzanie komputera pokładowego OBC powyżej +68,0 °C z alarmem `TM[5,2]` (`0x1202`).
+4. `comm-loss` — utrata łączności radiowej (skok licznika sekwencji CCSDS o 17 utraconych ramek i raport `0x0502`).
+5. `reboot` — reset komputera pokładowego OBC (watchdog reset, wyzerowanie `OBC_UPTIME_S` i raport startowy `0x0503`).
+6. `attitude-loss` — utrata orientacji ADCS (tumble / star-tracker fault, raport `0x0504` i natychmiastowe przejście do `SAFE_MODE`).
+7. `sensor-glitch` — przekłamanie przetwornika ADC / błędne wartości telemetryczne (pik 35,9 V / 85,0 °C i raport anomalii `0x0505`).
+
+### 4.3. Interoperacyjność w ekosystemie Rust (`sat-rs`, `spacepackets-rs`, `cfdp-rs`)
+
+```text
+             RustSpaceLab
+                  |
+        +---------+---------+
+        |                   |
+     xtce-rs             xtce-flight
+        |                   |
+        +---------+---------+
+                  |
+        CCSDS / ECSS PUS Layer (xtce-pus #![no_std])
+                  |
+        +---------+---------+
+        |                   |
+     spacepackets-rs      sat-rs / cfdp-rs
+        |
+      xtce-gs
+        |
+   Telemetry Studio / OrbitTrack Live Mission Demo
+```
+
+Zamiast duplikować całe frameworki oprogramowania pokładowego lub protokoły transferu plików:
+* `xtce-decode::SpacePacketBytes` oraz `xtce-pus::PusPacket` operują bezpośrednio na surowych wycinkach `&[u8]` CCSDS 133.0-B-2, co pozwala na bezkopiową wymianę ramek z `spacepackets-rs`, `sat-rs` oraz `cfdp-rs`.
+
+### 4.4. Trzy filary rozpoznawalności i adopcji `RustSpaceLab`
+
+1. **RustSpaceLab Mission Demo (`OrbitTrack / Telemetry Studio Live`):**
+   * Publicznie dostępny, interaktywny demonstrator online (wdrożony na żywo pod adresem **`https://altanix.dev/mission-demo`**) połączony z prawdziwym silnikiem Rust (`xtce` + `#![no_std]` `xtce-pus` HIL OBC responder), wizualizujący w czasie rzeczywistym konstelację polskich i europejskich satelitów LEO (`PIAST-M`, `CAMILA-1`, `EagleEye-2`, `OPS-SAT-2`, `PW-Sat3`) na mapie orbitalnej oraz globusie 3D nad stacją naziemną w Warszawie, z żywymi wykresami telemetrii, wstrzykiwaniem awarii, wysyłaniem podpisanych kryptograficznie telekomend ECSS PUS-C (SipHash-2-4 MAC) i inspektorem ramek CCSDS.
+2. **Public Performance Lab:**
+   * Powtarzalne benchmarki (`cargo run -p xtask --release -- diff` oraz `xtce bench`) porównujące przepustowość i czas ładowania definicji (do **103× szybciej przy ładowaniu** i **124× szybciej przy dekodowaniu** niż referencyjny `space_packet_parser` w Pythonie, przy **0 alokacjach na pakiet** w ścieżce `decode_into` oraz `xtce-codegen`).
+3. **Space Software Engineering Blog (Seria artykułów technicznych):**
+   * *Why Rust is interesting for spacecraft software*
+   * *How to build a zero-allocation XTCE decoder*
+   * *From XTCE XML to `#![no_std]` machine code without a single panic path*
+   * *How CCSDS and ECSS PUS-C telemetry decoding works*
+   * *Testing satellite software without a satellite (Deterministic HIL & Fault Injection)*
+   * *Deterministic Rust in embedded systems*
+

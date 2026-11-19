@@ -27,6 +27,10 @@ pub enum Scenario {
     CommLoss,
     /// On-board watchdog reset mid-pass: uptime and sequence counters reset with a boot event.
     Reboot,
+    /// ADCS star-tracker / reaction-wheel tumble: spacecraft drops into SAFE mode with event `0x0504`.
+    AttitudeLoss,
+    /// Corrupted sensor readout: injects an out-of-limits telemetry spike and anomaly report `0x0505`.
+    SensorGlitch,
 }
 
 /// Configuration for `xtce sim`.
@@ -118,6 +122,13 @@ pub fn generate_stream(scenario: Scenario, packet_count: usize, seed: u64) -> Ve
                 seq_count = 0;
                 mode = 0; // Boot into SAFE mode
             }
+            Scenario::AttitudeLoss if step >= fault_step => {
+                mode = 0; // ADCS tumble -> enter SAFE mode
+            }
+            Scenario::SensorGlitch if step == fault_step + 1 => {
+                bus_voltage_mv = 35_900; // Spurious ADC spike
+                obc_temp_cdeg = 8_500;
+            }
             _ => {}
         }
 
@@ -128,6 +139,8 @@ pub fn generate_stream(scenario: Scenario, packet_count: usize, seed: u64) -> Ve
                     Scenario::Overheat => (0x1202, obc_temp_cdeg as u16),
                     Scenario::CommLoss => (0x0502, 17),
                     Scenario::Reboot => (0x0503, 1),
+                    Scenario::AttitudeLoss => (0x0504, 0),
+                    Scenario::SensorGlitch => (0x0505, 0xFFFF),
                     Scenario::Nominal => (0x0000, 0),
                 };
                 let id_b = ev_id.to_be_bytes();
@@ -244,6 +257,8 @@ mod tests {
             Scenario::Overheat,
             Scenario::CommLoss,
             Scenario::Reboot,
+            Scenario::AttitudeLoss,
+            Scenario::SensorGlitch,
         ] {
             let stream = generate_stream(scenario, 12, 1337);
             let mut count = 0usize;

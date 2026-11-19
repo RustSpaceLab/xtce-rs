@@ -19,6 +19,7 @@ use std::time::Instant;
 use clap::{Parser, Subcommand};
 use xtce_model::XtceDb;
 
+mod compile;
 mod decode;
 mod diff;
 mod encode;
@@ -98,6 +99,24 @@ enum Command {
         root: Option<String>,
 
         /// Write here instead of standard output.
+        #[arg(long, short)]
+        out: Option<PathBuf>,
+    },
+
+    /// Multi-target XTCE mission compiler (rust-ground, wireshark, json-schema, docs, dashboard).
+    Compile {
+        /// XTCE definition. Use '-' to read from standard input.
+        definition: PathBuf,
+
+        /// Artifact target to compile.
+        #[arg(long, value_enum, default_value_t = compile::Target::RustGround)]
+        target: compile::Target,
+
+        /// Explicit root container to start from.
+        #[arg(long)]
+        root: Option<String>,
+
+        /// Write compiled artifact here instead of standard output.
         #[arg(long, short)]
         out: Option<PathBuf>,
     },
@@ -325,6 +344,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             root,
             out,
         } => run_codegen(&definition, root, out),
+        Command::Compile {
+            definition,
+            target,
+            root,
+            out,
+        } => run_compile(&definition, target, root.as_deref(), out.as_deref()),
         Command::Wireshark {
             definition,
             root,
@@ -403,6 +428,24 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             out: out.as_deref(),
         }),
     }
+}
+
+fn run_compile(
+    definition: &Path,
+    target: compile::Target,
+    root: Option<&str>,
+    out: Option<&Path>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let db = load_db(definition)?;
+    compile::run_with_db(
+        &db,
+        &compile::Options {
+            definition,
+            target,
+            root,
+            out,
+        },
+    )
 }
 
 fn run_diff(

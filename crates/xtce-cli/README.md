@@ -52,6 +52,14 @@ $ xtce diff mission_v1.xml mission_v2.xml --fail-on-breaking
 # 9. Simulate a deterministic CCSDS / ECSS PUS-C telemetry stream (with fault injection)
 $ xtce sim --scenario voltage-drop --packets 20 --seed 42 -o fault_pass.bin
 $ xtce sim --scenario overheat --packets 20 --seed 42 --pcap -o overheat_pass.pcap
+$ xtce sim --scenario attitude-loss --packets 20 --seed 42 -o adcs_tumble.bin
+
+# 10. Multi-target XTCE mission compiler (rust-ground, wireshark, json-schema, docs, dashboard)
+$ xtce compile ecss_pus.xml --target rust-ground -o decoder.rs
+$ xtce compile ecss_pus.xml --target wireshark   -o mission.lua
+$ xtce compile ecss_pus.xml --target json-schema -o mission.schema.json
+$ xtce compile ecss_pus.xml --target docs        -o MISSION_DICTIONARY.md
+$ xtce compile ecss_pus.xml --target dashboard   -o telemetry_studio.json
 ```
 
 Part of [RustSpaceLab/xtce-rs](https://github.com/RustSpaceLab/xtce-rs).
