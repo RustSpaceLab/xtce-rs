@@ -862,4 +862,23 @@ mod tests {
         assert!(is_pcap);
         assert_eq!(stripped, raw);
     }
+
+    #[test]
+    fn extract_packets_if_pcap_edge_cases_and_invalid_magic() {
+        let empty: &[u8] = &[];
+        let (is_pcap_empty, extracted_empty) = extract_packets_if_pcap(empty);
+        assert!(!is_pcap_empty);
+        assert_eq!(extracted_empty, [] as [u8; 0]);
+
+        let short_bytes: &[u8] = &[0xD4, 0xC3, 0xB2, 0xA1, 0x02, 0x00];
+        let (is_pcap_short, extracted_short) = extract_packets_if_pcap(short_bytes);
+        assert!(!is_pcap_short);
+        assert_eq!(extracted_short, [] as [u8; 0]);
+
+        let mut invalid_header_pcap = vec![0x11, 0x22, 0x33, 0x44];
+        invalid_header_pcap.resize(24, 0);
+        let (is_pcap_invalid, extracted_invalid) = extract_packets_if_pcap(&invalid_header_pcap);
+        assert!(!is_pcap_invalid);
+        assert_eq!(extracted_invalid, [] as [u8; 0]);
+    }
 }

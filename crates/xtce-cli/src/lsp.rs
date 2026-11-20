@@ -25,10 +25,39 @@ use crate::validate::{self, Level};
 /// Maximum LSP message payload size accepted from `stdin` (32 MiB) to prevent unbounded allocation.
 const MAX_LSP_BODY_BYTES: usize = 32 * 1024 * 1024;
 
+/// Cached document buffer with precomputed line-start byte offsets for O(1) line lookup.
+#[derive(Default)]
+struct CachedDocument {
+    text: String,
+    line_starts: Vec<usize>,
+}
+
+impl CachedDocument {
+    fn new(text: String) -> Self {
+        let mut line_starts = vec![0];
+        for (idx, b) in text.bytes().enumerate() {
+            if b == b'\n' {
+                line_starts.push(idx + 1);
+            }
+        }
+        Self { text, line_starts }
+    }
+
+    fn line_slice(&self, line: usize) -> Option<&str> {
+        let start = *self.line_starts.get(line)?;
+        let end = self
+            .line_starts
+            .get(line + 1)
+            .map_or(self.text.len(), |next| next.saturating_sub(1));
+        let slice = self.text.get(start..end)?;
+        Some(slice.strip_suffix('\r').unwrap_or(slice))
+    }
+}
+
 /// In-memory state of the XTCE Language Server.
 #[derive(Default)]
 pub struct LspServer {
-    documents: BTreeMap<String, String>,
+    documents: BTreeMap<String, CachedDocument>,
     shutdown_requested: bool,
 }
 
@@ -92,7 +121,7 @@ impl LspServer {
                 if let Some(uri) = extract_json_str(body, "uri") {
                     if let Some(text) = extract_json_str(body, "text") {
                         let diag_json = build_diagnostics_notification(&uri, &text);
-                        self.documents.insert(uri, text);
+                        self.documents.insert(uri, CachedDocument::new(text));
                         write_lsp_frame(out, &diag_json)?;
                     }
                 }
@@ -134,10 +163,13 @@ impl LspServer {
         let line = extract_json_usize(body, "line").unwrap_or(0);
         let character = extract_json_usize(body, "character").unwrap_or(0);
 
-        let Some(token) = word_at_position(doc, line, character) else {
+        let Some(line_str) = doc.line_slice(line) else {
             return "null".to_owned();
         };
-        let Ok(db) = XtceDb::from_xml(doc) else {
+        let Some(token) = word_in_line_utf16(line_str, character) else {
+            return "null".to_owned();
+        };
+        let Ok(db) = XtceDb::from_xml(&doc.text) else {
             return "null".to_owned();
         };
         let Some(markdown) = build_hover_markdown(&db, token) else {
@@ -159,10 +191,13 @@ impl LspServer {
         let line = extract_json_usize(body, "line").unwrap_or(0);
         let character = extract_json_usize(body, "character").unwrap_or(0);
 
-        let Some(token) = word_at_position(doc, line, character) else {
+        let Some(line_str) = doc.line_slice(line) else {
             return "null".to_owned();
         };
-        let Some((def_line, def_col)) = find_xml_definition_line(doc, token) else {
+        let Some(token) = word_in_line_utf16(line_str, character) else {
+            return "null".to_owned();
+        };
+        let Some((def_line, def_col)) = find_xml_definition_line(&doc.text, token) else {
             return "null".to_owned();
         };
 
@@ -181,7 +216,7 @@ impl LspServer {
         let Some(doc) = self.documents.get(&uri) else {
             return "[]".to_owned();
         };
-        let Ok(db) = XtceDb::from_xml(doc) else {
+        let Ok(db) = XtceDb::from_xml(&doc.text) else {
             return "[]".to_owned();
         };
 
@@ -191,17 +226,17 @@ impl LspServer {
 
         for c in db.containers() {
             let name = db.name(c.name);
-            let (line, col) = find_xml_definition_line(doc, name).unwrap_or((0, 0));
+            let (line, col) = find_xml_definition_line(&doc.text, name).unwrap_or((0, 0));
             append_symbol_json(&mut out, &mut first, name, 23, line, col);
         }
         for p in db.parameters() {
             let name = db.name(p.name);
-            let (line, col) = find_xml_definition_line(doc, name).unwrap_or((0, 0));
+            let (line, col) = find_xml_definition_line(&doc.text, name).unwrap_or((0, 0));
             append_symbol_json(&mut out, &mut first, name, 8, line, col);
         }
         for cmd in db.meta_commands() {
             let name = db.name(cmd.name);
-            let (line, col) = find_xml_definition_line(doc, name).unwrap_or((0, 0));
+            let (line, col) = find_xml_definition_line(&doc.text, name).unwrap_or((0, 0));
             append_symbol_json(&mut out, &mut first, name, 12, line, col);
         }
 
@@ -397,13 +432,22 @@ pub fn find_xml_definition_line(xml_text: &str, symbol: &str) -> Option<(usize, 
     None
 }
 
-fn word_at_position(text: &str, line: usize, character: usize) -> Option<&str> {
-    let target_line = text.lines().nth(line)?;
-    let bytes = target_line.as_bytes();
-    if bytes.is_empty() {
+fn word_in_line_utf16(target_line: &str, character_utf16: usize) -> Option<&str> {
+    if target_line.is_empty() {
         return None;
     }
-    let idx = character.min(bytes.len().saturating_sub(1));
+    let mut utf16_col = 0usize;
+    let mut target_byte_idx = None;
+    for (byte_idx, ch) in target_line.char_indices() {
+        let ch_utf16_len = ch.len_utf16();
+        if character_utf16 >= utf16_col && character_utf16 < utf16_col + ch_utf16_len {
+            target_byte_idx = Some(byte_idx);
+            break;
+        }
+        utf16_col += ch_utf16_len;
+    }
+    let idx = target_byte_idx?;
+    let bytes = target_line.as_bytes();
     if !is_ident_byte(*bytes.get(idx)?) {
         return None;
     }
@@ -605,5 +649,16 @@ mod tests {
         assert!(out_str.contains(r#""name":"xtce-lsp""#));
         assert!(out_str.contains(r#""method":"textDocument/publishDiagnostics""#));
         assert!(out_str.contains("Parameter `VBUS`"));
+    }
+
+    #[test]
+    fn word_in_line_utf16_handles_multibyte_and_edge_cases() {
+        let line = r#"<!-- 🛰️ komentarz --> <Parameter name="OBC_VBUS_V" parameterTypeRef="U16"/>"#;
+        // "<!-- " is 5 UTF-16 units, "🛰️" is 3 UTF-16 units (surrogate pair + VS16), " komentarz --> <Parameter name=\"" is 32 UTF-16 units => 40
+        let word = super::word_in_line_utf16(line, 43);
+        assert_eq!(word, Some("OBC_VBUS_V"));
+        assert!(super::word_in_line_utf16(line, 21).is_none());
+        assert!(super::word_in_line_utf16("", 0).is_none());
+        assert!(super::word_in_line_utf16(line, 999).is_none());
     }
 }
