@@ -1,9 +1,14 @@
 # xtce-rs
 
 [![CI](https://github.com/RustSpaceLab/xtce-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/RustSpaceLab/xtce-rs/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/xtce-cli.svg)](https://crates.io/crates/xtce-cli)
+[![docs.rs](https://docs.rs/xtce-decode/badge.svg)](https://docs.rs/xtce-decode)
 
 Decode CCSDS telemetry packets in Rust, according to an [XTCE](https://www.omg.org/spec/XTCE/)
 definition. Part of [RustSpaceLab](https://github.com/RustSpaceLab).
+
+🛰️ **Live Interactive Mission Demo (OrbitTrack & ECSS PUS-C Telemetry Studio):**  
+👉 **[https://altanix.dev/mission-demo/](https://altanix.dev/mission-demo/)** — *Fly 5 live LEO satellites (`PIAST-M`, `CAMILA-1`, `EagleEye-2`, `PW-Sat3`, `OPS-SAT-2`) in 2D/3D orbit, uplink authenticated ECSS-E-ST-70-41C (PUS-C) telecommands over UDP to the `#![no_std]` OBC responder, inject orbital faults (`xtce sim`), and run `xtce diff` / `validate` / `codegen` / `wireshark` live in your browser.*
 
 The reference implementation in this niche, [`lasp/space_packet_parser`][spp], has a known
 performance problem: on real mission databases, loading the XTCE file costs more than parsing
@@ -13,10 +18,11 @@ validated against that same implementation packet for packet.
 
 | Crate | What it does |
 |---|---|
-| `xtce-model` | XTCE XML → arena-backed IR, reference resolution, validation; telemetry and telecommands |
-| `xtce-decode` | IR + `&[u8]` → parameter values |
-| `xtce-codegen` | IR → a static Rust decoder with every offset baked in |
-| `xtce-cli` | `xtce info`, `xtce decode`, `xtce codegen`, `xtce bench` |
+| [`xtce-model`](https://crates.io/crates/xtce-model) | XTCE XML → arena-backed IR, reference resolution, validation; telemetry and telecommands |
+| [`xtce-decode`](https://crates.io/crates/xtce-decode) | IR + `&[u8]` / `PacketReader` → parameter values |
+| [`xtce-codegen`](https://crates.io/crates/xtce-codegen) | IR → a static Rust decoder with every offset baked in |
+| [`xtce-pus`](https://crates.io/crates/xtce-pus) | `#![no_std]` ECSS-E-ST-70-41C (PUS-C) framing, CRC-16-CCITT, and HIL OBC responder |
+| [`xtce-cli`](https://crates.io/crates/xtce-cli) | `xtce info`, `xtce decode`, `xtce codegen`, `xtce compile`, `xtce wireshark`, `xtce pcap`, `xtce encode`, `xtce pus`, `xtce diff`, `xtce validate`, `xtce sim`, `xtce bench` |
 | `xtce-py` | Python bindings (PyO3), built by `maturin` |
 | `xtask` | differential test harness against the Python reference |
 
@@ -66,12 +72,18 @@ back — see [`SUPPORTED.md`](SUPPORTED.md).
 #### Try it
 
 ```console
+$ cargo install xtce-cli
 $ cargo run --release -p xtce-cli -- info testdata/spp/ctim/ctim_xtce_v1.xml
 $ cargo run --release -p xtce-cli -- decode \
       testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml \
       testdata/spp/jpss/J01_G011_LZ_2021-04-09T00-00-00Z_V01.DAT1 --limit 3 --raw
 $ cargo run --release -p xtce-cli -- codegen \
       testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml
+$ cargo run --release -p xtce-cli -- wireshark \
+      testdata/spp/jpss/jpss1_geolocation_xtce_v1.xml --udp-port 5005
+$ cargo run --release -p xtce-cli -- pcap \
+      testdata/spp/jpss/J01_G011_LZ_2021-04-09T00-00-00Z_V01.DAT1 --limit 10 -o jpss.pcap
+$ cargo run --release -p xtce-cli -- pus --hil-demo
 $ cargo xtask diff
 $ cargo bench
 ```

@@ -7,7 +7,7 @@ members = ["crates/*", "xtask"]
 exclude = ["crates/xtce-py"]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.2.1"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -15,9 +15,10 @@ repository = "https://github.com/RustSpaceLab/xtce-rs"
 authors = ["Maciej Myszkiewicz"]
 
 [workspace.dependencies]
-xtce-model = { path = "crates/xtce-model", version = "0.1.0" }
-xtce-decode = { path = "crates/xtce-decode", version = "0.1.0" }
-xtce-codegen = { path = "crates/xtce-codegen", version = "0.1.0" }
+xtce-model = { path = "crates/xtce-model", version = "0.2.1" }
+xtce-decode = { path = "crates/xtce-decode", version = "0.2.1" }
+xtce-codegen = { path = "crates/xtce-codegen", version = "0.2.1" }
+xtce-pus = { path = "crates/xtce-pus", version = "0.2.1" }
 
 # Keep this list short and justified — see CONTRIBUTING.md rule 7.
 anyhow = "1"
