@@ -24,6 +24,7 @@ mod decode;
 mod diff;
 mod encode;
 mod info;
+mod lsp;
 mod pcap;
 mod pus;
 mod sim;
@@ -283,6 +284,9 @@ enum Command {
         #[arg(long, short)]
         out: Option<PathBuf>,
     },
+
+    /// Start the XTCE 1.2 Language Server Protocol (LSP) JSON-RPC server over stdio.
+    Lsp,
 }
 
 fn main() -> ExitCode {
@@ -427,6 +431,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             pcap_format: pcap,
             out: out.as_deref(),
         }),
+        Command::Lsp => lsp::run_stdio(),
     }
 }
 

@@ -982,6 +982,15 @@ name = "xtce-pus"
 version = "0.2.1"
 
 [[package]]
+name = "xtce-wasm"
+version = "0.2.1"
+dependencies = [
+ "xtce-decode",
+ "xtce-model",
+ "xtce-pus",
+]
+
+[[package]]
 name = "zerocopy"
 version = "0.8.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"

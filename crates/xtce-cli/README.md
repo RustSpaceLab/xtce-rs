@@ -60,6 +60,9 @@ $ xtce compile ecss_pus.xml --target wireshark   -o mission.lua
 $ xtce compile ecss_pus.xml --target json-schema -o mission.schema.json
 $ xtce compile ecss_pus.xml --target docs        -o MISSION_DICTIONARY.md
 $ xtce compile ecss_pus.xml --target dashboard   -o telemetry_studio.json
+
+# 11. Run the XTCE 1.2 Language Server Protocol (LSP) JSON-RPC server over stdio
+$ xtce lsp
 ```
 
 Part of [RustSpaceLab/xtce-rs](https://github.com/RustSpaceLab/xtce-rs).

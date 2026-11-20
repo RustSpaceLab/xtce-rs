@@ -1,0 +1,17 @@
+[package]
+name = "xtce-wasm"
+description = "Zero-bindgen client-side WebAssembly (wasm32-unknown-unknown) XTCE 1.2 and ECSS-E-ST-70-41C (PUS-C) telemetry & PCAP decoder."
+version = "0.2.1"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/RustSpaceLab/xtce-rs"
+authors = ["Maciej Myszkiewicz"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+xtce-model = { path = "../xtce-model", version = "0.2.1" }
+xtce-decode = { path = "../xtce-decode", version = "0.2.1" }
+xtce-pus = { path = "../xtce-pus", version = "0.2.1" }
