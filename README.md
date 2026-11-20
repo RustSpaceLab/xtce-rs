@@ -7,6 +7,9 @@
 Decode CCSDS telemetry packets in Rust, according to an [XTCE](https://www.omg.org/spec/XTCE/)
 definition. Part of [RustSpaceLab](https://github.com/RustSpaceLab).
 
+🛰️ **Live Interactive Mission Demo (OrbitTrack & ECSS PUS-C Telemetry Studio):**  
+👉 **[https://altanix.dev/mission-demo/](https://altanix.dev/mission-demo/)** — *Fly 5 live LEO satellites (`PIAST-M`, `CAMILA-1`, `EagleEye-2`, `PW-Sat3`, `OPS-SAT-2`) in 2D/3D orbit, uplink authenticated ECSS-E-ST-70-41C (PUS-C) telecommands over UDP to the `#![no_std]` OBC responder, inject orbital faults (`xtce sim`), and run `xtce diff` / `validate` / `codegen` / `wireshark` live in your browser.*
+
 The reference implementation in this niche, [`lasp/space_packet_parser`][spp], has a known
 performance problem: on real mission databases, loading the XTCE file costs more than parsing
 the packets ([issue #112][issue112]). This project attacks both halves — a fast XML-to-IR
@@ -19,7 +22,7 @@ validated against that same implementation packet for packet.
 | [`xtce-decode`](https://crates.io/crates/xtce-decode) | IR + `&[u8]` / `PacketReader` → parameter values |
 | [`xtce-codegen`](https://crates.io/crates/xtce-codegen) | IR → a static Rust decoder with every offset baked in |
 | [`xtce-pus`](https://crates.io/crates/xtce-pus) | `#![no_std]` ECSS-E-ST-70-41C (PUS-C) framing, CRC-16-CCITT, and HIL OBC responder |
-| [`xtce-cli`](https://crates.io/crates/xtce-cli) | `xtce info`, `xtce decode`, `xtce codegen`, `xtce wireshark`, `xtce pcap`, `xtce pus`, `xtce bench` |
+| [`xtce-cli`](https://crates.io/crates/xtce-cli) | `xtce info`, `xtce decode`, `xtce codegen`, `xtce compile`, `xtce wireshark`, `xtce pcap`, `xtce encode`, `xtce pus`, `xtce diff`, `xtce validate`, `xtce sim`, `xtce bench` |
 | `xtce-py` | Python bindings (PyO3), built by `maturin` |
 | `xtask` | differential test harness against the Python reference |
 
