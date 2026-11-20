@@ -1,10 +1,10 @@
 //! `xtce decode` — run a packet stream through a definition and print the values.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::time::Instant;
 
-use xtce_decode::{DecodeError, Decoder, EngValue, PacketIter, RawValue};
+use xtce_decode::{DecodeError, Decoder, EngValue, PacketReader, RawValue};
 use xtce_model::XtceDb;
 
 /// How to render each packet.
@@ -14,6 +14,8 @@ pub enum Format {
     Table,
     /// One JSON object per packet, one packet per line.
     Jsonl,
+    /// Comma-separated values (CSV) with packet, container, and parameter columns.
+    Csv,
     /// Nothing per packet; only the summary.
     Quiet,
 }
@@ -28,6 +30,65 @@ pub struct Options<'a> {
     pub only: &'a [String],
     pub format: Format,
     pub show_raw: bool,
+    pub no_summary: bool,
+}
+
+fn open_packet_source(packets: &Path) -> std::io::Result<Box<dyn Read>> {
+    if packets.as_os_str() == "-" {
+        Ok(Box::new(std::io::BufReader::new(std::io::stdin())))
+    } else {
+        let file = std::fs::File::open(packets)?;
+        Ok(Box::new(std::io::BufReader::new(file)))
+    }
+}
+
+const MAX_DEFINITION_BYTES: u64 = 256 * 1024 * 1024;
+
+fn load_definition(definition: &Path) -> Result<XtceDb, Box<dyn std::error::Error>> {
+    if definition.as_os_str() == "-" {
+        let mut xml = String::new();
+        std::io::stdin()
+            .take(MAX_DEFINITION_BYTES)
+            .read_to_string(&mut xml)?;
+        Ok(XtceDb::from_xml(&xml)?)
+    } else {
+        Ok(XtceDb::from_path(definition)?)
+    }
+}
+
+struct Summary {
+    total: usize,
+    decoded: usize,
+    unrecognised: usize,
+    failed: usize,
+    trailing: usize,
+    load_elapsed: std::time::Duration,
+    decode_elapsed: std::time::Duration,
+}
+
+fn print_summary(out: &mut impl Write, summary: &Summary) -> std::io::Result<()> {
+    writeln!(out)?;
+    writeln!(
+        out,
+        "{} packet(s): {} decoded, {} not described, {} failed",
+        summary.total, summary.decoded, summary.unrecognised, summary.failed
+    )?;
+    if summary.trailing > 0 {
+        // Worth surfacing: the definition and the packets disagree about length, which
+        // usually means a container is missing entries rather than that anything is corrupt.
+        writeln!(
+            out,
+            "{} packet(s) had bits no entry claimed — the definition may be incomplete",
+            summary.trailing
+        )?;
+    }
+    writeln!(
+        out,
+        "load {:.2} ms, decode {:.2} ms ({:.1} packets/s)",
+        summary.load_elapsed.as_secs_f64() * 1e3,
+        summary.decode_elapsed.as_secs_f64() * 1e3,
+        summary.decoded as f64 / summary.decode_elapsed.as_secs_f64().max(f64::MIN_POSITIVE),
+    )
 }
 
 /// Decodes a stream and writes the result.
@@ -39,8 +100,12 @@ pub struct Options<'a> {
 /// not well-framed. A packet that fails to *decode* is reported and counted, not fatal: one
 /// malformed frame in a downlink should not end the run.
 pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
+    if options.definition.as_os_str() == "-" && options.packets.as_os_str() == "-" {
+        return Err("cannot read both definition and packets from standard input".into());
+    }
+
     let load_start = Instant::now();
-    let db = XtceDb::from_path(options.definition)?;
+    let db = load_definition(options.definition)?;
     let load_elapsed = load_start.elapsed();
 
     check_only(&db, options.only)?;
@@ -50,7 +115,8 @@ pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
         None => Decoder::new(&db)?,
     };
 
-    let stream = std::fs::read(options.packets)?;
+    let source = open_packet_source(options.packets)?;
+    let mut reader = PacketReader::new(source, options.skip_header_bytes);
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
 
@@ -60,19 +126,24 @@ pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
     let mut trailing = 0usize;
     let mut total = 0usize;
 
-    // One packet buffer for the whole stream: after the first packet this allocates nothing.
-    let mut packet = decoder.new_packet(&stream);
+    if options.format == Format::Csv {
+        if options.show_raw {
+            writeln!(out, "packet,container,parameter,eng,raw")?;
+        } else {
+            writeln!(out, "packet,container,parameter,eng")?;
+        }
+    }
 
     let decode_start = Instant::now();
-    for (index, framed) in PacketIter::new(&stream, options.skip_header_bytes).enumerate() {
+    let mut index = 0usize;
+    while let Some(framed) = reader.next_packet()? {
         if options.limit.is_some_and(|limit| total >= limit) {
             break;
         }
         total += 1;
-        let framed = framed?;
 
-        match decoder.decode_into(&mut packet, framed.bytes()) {
-            Ok(()) => {
+        match decoder.decode(framed.bytes()) {
+            Ok(packet) => {
                 decoded_count += 1;
                 if packet.trailing_bits() != 0 {
                     trailing += 1;
@@ -80,46 +151,50 @@ pub fn run(options: &Options<'_>) -> Result<(), Box<dyn std::error::Error>> {
                 match options.format {
                     Format::Table => write_table(&mut out, index, &packet, options)?,
                     Format::Jsonl => write_jsonl(&mut out, index, &packet, options)?,
+                    Format::Csv => write_csv(&mut out, index, &packet, options)?,
                     Format::Quiet => {}
                 }
             }
             Err(DecodeError::UnrecognizedPacket { container, .. }) => {
                 unrecognised += 1;
-                if options.format != Format::Quiet {
+                if options.format == Format::Table {
                     writeln!(
                         out,
                         "packet {index}: not described by this definition (no inheritor of {container} matches)"
                     )?;
+                } else if options.format != Format::Quiet {
+                    eprintln!(
+                        "packet {index}: not described by this definition (no inheritor of {container} matches)"
+                    );
                 }
             }
             Err(error) => {
                 failed += 1;
-                writeln!(out, "packet {index}: {error}")?;
+                if options.format == Format::Table {
+                    writeln!(out, "packet {index}: {error}")?;
+                } else {
+                    eprintln!("packet {index}: {error}");
+                }
             }
         }
+        index += 1;
     }
     let decode_elapsed = decode_start.elapsed();
 
-    writeln!(out)?;
-    writeln!(
-        out,
-        "{total} packet(s): {decoded_count} decoded, {unrecognised} not described, {failed} failed"
-    )?;
-    if trailing > 0 {
-        // Worth surfacing: the definition and the packets disagree about length, which
-        // usually means a container is missing entries rather than that anything is corrupt.
-        writeln!(
-            out,
-            "{trailing} packet(s) had bits no entry claimed — the definition may be incomplete"
+    if !options.no_summary {
+        print_summary(
+            &mut out,
+            &Summary {
+                total,
+                decoded: decoded_count,
+                unrecognised,
+                failed,
+                trailing,
+                load_elapsed,
+                decode_elapsed,
+            },
         )?;
     }
-    writeln!(
-        out,
-        "load {:.2} ms, decode {:.2} ms ({:.1} packets/s)",
-        load_elapsed.as_secs_f64() * 1e3,
-        decode_elapsed.as_secs_f64() * 1e3,
-        decoded_count as f64 / decode_elapsed.as_secs_f64().max(f64::MIN_POSITIVE),
-    )?;
     out.flush()?;
 
     if failed > 0 {
@@ -382,6 +457,96 @@ fn write_json_string(out: &mut impl Write, text: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+fn write_csv(
+    out: &mut impl Write,
+    index: usize,
+    packet: &xtce_decode::DecodedPacket<'_, '_>,
+    options: &Options<'_>,
+) -> std::io::Result<()> {
+    let db = packet.db();
+    let container = db
+        .container(packet.container())
+        .map_or("?", |container| db.name(container.name));
+    for (name, value) in packet.iter_named() {
+        if !wanted(options.only, name) {
+            continue;
+        }
+        write!(out, "{index},")?;
+        write_csv_string(out, container)?;
+        write!(out, ",")?;
+        write_csv_string(out, name)?;
+        write!(out, ",")?;
+        write_csv_eng(out, &value.eng)?;
+        if options.show_raw {
+            write!(out, ",")?;
+            write_csv_raw(out, &value.raw)?;
+        }
+        writeln!(out)?;
+    }
+    Ok(())
+}
+
+fn write_csv_eng(out: &mut impl Write, value: &EngValue<'_, '_>) -> std::io::Result<()> {
+    match value {
+        EngValue::Unsigned(number) => write!(out, "{number}"),
+        EngValue::Signed(number) => write!(out, "{number}"),
+        EngValue::Float(number) => write_csv_float(out, *number),
+        EngValue::Bool(flag) => write!(out, "{flag}"),
+        EngValue::Label(text) => write_csv_string(out, text),
+        EngValue::Text(text) => write_csv_string(out, text.as_ref()),
+        EngValue::Bytes(bytes) => write_hex_raw(out, bytes),
+    }
+}
+
+fn write_csv_raw(out: &mut impl Write, value: &RawValue<'_>) -> std::io::Result<()> {
+    match value {
+        RawValue::Unsigned(number) => write!(out, "{number}"),
+        RawValue::Signed(number) => write!(out, "{number}"),
+        RawValue::Float(number) => write_csv_float(out, *number),
+        RawValue::Bytes(bytes) => write_hex_raw(out, bytes),
+    }
+}
+
+fn write_csv_float(out: &mut impl Write, value: f64) -> std::io::Result<()> {
+    if value.is_nan() {
+        write!(out, "NaN")
+    } else if value.is_infinite() {
+        if value.is_sign_positive() {
+            write!(out, "Infinity")
+        } else {
+            write!(out, "-Infinity")
+        }
+    } else {
+        write!(out, "{value}")
+    }
+}
+
+fn write_hex_raw(out: &mut impl Write, bytes: &[u8]) -> std::io::Result<()> {
+    for byte in bytes {
+        write!(out, "{byte:02x}")?;
+    }
+    Ok(())
+}
+
+fn write_csv_string(out: &mut impl Write, text: &str) -> std::io::Result<()> {
+    if text.contains([',', '"', '\n', '\r']) {
+        out.write_all(b"\"")?;
+        let bytes = text.as_bytes();
+        let mut last = 0;
+        for (i, &b) in bytes.iter().enumerate() {
+            if b == b'"' {
+                out.write_all(&bytes[last..=i])?;
+                out.write_all(b"\"")?;
+                last = i + 1;
+            }
+        }
+        out.write_all(&bytes[last..])?;
+        out.write_all(b"\"")
+    } else {
+        out.write_all(text.as_bytes())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{check_only, edit_distance, glob_matches, suggest, wanted};
@@ -567,5 +732,121 @@ mod tests {
         assert_eq!(edit_distance("ADGPSPOSX", "ADGPSPSOX"), 1);
         // Two characters apart is still two edits: only *adjacent* swaps are one.
         assert_eq!(edit_distance("ABCD", "CBAD"), 2);
+    }
+
+    #[test]
+    fn csv_string_escapes_only_when_needed() {
+        let mut out = Vec::new();
+        super::write_csv_string(&mut out, "plain_identifier").unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "plain_identifier");
+
+        let mut out = Vec::new();
+        super::write_csv_string(&mut out, "comma, separated").unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "\"comma, separated\"");
+
+        let mut out = Vec::new();
+        super::write_csv_string(&mut out, "contains \"quotes\" inside").unwrap();
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            "\"contains \"\"quotes\"\" inside\""
+        );
+
+        let mut out = Vec::new();
+        super::write_csv_string(&mut out, "line1\nline2").unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "\"line1\nline2\"");
+    }
+
+    #[test]
+    fn csv_float_formats_special_values() {
+        let mut out = Vec::new();
+        super::write_csv_float(&mut out, 42.5).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "42.5");
+
+        let mut out = Vec::new();
+        super::write_csv_float(&mut out, f64::NAN).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "NaN");
+
+        let mut out = Vec::new();
+        super::write_csv_float(&mut out, f64::INFINITY).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "Infinity");
+
+        let mut out = Vec::new();
+        super::write_csv_float(&mut out, f64::NEG_INFINITY).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "-Infinity");
+    }
+
+    #[test]
+    fn csv_formatting_writes_headers_and_rows() {
+        let db = db();
+        let decoder = xtce_decode::Decoder::new(&db).expect("decoder creates");
+        let data = [0x00, 0x00, 0x00, 0x2A];
+        let mut packet = decoder.new_packet(&data);
+        decoder.decode_into(&mut packet, &data).expect("decodes");
+
+        let mut out = Vec::new();
+        let options = super::Options {
+            definition: std::path::Path::new("dummy.xml"),
+            packets: std::path::Path::new("dummy.bin"),
+            root: None,
+            skip_header_bytes: 0,
+            limit: None,
+            only: &[],
+            format: super::Format::Csv,
+            show_raw: false,
+            no_summary: false,
+        };
+
+        super::write_csv(&mut out, 0, &packet, &options).expect("writes csv");
+        let text = String::from_utf8(out).expect("utf8");
+        assert_eq!(text, "0,PKT,ADGPSPOSX,42\n");
+
+        let mut out = Vec::new();
+        let options_raw = super::Options {
+            show_raw: true,
+            ..options
+        };
+        super::write_csv(&mut out, 0, &packet, &options_raw).expect("writes csv raw");
+        let text_raw = String::from_utf8(out).expect("utf8");
+        assert_eq!(text_raw, "0,PKT,ADGPSPOSX,42,42\n");
+    }
+
+    #[test]
+    fn print_summary_writes_formatted_counts() {
+        let mut out = Vec::new();
+        let summary = super::Summary {
+            total: 10,
+            decoded: 8,
+            unrecognised: 1,
+            failed: 1,
+            trailing: 2,
+            load_elapsed: std::time::Duration::from_millis(5),
+            decode_elapsed: std::time::Duration::from_millis(15),
+        };
+        super::print_summary(&mut out, &summary).expect("prints summary");
+        let text = String::from_utf8(out).expect("utf8");
+        assert!(text.contains("10 packet(s): 8 decoded, 1 not described, 1 failed"));
+        assert!(text.contains("2 packet(s) had bits no entry claimed"));
+    }
+
+    #[test]
+    fn run_rejects_stdin_conflict_for_definition_and_packets() {
+        let options = super::Options {
+            definition: std::path::Path::new("-"),
+            packets: std::path::Path::new("-"),
+            root: None,
+            skip_header_bytes: 0,
+            limit: None,
+            only: &[],
+            format: super::Format::Quiet,
+            show_raw: false,
+            no_summary: true,
+        };
+        let result = super::run(&options);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "cannot read both definition and packets from standard input"
+        );
     }
 }

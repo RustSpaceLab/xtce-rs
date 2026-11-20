@@ -9,7 +9,7 @@ pub fn report(db: &XtceDb, elapsed: Duration, verbose: bool) {
     let stats = db.stats();
     let source = db
         .source()
-        .map_or_else(|| "<memory>".to_owned(), |path| path.display().to_string());
+        .map_or_else(|| "<stdin>".to_owned(), |path| path.display().to_string());
 
     println!("{source}");
     println!(
@@ -97,6 +97,7 @@ pub fn report(db: &XtceDb, elapsed: Duration, verbose: bool) {
 
     if verbose {
         print_containers(db);
+        print_commands(db);
     }
     println!();
 }
@@ -260,6 +261,51 @@ fn print_containers(db: &XtceDb) {
                     println!("      <unsupported {}>", db.name(element));
                 }
             }
+        }
+    }
+}
+
+fn print_commands(db: &XtceDb) {
+    if db.meta_commands().is_empty() {
+        return;
+    }
+    println!("  telecommands:");
+    for command in db.meta_commands() {
+        let base = command
+            .base
+            .and_then(|base| db.meta_command(base))
+            .map(|base| format!(" extends {}", db.name(base.name)))
+            .unwrap_or_default();
+        let container = command
+            .container
+            .and_then(|c| db.container(c))
+            .map(|c| format!(" -> {}", db.name(c.name)))
+            .unwrap_or_default();
+        println!(
+            "    {}{}{}{}",
+            db.name(command.name),
+            if command.is_abstract {
+                " (abstract)"
+            } else {
+                ""
+            },
+            base,
+            container
+        );
+        for &param_id in &command.arguments {
+            let Some(param) = db.parameter(param_id) else {
+                continue;
+            };
+            let ty = db.type_of(param_id);
+            let bits = ty
+                .and_then(xtce_model::ParameterType::fixed_size_in_bits)
+                .map_or_else(|| "var".to_owned(), |bits| format!("{bits}b"));
+            println!(
+                "      {:<28} {:<16} {}",
+                db.name(param.name),
+                ty.map_or("?", |ty| ty.kind.label()),
+                bits
+            );
         }
     }
 }

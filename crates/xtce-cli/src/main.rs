@@ -11,7 +11,8 @@
 #![allow(clippy::doc_markdown)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
-use std::path::PathBuf;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Instant;
 
@@ -32,7 +33,7 @@ struct Cli {
 enum Command {
     /// Summarise one or more XTCE files: space systems, counts, and anything not decodable.
     Info {
-        /// XTCE files to inspect.
+        /// XTCE files to inspect. Use '-' to read from standard input.
         #[arg(required = true)]
         files: Vec<PathBuf>,
 
@@ -43,10 +44,10 @@ enum Command {
 
     /// Decode a CCSDS packet stream against an XTCE definition.
     Decode {
-        /// XTCE definition.
+        /// XTCE definition. Use '-' to read from standard input.
         definition: PathBuf,
 
-        /// File of concatenated CCSDS packets.
+        /// File of concatenated CCSDS packets. Use '-' to read from standard input.
         packets: PathBuf,
 
         /// Container to start from. Defaults to CCSDSPacket, CCSDSTelemetryPacket, or the
@@ -74,11 +75,15 @@ enum Command {
         /// Also show the raw value alongside the engineering value.
         #[arg(long)]
         raw: bool,
+
+        /// Suppress the final summary (load and decode timing, packet counts).
+        #[arg(long)]
+        no_summary: bool,
     },
 
     /// Compile a definition into a static Rust decoder.
     Codegen {
-        /// XTCE definition.
+        /// XTCE definition. Use '-' to read from standard input.
         definition: PathBuf,
 
         /// Container to start from.
@@ -92,7 +97,7 @@ enum Command {
 
     /// Time loading an XTCE file.
     Bench {
-        /// XTCE file to load.
+        /// XTCE file to load. Use '-' to read from standard input.
         file: PathBuf,
 
         /// Number of load iterations to time.
@@ -116,26 +121,23 @@ fn main() -> ExitCode {
     }
 }
 
+const MAX_DEFINITION_BYTES: u64 = 256 * 1024 * 1024;
+
+fn load_db(path: &Path) -> Result<XtceDb, Box<dyn std::error::Error>> {
+    if path.as_os_str() == "-" {
+        let mut xml = String::new();
+        std::io::stdin()
+            .take(MAX_DEFINITION_BYTES)
+            .read_to_string(&mut xml)?;
+        Ok(XtceDb::from_xml(&xml)?)
+    } else {
+        Ok(XtceDb::from_path(path)?)
+    }
+}
+
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
-        Command::Info { files, verbose } => {
-            let mut failures = 0;
-            for file in &files {
-                let started = Instant::now();
-                match XtceDb::from_path(file) {
-                    Ok(db) => info::report(&db, started.elapsed(), verbose),
-                    Err(error) => {
-                        failures += 1;
-                        eprintln!("{}: {error}", file.display());
-                    }
-                }
-            }
-            if failures > 0 {
-                return Err(format!("{failures} of {} file(s) failed to load", files.len()).into());
-            }
-            Ok(())
-        }
-
+        Command::Info { files, verbose } => run_info(&files, verbose),
         Command::Decode {
             definition,
             packets,
@@ -145,6 +147,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             params,
             format,
             raw,
+            no_summary,
         } => decode::run(&decode::Options {
             definition: &definition,
             packets: &packets,
@@ -154,69 +157,107 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             only: &params,
             format,
             show_raw: raw,
+            no_summary,
         }),
-
         Command::Codegen {
             definition,
             root,
             out,
-        } => {
-            let db = XtceDb::from_path(&definition)?;
-            let source = xtce_codegen::generate(
-                &db,
-                &xtce_codegen::Options {
-                    root,
-                    source_label: Some(definition.display().to_string()),
-                },
-            )?;
-            match out {
-                Some(path) => {
-                    std::fs::write(&path, source)?;
-                    eprintln!("wrote {}", path.display());
-                    eprintln!(
-                        "include it inside a module carrying the lint allowances generated \
-                         code needs; the file's header shows how"
-                    );
-                }
-                None => print!("{source}"),
-            }
-            Ok(())
-        }
+        } => run_codegen(&definition, root, out),
+        Command::Bench { file, iterations } => run_bench(&file, iterations),
+    }
+}
 
-        Command::Bench { file, iterations } => {
-            let bytes = std::fs::metadata(&file).map_or(0, |meta| meta.len());
-            let mut timings = Vec::with_capacity(iterations as usize);
-            let mut last = None;
-            for _ in 0..iterations.max(1) {
-                let started = Instant::now();
-                let db = XtceDb::from_path(&file)?;
-                timings.push(started.elapsed());
-                last = Some(db);
+fn run_info(files: &[PathBuf], verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let mut failures = 0;
+    for file in files {
+        let started = Instant::now();
+        match load_db(file) {
+            Ok(db) => info::report(&db, started.elapsed(), verbose),
+            Err(error) => {
+                failures += 1;
+                eprintln!("{}: {error}", file.display());
             }
-            timings.sort_unstable();
-            let median = timings.get(timings.len() / 2).copied().unwrap_or_default();
-            let best = timings.first().copied().unwrap_or_default();
-
-            println!("{}", file.display());
-            println!("  size        {:>10.1} KiB", bytes as f64 / 1024.0);
-            println!("  load median {:>10.3} ms", median.as_secs_f64() * 1e3);
-            println!("  load best   {:>10.3} ms", best.as_secs_f64() * 1e3);
-            if let Some(db) = last {
-                let stats = db.stats();
-                println!(
-                    "  throughput  {:>10.1} MiB/s",
-                    (bytes as f64 / (1024.0 * 1024.0))
-                        / median.as_secs_f64().max(f64::MIN_POSITIVE)
-                );
-                println!(
-                    "  model       {} parameters, {} containers, {} interned names ({:.1} KiB)",
-                    stats.parameters,
-                    stats.containers,
-                    stats.interned_names,
-                    stats.interned_bytes as f64 / 1024.0
-                );
-            }
-            Ok(())
         }
     }
+    if failures > 0 {
+        return Err(format!("{failures} of {} file(s) failed to load", files.len()).into());
+    }
+    Ok(())
+}
+
+fn run_codegen(
+    definition: &Path,
+    root: Option<String>,
+    out: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let db = load_db(definition)?;
+    let source_label = if definition.as_os_str() == "-" {
+        Some("<stdin>".to_owned())
+    } else {
+        Some(definition.display().to_string())
+    };
+    let source = xtce_codegen::generate(&db, &xtce_codegen::Options { root, source_label })?;
+    match out {
+        Some(path) => {
+            std::fs::write(&path, source)?;
+            eprintln!("wrote {}", path.display());
+            eprintln!(
+                "include it inside a module carrying the lint allowances generated \
+                 code needs; the file's header shows how"
+            );
+        }
+        None => print!("{source}"),
+    }
+    Ok(())
+}
+
+fn run_bench(file: &Path, iterations: u32) -> Result<(), Box<dyn std::error::Error>> {
+    let (bytes, xml_data) = if file.as_os_str() == "-" {
+        let mut xml = String::new();
+        std::io::stdin()
+            .take(MAX_DEFINITION_BYTES)
+            .read_to_string(&mut xml)?;
+        (xml.len() as u64, Some(xml))
+    } else {
+        (std::fs::metadata(file).map_or(0, |meta| meta.len()), None)
+    };
+    let mut timings = Vec::with_capacity(iterations as usize);
+    let mut last = None;
+    for _ in 0..iterations.max(1) {
+        let started = Instant::now();
+        let db = match &xml_data {
+            Some(xml) => XtceDb::from_xml(xml)?,
+            None => XtceDb::from_path(file)?,
+        };
+        timings.push(started.elapsed());
+        last = Some(db);
+    }
+    timings.sort_unstable();
+    let median = timings.get(timings.len() / 2).copied().unwrap_or_default();
+    let best = timings.first().copied().unwrap_or_default();
+
+    if file.as_os_str() == "-" {
+        println!("<stdin>");
+    } else {
+        println!("{}", file.display());
+    }
+    println!("  size        {:>10.1} KiB", bytes as f64 / 1024.0);
+    println!("  load median {:>10.3} ms", median.as_secs_f64() * 1e3);
+    println!("  load best   {:>10.3} ms", best.as_secs_f64() * 1e3);
+    if let Some(db) = last {
+        let stats = db.stats();
+        println!(
+            "  throughput  {:>10.1} MiB/s",
+            (bytes as f64 / (1024.0 * 1024.0)) / median.as_secs_f64().max(f64::MIN_POSITIVE)
+        );
+        println!(
+            "  model       {} parameters, {} containers, {} interned names ({:.1} KiB)",
+            stats.parameters,
+            stats.containers,
+            stats.interned_names,
+            stats.interned_bytes as f64 / 1024.0
+        );
+    }
+    Ok(())
 }
