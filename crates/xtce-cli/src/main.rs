@@ -21,6 +21,8 @@ use xtce_model::XtceDb;
 
 mod decode;
 mod info;
+mod pcap;
+mod wireshark;
 
 #[derive(Parser)]
 #[command(name = "xtce", version, about, long_about = None)]
@@ -95,6 +97,42 @@ enum Command {
         out: Option<PathBuf>,
     },
 
+    /// Compile a definition into a Wireshark Lua dissector script (.lua).
+    Wireshark {
+        /// XTCE definition. Use '-' to read from standard input.
+        definition: PathBuf,
+
+        /// Container to start from.
+        #[arg(long)]
+        root: Option<String>,
+
+        /// Write here instead of standard output.
+        #[arg(long, short)]
+        out: Option<PathBuf>,
+
+        /// Also register the dissector on this UDP port in addition to DLT_USER0 (147).
+        #[arg(long)]
+        udp_port: Option<u16>,
+    },
+
+    /// Wrap a raw CCSDS packet stream in a libpcap (.pcap) capture file for Wireshark.
+    Pcap {
+        /// File of concatenated CCSDS packets. Use '-' to read from standard input.
+        packets: PathBuf,
+
+        /// Write here instead of standard output.
+        #[arg(long, short)]
+        out: Option<PathBuf>,
+
+        /// Bytes of per-packet wrapper to skip before each CCSDS header.
+        #[arg(long, default_value_t = 0)]
+        skip_header_bytes: usize,
+
+        /// Stop after this many packets.
+        #[arg(long)]
+        limit: Option<usize>,
+    },
+
     /// Time loading an XTCE file.
     Bench {
         /// XTCE file to load. Use '-' to read from standard input.
@@ -164,8 +202,43 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             root,
             out,
         } => run_codegen(&definition, root, out),
+        Command::Wireshark {
+            definition,
+            root,
+            out,
+            udp_port,
+        } => run_wireshark(&definition, root.as_deref(), out.as_deref(), udp_port),
+        Command::Pcap {
+            packets,
+            out,
+            skip_header_bytes,
+            limit,
+        } => pcap::run(&pcap::Options {
+            packets: &packets,
+            out: out.as_deref(),
+            skip_header_bytes,
+            limit,
+        }),
         Command::Bench { file, iterations } => run_bench(&file, iterations),
     }
+}
+
+fn run_wireshark(
+    definition: &Path,
+    root: Option<&str>,
+    out: Option<&Path>,
+    udp_port: Option<u16>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let db = load_db(definition)?;
+    wireshark::run_with_db(
+        &db,
+        &wireshark::Options {
+            definition,
+            root,
+            out,
+            udp_port,
+        },
+    )
 }
 
 fn run_info(files: &[PathBuf], verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
