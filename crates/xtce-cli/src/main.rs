@@ -104,7 +104,7 @@ enum Command {
         out: Option<PathBuf>,
     },
 
-    /// Multi-target XTCE mission compiler (rust-ground, wireshark, json-schema, docs, dashboard).
+    /// Multi-target XTCE mission compiler (rust-ground, wireshark, json-schema, docs, dashboard, c-header, python-ctypes).
     Compile {
         /// XTCE definition. Use '-' to read from standard input.
         definition: PathBuf,
