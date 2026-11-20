@@ -29,8 +29,8 @@ use std::fmt::Write as _;
 use xtce_decode::{DecodeError, Decoder, PacketIter, SpacePacketBytes};
 use xtce_model::{TypeKind, XtceDb};
 use xtce_pus::{
-    CucTimestamp, MAX_HIL_FRAME_LEN, ObcHousekeeping, PusHeader, PusPacket, TmParams, encode_tm,
-    verify_crc16_ccitt,
+    AckFlags, CucTimestamp, MAX_HIL_FRAME_LEN, ObcHousekeeping, PusHeader, PusPacket, PusResponder,
+    TcParams, TmParams, build_auth_trailer, crc16_ccitt, encode_tc, encode_tm, verify_crc16_ccitt,
 };
 
 thread_local! {
@@ -850,6 +850,208 @@ pub fn wrap_in_pcap(raw_stream: &[u8]) -> Vec<u8> {
     out
 }
 
+/// Assembles an ECSS-E-ST-70-41C (PUS-C) Telecommand (`TC[service, subtype]`) in WebAssembly
+/// linear memory, optionally signs it with a 12-byte SipHash-2-4 dual-use authentication trailer
+/// (`TC_AUTH_TRAILER_LEN`), runs it against the `#![no_std]` [`PusResponder`] On-Board Computer
+/// simulator, and stores a JSON report of the encoded TC hex, CRC-16-CCITT syndrome, and all
+/// closed-loop OBC Telemetry responses (`TM[1,1]`, `TM[1,7]`, `TM[3,25]`, `TM[5,x]`, `TM[17,2]`)
+/// in the result buffer.
+///
+/// # Safety
+///
+/// If `app_data_len > 0`, `app_data_ptr` must point to a valid byte slice of `app_data_len` bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wasm_encode_pus_tc_and_hil(
+    apid: u16,
+    seq_count: u16,
+    service: u8,
+    subtype: u8,
+    source_id: u16,
+    app_data_ptr: *const u8,
+    app_data_len: usize,
+    corrupt_crc: u32,
+    sign_auth: u32,
+    counter: u32,
+) -> i32 {
+    let app_data: &[u8] = if app_data_ptr.is_null() || app_data_len == 0 {
+        &[]
+    } else {
+        // SAFETY: Caller guarantees `app_data_ptr..app_data_ptr + app_data_len` is valid.
+        unsafe { std::slice::from_raw_parts(app_data_ptr, app_data_len.min(180)) }
+    };
+
+    match encode_pus_tc_and_hil_to_json(
+        apid,
+        seq_count,
+        service,
+        subtype,
+        source_id,
+        app_data,
+        corrupt_crc != 0,
+        sign_auth != 0,
+        counter,
+    ) {
+        Ok(json) => {
+            store_result(json.into_bytes());
+            0
+        }
+        Err(err) => store_json_error(&err),
+    }
+}
+
+/// Pure-Rust implementation of [`wasm_encode_pus_tc_and_hil`].
+///
+/// # Errors
+///
+/// Returns an error string if the telecommand frame cannot be encoded.
+#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
+pub fn encode_pus_tc_and_hil_to_json(
+    apid: u16,
+    seq_count: u16,
+    service: u8,
+    subtype: u8,
+    source_id: u16,
+    app_data: &[u8],
+    corrupt_crc: bool,
+    sign_auth: bool,
+    counter: u32,
+) -> Result<String, String> {
+    const MISSION_KEY: [u8; 16] = *b"RUSTSPACELAB2027";
+
+    let mut payload_buf = [0u8; 220];
+    let copy_len = app_data.len().min(192);
+    payload_buf[..copy_len].copy_from_slice(&app_data[..copy_len]);
+
+    let mut total_app_len = copy_len;
+    let mut auth_tag_hex = String::new();
+
+    if sign_auth {
+        let trailer = build_auth_trailer(&MISSION_KEY, counter, &payload_buf[..copy_len]);
+        payload_buf[copy_len..copy_len + trailer.len()].copy_from_slice(&trailer);
+        total_app_len += trailer.len();
+        write_hex_into(&trailer[4..12], &mut auth_tag_hex);
+    }
+
+    let mut tc_buf = [0u8; MAX_HIL_FRAME_LEN];
+    let tc_len = encode_tc(
+        &TcParams {
+            apid: apid & 0x07FF,
+            sequence_count: seq_count & 0x3FFF,
+            ack: AckFlags::ACCEPT_AND_COMPLETE,
+            service,
+            subtype,
+            source_id,
+        },
+        &payload_buf[..total_app_len],
+        &mut tc_buf,
+    )
+    .map_err(|e| format!("TC encode error: {e:?}"))?;
+
+    if corrupt_crc && tc_len >= 2 {
+        tc_buf[tc_len - 1] ^= 0xFF;
+    }
+
+    let crc_valid = verify_crc16_ccitt(&tc_buf[..tc_len]);
+    let computed_crc = if tc_len >= 2 {
+        u16::from_be_bytes([tc_buf[tc_len - 2], tc_buf[tc_len - 1]])
+    } else {
+        crc16_ccitt(&tc_buf[..tc_len])
+    };
+
+    let mut tc_hex = String::with_capacity(tc_len * 2);
+    write_hex_into(&tc_buf[..tc_len], &mut tc_hex);
+
+    let mut responder = PusResponder::new(apid & 0x07FF, 0x0001);
+    let mut out_frames = [[0u8; MAX_HIL_FRAME_LEN]; 4];
+    let mut out_lens = [0usize; 4];
+    let resp_count = responder
+        .process_telecommand(&tc_buf[..tc_len], &mut out_frames, &mut out_lens)
+        .unwrap_or(0);
+
+    let mut out = String::with_capacity(2048);
+    let _ = write!(
+        out,
+        "{{\"ok\":true,\"tc\":{{\"service\":{service},\"subtype\":{subtype},\"apid\":{},\"seq\":{},\"source_id\":{source_id},\"byte_len\":{tc_len},\"hex\":\"{tc_hex}\",\"crc16\":\"0x{computed_crc:04X}\",\"crc_valid\":{crc_valid},\"signed_siphash\":{sign_auth},\"counter\":{counter},\"siphash_tag\":",
+        apid & 0x07FF,
+        seq_count & 0x3FFF
+    );
+    if sign_auth {
+        push_json_str(&mut out, &auth_tag_hex);
+    } else {
+        out.push_str("null");
+    }
+    out.push_str("},\"obc_responses\":[");
+
+    for idx in 0..resp_count {
+        let frame = &out_frames[idx][..out_lens[idx]];
+        append_hil_tm_response_json(&mut out, idx, frame);
+    }
+
+    out.push_str("]}");
+    Ok(out)
+}
+
+fn append_hil_tm_response_json(out: &mut String, idx: usize, frame: &[u8]) {
+    if idx > 0 {
+        out.push(',');
+    }
+    let mut hex_str = String::with_capacity(frame.len() * 2);
+    write_hex_into(frame, &mut hex_str);
+    let crc_ok = verify_crc16_ccitt(frame);
+    if let Ok(pkt) = PusPacket::parse(frame) {
+        let (srv, sub) = match pkt.header {
+            PusHeader::Telemetry {
+                service, subtype, ..
+            }
+            | PusHeader::Telecommand {
+                service, subtype, ..
+            } => (service, subtype),
+        };
+        let label = pus_tm_label(srv, sub);
+        let _ = write!(
+            out,
+            "{{\"index\":{idx},\"service\":{srv},\"subtype\":{sub},\"label\":",
+        );
+        push_json_str(out, label);
+        let _ = write!(
+            out,
+            ",\"byte_len\":{},\"crc_valid\":{crc_ok},\"hex\":\"{hex_str}\"}}",
+            frame.len()
+        );
+    } else {
+        let _ = write!(
+            out,
+            "{{\"index\":{idx},\"byte_len\":{},\"crc_valid\":{crc_ok},\"hex\":\"{hex_str}\"}}",
+            frame.len()
+        );
+    }
+}
+
+const fn pus_tm_label(service: u8, subtype: u8) -> &'static str {
+    match (service, subtype) {
+        (1, 1) => "TM[1,1] Telecommand Acceptance Success",
+        (1, 2) => "TM[1,2] Telecommand Acceptance Failure (CRC/Reject)",
+        (1, 7) => "TM[1,7] Telecommand Execution Completion Success",
+        (1, 8) => "TM[1,8] Telecommand Execution Completion Failure",
+        (3, 25) => "TM[3,25] OBC Housekeeping Parameter Report",
+        (5, 1) => "TM[5,1] Informative On-Board Event Report",
+        (5, 2) => "TM[5,2] Low-Severity Anomaly Event Report",
+        (5, 4) => "TM[5,4] High-Severity Fault Event Report",
+        (6, 6) => "TM[6,6] On-Board Memory Dump Report",
+        (6, 10) => "TM[6,10] On-Board Memory CRC-16 Scrub Report",
+        (17, 2) => "TM[17,2] Are-You-Alive Connection Test Report",
+        _ => "TM[?,?] ECSS PUS-C Telemetry Frame",
+    }
+}
+
+fn write_hex_into(bytes: &[u8], out: &mut String) {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for &b in bytes {
+        out.push(HEX[(b >> 4) as usize] as char);
+        out.push(HEX[(b & 0x0F) as usize] as char);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -880,5 +1082,20 @@ mod tests {
         let (is_pcap_invalid, extracted_invalid) = extract_packets_if_pcap(&invalid_header_pcap);
         assert!(!is_pcap_invalid);
         assert_eq!(extracted_invalid, [] as [u8; 0]);
+    }
+
+    #[test]
+    fn wasm_encode_pus_tc_and_hil_roundtrips_st17_and_corrupted_crc() {
+        let json_ok = encode_pus_tc_and_hil_to_json(0x010, 42, 17, 1, 0x0042, &[], false, true, 7)
+            .expect("encodes TC[17,1]");
+        assert!(json_ok.contains("\"crc_valid\":true"));
+        assert!(json_ok.contains("\"signed_siphash\":true"));
+        assert!(json_ok.contains("TM[1,1] Telecommand Acceptance Success"));
+        assert!(json_ok.contains("TM[17,2] Are-You-Alive Connection Test Report"));
+
+        let json_bad = encode_pus_tc_and_hil_to_json(0x010, 43, 17, 1, 0x0042, &[], true, false, 8)
+            .expect("encodes corrupted TC[17,1]");
+        assert!(json_bad.contains("\"crc_valid\":false"));
+        assert!(json_bad.contains("TM[1,2] Telecommand Acceptance Failure"));
     }
 }

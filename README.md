@@ -23,7 +23,7 @@ validated against that same implementation packet for packet.
 | [`xtce-codegen`](https://crates.io/crates/xtce-codegen) | IR → a static Rust decoder with every offset baked in |
 | [`xtce-pus`](https://crates.io/crates/xtce-pus) | `#![no_std]` ECSS-E-ST-70-41C (PUS-C) framing, CRC-16-CCITT, and HIL OBC responder |
 | [`xtce-cli`](https://crates.io/crates/xtce-cli) | `xtce info`, `xtce decode`, `xtce codegen`, `xtce compile`, `xtce wireshark`, `xtce pcap`, `xtce encode`, `xtce pus`, `xtce diff`, `xtce validate`, `xtce sim`, `xtce lsp`, `xtce bench` |
-| `xtce-wasm` | Client-side WebAssembly (`wasm32-unknown-unknown`) XTCE 1.2, CCSDS, ECSS PUS-C & `.pcap` decoder |
+| `xtce-wasm` | Client-side WebAssembly (`wasm32-unknown-unknown`) XTCE 1.2, CCSDS, ECSS PUS-C, `.pcap` decoder & closed-loop HIL OBC telecommand builder |
 | `xtce-py` | Python bindings (PyO3), built by `maturin` |
 | `xtask` | differential test harness against the Python reference |
 
