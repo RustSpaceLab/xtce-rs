@@ -7,8 +7,8 @@
 Decode CCSDS telemetry packets in Rust, according to an [XTCE](https://www.omg.org/spec/XTCE/)
 definition. Part of [RustSpaceLab](https://github.com/RustSpaceLab).
 
-🛰️ **Live Interactive Mission Demo (OrbitTrack & ECSS PUS-C Telemetry Studio):**  
-👉 **[https://altanix.dev/mission-demo/](https://altanix.dev/mission-demo/)** — *Fly 5 live LEO satellites (`PIAST-M`, `CAMILA-1`, `EagleEye-2`, `PW-Sat3`, `OPS-SAT-2`) in 2D/3D orbit, uplink authenticated ECSS-E-ST-70-41C (PUS-C) telecommands over UDP to the `#![no_std]` OBC responder, inject orbital faults (`xtce sim`), and run `xtce diff` / `validate` / `codegen` / `wireshark` live in your browser.*
+🛰️ **Live Interactive Mission Demo (OrbitTrack & ECSS PUS-C Telemetry Studio + 100% Client-Side WebAssembly Engine):**  
+👉 **[https://altanix.dev/mission-demo/](https://altanix.dev/mission-demo/)** — *Fly 5 live LEO satellites (`PIAST-M`, `CAMILA-1`, `EagleEye-2`, `PW-Sat3`, `OPS-SAT-2`) in 2D/3D orbit, uplink authenticated ECSS-E-ST-70-41C (PUS-C) telecommands over UDP to the `#![no_std]` OBC responder, decode your own `.xml` + `.bin`/`.pcap` telemetry 100% client-side in WebAssembly (`xtce-wasm`, zero server upload), assemble & sign SipHash-2-4 telecommands in the browser, and run `xtce compile` (`rust-ground`, `wireshark`, `json-schema`, `docs`, `dashboard`, `c-header`, `python-ctypes`) / `diff` / `validate` live.*
 
 The reference implementation in this niche, [`lasp/space_packet_parser`][spp], has a known
 performance problem: on real mission databases, loading the XTCE file costs more than parsing
@@ -85,6 +85,13 @@ $ cargo run --release -p xtce-cli -- wireshark \
 $ cargo run --release -p xtce-cli -- pcap \
       testdata/spp/jpss/J01_G011_LZ_2021-04-09T00-00-00Z_V01.DAT1 --limit 10 -o jpss.pcap
 $ cargo run --release -p xtce-cli -- pus --hil-demo
+$ cargo run --release -p xtce-cli -- pus --emit-xtce -o ecss_pus.xml
+$ cargo run --release -p xtce-cli -- compile ecss_pus.xml --target c-header -o mission_telemetry.h
+$ cargo run --release -p xtce-cli -- compile ecss_pus.xml --target python-ctypes -o mission_telemetry.py
+$ cargo run --release -p xtce-cli -- validate ecss_pus.xml --strict
+$ cargo run --release -p xtce-cli -- diff ecss_pus.xml ecss_pus.xml --fail-on-breaking
+$ cargo run --release -p xtce-cli -- sim --scenario voltage-drop --packets 20 --pcap -o eclipse.pcap
+$ cargo run --release -p xtce-cli -- lsp
 $ cargo xtask diff
 $ cargo bench
 ```
@@ -115,8 +122,8 @@ committed under `testdata/golden/`.
 ### Everything, the short way
 
 ```console
-$ cargo test --workspace     # 179 tests
-$ cargo xtask diff           # the differential suite, 9 definition/stream pairs
+$ cargo test --workspace     # 219 tests across 8 crates
+$ cargo xtask diff           # the differential suite, 18 definition/stream pairs
 ```
 
 `cargo xtask diff` is the one that matters. It decodes every packet of nine streams — six of
