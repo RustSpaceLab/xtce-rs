@@ -19,11 +19,12 @@ Główny plik `Cargo.toml` (linie `1–48`) definiuje workspace z `resolver = "3
 | **`xtce-codegen`** | `crates/xtce-codegen` | `lib` (emituje kod `core`/`no_std`) | `std` (generator) / `core` (wyjście) | `xtce-model`, `thiserror = "2"`, `proc-macro2 = "1"`, `quote = "1"`, `prettyplease = "0.2"`, `syn = "2"` | **15** (1 unit + 14 integr.) |
 | **`xtce-codegen-e2e`** | `crates/xtce-codegen-e2e` | `lib` (`publish = false`) | `std` | `[build-dependencies]`: `xtce-model`, `xtce-codegen`; `[dev-dependencies]`: `xtce-model`, `xtce-decode` | **19** (19 integr. E2E) |
 | **`xtce-pus`** | `crates/xtce-pus` | `lib` | **`#![no_std]`** (zero alokacji) | **Brak (`0` zależności zewnętrznych)** | **9** (9 unit/HIL) |
-| **`xtce-cli`** | `crates/xtce-cli` | `bin` (`xtce`) | `std` | `xtce-model`, `xtce-decode`, `xtce-codegen`, `xtce-pus`, `clap = "4"` (`derive`) | **39** (39 unit) |
+| **`xtce-wasm`** | `crates/xtce-wasm` | `cdylib` + `rlib` | `std` + `wasm32-unknown-unknown` (C-ABI, zero bindgen) | `xtce-model`, `xtce-decode`, `xtce-pus` | **3** (3 unit/HIL/PCAP) |
+| **`xtce-cli`** | `crates/xtce-cli` | `bin` (`xtce`) | `std` | `xtce-model`, `xtce-decode`, `xtce-codegen`, `xtce-pus`, `clap = "4"` (`derive`) | **42** (42 unit, w tym `lsp` i `compile`) |
 | **`xtce-py`** | `crates/xtce-py` | `cdylib` (`xtce`, osobny workspace) | `std` + CPython ABI3 | `xtce-model`, `xtce-decode`, `pyo3 = "0.28"` (`abi3-py310`, `extension-module`) | **14** uruchomień `pytest` (6 funkcji + 2×4 parametryzacji) |
 | **`xtask`** | `xtask` | `bin` (`publish = false`) | `std` | `xtce-model`, `xtce-decode`, `serde_json = "1"`, `clap = "4"` | **12** (12 unit) |
 
-*Łączna liczba testów Rust (`#[test]` w workspace):* **214 testów** (+ 5 doc-testów + 14 przypadków testowych `pytest` w `crates/xtce-py/tests/test_against_reference.py` oraz 18 zestawów referencyjnych *golden files* weryfikowanych przez `cargo xtask diff`).
+*Łączna liczba testów Rust (`#[test]` w workspace):* **219 testów** (+ 5 doc-testów + 14 przypadków testowych `pytest` w `crates/xtce-py/tests/test_against_reference.py` oraz 18 zestawów referencyjnych *golden files* weryfikowanych przez `cargo xtask diff`).
 
 ---
 
@@ -71,11 +72,11 @@ Główny plik `Cargo.toml` (linie `1–48`) definiuje workspace z `resolver = "3
   * **Suma kontrolna (`crc.rs`):** `crc16_ccitt`, `verify_crc16_ccitt`.
 
 #### 1.2.5. `xtce-cli` (`crates/xtce-cli/src/main.rs`)
-* Narzędzie wiersza poleceń `xtce` z 12 podkomendami (`Command` enum):
+* Narzędzie wiersza poleceń `xtce` z 13 podkomendami (`Command` enum):
   1. `xtce info <files...> [--verbose]` (`src/info.rs`)
   2. `xtce decode <definition> <packets> [--root] [--skip-header-bytes] [--limit] [--param] [--format table|jsonl|csv] [--raw] [--no-summary]` (`src/decode.rs`)
   3. `xtce codegen <definition> [--root] [--out]` (`src/main.rs`)
-  4. `xtce compile <definition> [--target rust-ground|wireshark|json-schema|docs|dashboard] [--root] [--out]` (`src/compile.rs` — wielocelowy kompilator misji XTCE)
+  4. `xtce compile <definition> [--target rust-ground|wireshark|json-schema|docs|dashboard|c-header|python-ctypes] [--root] [--out]` (`src/compile.rs` — wielocelowy kompilator misji XTCE)
   5. `xtce wireshark <definition> [--root] [--out] [--udp-port]` (`src/wireshark.rs` — generator dysektora Lua dla Wireshark)
   6. `xtce pcap <packets> [--out] [--skip-header-bytes] [--limit]` (`src/pcap.rs` — opakowanie strumienia CCSDS w `DLT_USER0` `.pcap`)
   7. `xtce encode <definition> <target> [--root] [--set NAME=VAL] [--out] [--hex] [--crc]` (`src/encode.rs` — koder pakietów TM/TC z definicji XTCE)
@@ -84,8 +85,14 @@ Główny plik `Cargo.toml` (linie `1–48`) definiuje workspace z `resolver = "3
   10. `xtce diff <old> <new> [--root] [--fail-on-breaking]` (`src/diff.rs` — Zadanie 4: Semantic Diff MVP dla definicji XTCE)
   11. `xtce validate <definition> [--root] [--json] [--strict]` (`src/validate.rs` — Zadanie 3: Walidator semantyczny i eksporter kanonicznego słownika JSON)
   12. `xtce sim [--scenario nominal|voltage-drop|overheat|comm-loss|reboot|attitude-loss|sensor-glitch] [--packets N] [--seed S] [--pcap] [--out]` (`src/sim.rs` — Zadanie 5: Deterministyczny symulator telemetrii z wstrzykiwaniem awarii)
+  13. `xtce lsp` (`src/lsp.rs` — Language Server Protocol JSON-RPC 2.0 przez `stdio` z indeksem linii $O(1)$ i translacją kolumn UTF-16 -> UTF-8)
 
-#### 1.2.6. `xtce-py` (`crates/xtce-py/src/lib.rs`)
+#### 1.2.6. `xtce-wasm` (`crates/xtce-wasm/src/lib.rs`)
+* Biblioteka WebAssembly (`wasm32-unknown-unknown`, `cdylib` + `rlib`) z czystym C-ABI (0 zależności od `wasm-bindgen`):
+  * Eksporty C-ABI: `wasm_alloc`, `wasm_free`, `wasm_result_ptr`, `wasm_result_len`, `wasm_inspect_xtce`, `wasm_decode_xtce_and_packets`, `wasm_generate_pus_stream`, `wasm_encode_pus_tc_and_hil`.
+  * Funkcje Rust: `inspect_xtce_to_json`, `decode_xtce_and_packets_to_json`, `extract_packets_if_pcap`, `generate_pus_stream_bytes`, `wrap_in_pcap`, `encode_pus_tc_and_hil_to_json`.
+
+#### 1.2.7. `xtce-py` (`crates/xtce-py/src/lib.rs`)
 * Moduł natywny Python (`#[pymodule] fn xtce`, `abi3-py310`):
   * Klasa `xtce.Definition(path)` (linia `95`): `Definition.from_string(xml)`, właściwości `source`, `parameter_count`, `container_count`, metody `parameter_names()`, `container_names()`, `unsupported()`, `decode_stream(data, *, skip_header_bytes=0, root=None, raw=false, skip_unrecognized=false)` (zwalnia GIL przez `py.detach`, linia `202`), `decode(data, *, root=None, raw=false)`, `container_of_each(data, *, skip_header_bytes=0, root=None)`.
 
@@ -333,14 +340,16 @@ Poniższa sekcja domyka elementy wizji strategicznej `RustSpaceLab`, które zost
 
 ### 4.1. Wielocelowy kompilator misji (`xtce compile --target <TARGET>`)
 
-Zgodnie z koncepcją *„Jeden ekosystem. Jeden model danych. Wiele zastosowań”*, pojedynczy plik definicji XTCE 1.2 stanowi źródło prawdy kompilowane z poziomu `xtce-cli` (`crates/xtce-cli/src/compile.rs`) do pięciu artefaktów inżynieryjnych:
+Zgodnie z koncepcją *„Jeden ekosystem. Jeden model danych. Wiele zastosowań”*, pojedynczy plik definicji XTCE 1.2 stanowi źródło prawdy kompilowane z poziomu `xtce-cli` (`crates/xtce-cli/src/compile.rs`) do siedmiu artefaktów inżynieryjnych:
 
 ```bash
-xtce compile mission.xml --target rust-ground -o decoder.rs
-xtce compile mission.xml --target wireshark   -o mission.lua
-xtce compile mission.xml --target json-schema -o mission.schema.json
-xtce compile mission.xml --target docs        -o MISSION_DICTIONARY.md
-xtce compile mission.xml --target dashboard   -o telemetry_studio.json
+xtce compile mission.xml --target rust-ground   -o decoder.rs
+xtce compile mission.xml --target wireshark     -o mission.lua
+xtce compile mission.xml --target json-schema   -o mission.schema.json
+xtce compile mission.xml --target docs          -o MISSION_DICTIONARY.md
+xtce compile mission.xml --target dashboard     -o telemetry_studio.json
+xtce compile mission.xml --target c-header      -o mission_telemetry.h
+xtce compile mission.xml --target python-ctypes -o mission_telemetry.py
 ```
 
 *Dla kompilacji pokładowych koderów `#![no_std]` używany jest komplementarny kompilator `xtce-flight` z repozytorium `RustSpaceLab/xtce-flight`, a dla wiązań Python — pakiet `xtce-py`.*
